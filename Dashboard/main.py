@@ -26,6 +26,8 @@ from fastapi import UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from Google_Earth import main as maps_main
+from geopy.distance import great_circle
+from geopy.point import Point
 
 # Key Lists
 PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
@@ -203,7 +205,11 @@ current_data_default = {
             'Cabin_Temperature': 35,
             'Cabin_Pressure': 76,
             'Cabin_CO2_Content': 2,
-        }
+        },
+        'Latitude': 0.0,
+        'Longitude': 0.0,
+        'Altitude': 0.0,
+        'Gradient': 0.0
     },
     "historic": {
         'Timestamps': [],
@@ -239,13 +245,15 @@ current_data_default = {
         'Acceleration': [],
         'Distance': [],
         'Altitude': [],
-        'Latitudes': [-12.446822],
-        'Longitudes': [130.907036],
+        'Latitudes': [],
+        'Longitudes': [],
     },
     "profile":{
         "Altitude": [],
-        "Distance": [],
-        "Gradient": []
+        "Distance_rounded": [],
+        "Gradient": [],
+        "Coordinates": [],
+        "Distance": []
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -589,9 +597,25 @@ async def update_processor(queue: asyncio.Queue):
                         distance_increment_km = (v * dt_seconds) / 1000.0
                         metric['distance_travelled'] += distance_increment_km
                     tracker_state["last_update_time"] = rx_dt
-
+                
                 metric['SOC_Ah'] = tracker_state["current_soc_percentage"]
-
+                if len(current_data['profile']['Coordinates'])>0:
+                    profile_distance=current_data['profile']['Distance'][-1]
+                    distance=metric['distance_travelled']%profile_distance
+                    i=-1
+                    while i<len(current_data['profile']['Distance'])-1 and distance>=current_data['profile']['Distance'][i+1]:
+                        i+=1
+                    f=(distance-current_data['profile']['Distance'][i])/(current_data['profile']['Distance'][i+1]-current_data['profile']['Distance'][i])
+                    lat1,lon1=current_data['profile']['Coordinates'][i]
+                    lat2,lon2=current_data['profile']['Coordinates'][i+1]
+                    alt1=current_data['profile']['Altitude'][i]
+                    alt2=current_data['profile']['Altitude'][i+1]
+                    grad1=current_data['profile']['Gradient'][i]
+                    grad2=current_data['profile']['Gradient'][i+1]
+                    metric['Latitude']=lat1 + f*(lat2-lat1)
+                    metric['Longitude']=lon1 + f*(lon2-lon1)
+                    metric['Altitude']=alt1 +f*(alt2-alt1)
+                    metric['Gradient']=grad1 + f*(grad2-grad1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,
@@ -632,10 +656,10 @@ async def update_processor(queue: asyncio.Queue):
                     'solar_mppt_D_Output_Current': pdata['Output_Current_D'],
 
                     'Distance': metric['distance_travelled'],
-                    'Altitude': pdata['Altitude'],
+                    'Altitude': metric['Altitude'] if metric['Altitude'] else pdata['Altitude'],
                     'Acceleration': math.sqrt(sum(pdata[f'acc_{i}']**2 for i in ('X', 'Y'))),
-                    'Latitudes': pdata['Latitude'],
-                    'Longitudes': pdata['Longitude'],
+                    'Latitudes': metric['Latitude'] if metric['Latitude'] else pdata['Latitude'],
+                    'Longitudes': metric['Longitude'] if metric['Longitude'] else pdata['Longitude'],
                 }
 
                 for k in current_data['historic']:
@@ -699,9 +723,8 @@ async def update_processor(queue: asyncio.Queue):
                     for key in CABIN_FLAG_NAMES       
                 }
             if ptype == "C":
-                current_data['profile']['Altitude']=pdata['Altitude']
-                current_data['profile']['Distance']=pdata['Distance']
-                current_data['profile']['Gradient']=pdata['Gradient']   
+                for key in pdata:
+                    current_data['profile'][key]=pdata[key]  
             current_data['metric'] = metric
             update_packet['metric'] = {**metric}
             update_packet['profile']={**current_data['profile']}
@@ -747,7 +770,7 @@ app.mount("/_app", StaticFiles(directory=os.path.join(frontend_dir, "_app")), na
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://192.168.1.232:5173"],  # Add your Svelte dev server ports
+    allow_origins=["*"],  # Add your Svelte dev server ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -794,6 +817,24 @@ async def get_session_options(session_id: str):
         return {"options": structural_options}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+@app.get("/api/live-car-gps")
+def get_live_car_gps():
+    # Format the live data exactly how Folium's Realtime plugin expects it
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [current_data['metric']["Longitude"], current_data['metric']["Latitude"]] # GeoJSON expects [Lon, Lat]
+                },
+                "properties": {
+                    "id": "live-car-pin"
+                }
+            }
+        ]
+    }
 @app.get("/")
 async def root():
     index_path = os.path.join(frontend_dir, "index.html")
@@ -882,7 +923,7 @@ async def render_selected_track(payload: SelectionPayload):
             
         # Pass the cleanly parsed layout array directly into your pipeline execution framework
         # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
-        map_html,altitude_profile,distance_profile = maps_main(route_name,coordinates)
+        map_html,altitude_profile,distance_profile,coordinates = maps_main(route_name,coordinates)
         total_distance = distance_profile[-1]*1000  # Total length of the loop in meters
         # 1. DYNAMICALLY CALCULATE WINDOW SIZE
         # Goal: We want the smoothing window to span roughly 45 meters of trail.
@@ -946,11 +987,13 @@ async def render_selected_track(payload: SelectionPayload):
         # 'edge' padding prevents the ends of your data from dropping off to zero
         padded_gradients = np.pad(raw_gradients_arr, window_size // 2, mode='edge')
         smoothed_gradient = np.convolve(padded_gradients, window, mode='valid').tolist()'''
-        distance_profile=[round(i,2) for i in distance_profile]
+        distance_profile_rounded=[round(i,2) for i in distance_profile]
         packet_c = {
             "Altitude": smoothed_altitude,
+            "Distance_rounded": distance_profile_rounded,
+            "Gradient": gradient_profile,
             "Distance": distance_profile,
-            "Gradient": gradient_profile
+            "Coordinates": coordinates
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}

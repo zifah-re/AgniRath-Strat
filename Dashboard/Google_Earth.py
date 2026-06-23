@@ -7,6 +7,7 @@ from geopy.distance import geodesic
 from shapely.geometry import LineString
 import numpy as np
 import folium
+from folium.plugins import Realtime
 import json
 
 def main(route_name,new_coordinates):
@@ -159,9 +160,13 @@ def main(route_name,new_coordinates):
     # 5. Drop the Start/End markers
     folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
     folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)
-
+    Realtime(
+        "http://localhost:8000/api/live-car-gps",  # Your backend URL supplying the coordinate JSON
+        get_feature_id="function(f) { return f.properties.id; }",
+        interval=2000,  # Auto-refresh interval in milliseconds (2 seconds)
+    ).add_to(m)
     # 6. Include a Layer Control button to alternate views dynamically
     folium.LayerControl(position="topright").add_to(m)
-
+    
     # Save the final product
-    return m._repr_html_(),altitude_list,x_distances
+    return m._repr_html_(),altitude_list,x_distances,google_matched_coordinates

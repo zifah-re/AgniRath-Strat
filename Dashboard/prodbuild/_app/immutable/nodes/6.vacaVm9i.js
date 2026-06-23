@@ -158,25 +158,27 @@ function De(ee, te) {
 
         // 2. 🔥 FIX: Accurate Chart.js property paths for Distance profiles
         const profileData = e().profile;
-        if (profileData && profileData.Distance && profileData.Distance.length > 0) {
+        if (profileData && profileData.Distance_rounded && profileData.Distance_rounded.length > 0) {
             
             if (window.chartAD) {
-                window.chartAD.data.labels = e().profile.Distance;
-                // 👇 FIXED: Added .data before .datasets[0]
-                window.chartAD.data.datasets[0].data = e().profile.Altitude || []; 
-                window.chartAD.update("none");
+                if (window.chartAD.data.datasets[0].data.length === 0){
+                    window.chartAD.data.labels = e().profile.Distance_rounded;
+                    window.chartAD.data.datasets[0].data = e().profile.Altitude || []; 
+                    window.chartAD.update("none");
+                }
             }
             if (window.chartGD) {
-                window.chartGD.data.labels = e().profile.Distance;
-                // 👇 FIXED: Added .data before .datasets[0]
+                if (window.chartGD.data.datasets[0].data.length === 0){
+                window.chartGD.data.labels = e().profile.Distance_rounded;
                 window.chartGD.data.datasets[0].data = e().profile.Gradient || []; 
                 window.chartGD.update("none");
+                }
             }
         }
     }
     xe( () => {
         const hasHistory = e().historic?.Timestamps?.length > 0;
-        const hasProfile = e().profile?.Distance?.length > 0;
+        const hasProfile = e().profile?.Distance_rounded?.length > 0;
         if (hasHistory || hasProfile) {
             re();
         }
@@ -193,7 +195,7 @@ function De(ee, te) {
             window.chartGD = new n(cGD,{
                 type: "line",
                 data: {
-                    labels: e().profile?.Distance || [],
+                    labels: e().profile?.Distance_rounded || [],
                     datasets: [{
                         label: "Gradient",
                         data: e().profile?.Gradient || [],
@@ -222,7 +224,7 @@ function De(ee, te) {
             window.chartAD = new n(cAD,{
                 type: "line",
                 data: {
-                    labels: e().profile?.Distance || [],
+                    labels: e().profile?.Distance_rounded || [],
                     datasets: [{
                         label: "Altitude",
                         data: e().profile?.Altitude || [],

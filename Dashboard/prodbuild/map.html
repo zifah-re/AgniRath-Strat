@@ -223,6 +223,22 @@
         doc.write(htmlContent);
         doc.close();
     }
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(wsProtocol + "//" + window.location.host + "/ws/updates");
+
+    socket.onmessage = function(event) {
+        // No custom marker logic here anymore! Just let the standard render process run.
+        try {
+            const response = JSON.parse(event.data);
+            // If your backend updates the map layout string, just push it straight through
+            if (response.html) {
+                renderHtmlToFrame(response.html);
+            }
+        } catch (err) {
+            console.error("Error reading socket stream:", err);
+        }
+    };
+
 </script>
 </body>
 </html>

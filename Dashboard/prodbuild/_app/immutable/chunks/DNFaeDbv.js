@@ -152,7 +152,11 @@ const u = {
             Cabin_Temperature: 0,
             Cabin_Pressure: 0,
             Cabin_CO2_Content: 0
-        }
+        },
+        Latitude: 0.0,
+        Longitude: 0.0,
+        Altitude: 0.0,
+        Gradient: 0.0
     },
     historic: {
         Timestamps: [],
@@ -185,8 +189,10 @@ const u = {
     },
     profile: {
         Altitude: [],
-        Distance: [],
+        Distance_rounded: [],
         Gradient: [],
+        Coordinates: [],
+        Distance: []
     }
 }
   , c = f([]);

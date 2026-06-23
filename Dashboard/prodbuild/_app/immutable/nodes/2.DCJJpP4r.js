@@ -312,7 +312,7 @@ function Xe(ae, se) {
         v(ue, ke),
         v(fe, Ce)
     }
-    , [ () => r(a().metric.Speed2, "km/h"), () => r(a().metric.predicted, "km/h"), () => r(g(D), "km/h"), () => r(a().metric.Pack_Voltage, "V"), () => r(a().metric.SOC_Ah, "%", 0), () => r(a().metric.Bus_Power, "W", 0), () => r(a().metric.solar_input, "W", 0), () => r(a().metric.distance_travelled, "km"), () => r(a().metric.Motor_Temp, "°", 3)]),
+    , [ () => r(a().metric.Speed2, "km/h"), () => r(a().metric.predicted, "km/h"), () => r(g(D), "km/h"), () => r(a().metric.Pack_Voltage, "V"), () => r(a().metric.SOC_Ah, "%", 0), () => r(a().metric.Bus_Power, "W", 0), () => r(a().metric.solar_input, "W", 0), () => r(a().metric.distance_travelled, "km"), () => r(a().metric.Gradient, "%", 3)]),
     We(ae, k),
     Ae(),
     re()
