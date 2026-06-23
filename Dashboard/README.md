@@ -28,8 +28,8 @@ Make sure you have Python 3.10+ and `pip` installed.
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/your-team/agnirath-strategy-dashboard.git](https://github.com/your-team/agnirath-strategy-dashboard.git)
-cd agnirath-strategy-dashboard
+git clone https://github.com/zifah-re/AgniRath-Strat.git
+cd AgniRath-Strat/Dashboard
 ```
 
 ### 2. Install Dependencies
