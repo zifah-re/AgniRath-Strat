@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Agnirath Telemetry - Route Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+    </style>
+</head>
+<body class="p-6 space-y-6">
+
+    <div class="flex items-center justify-between border-b border-gray-700 pb-4">
+        <h2 class="text-2xl font-bold text-white flex items-center space-x-2">
+            <span>🗺️</span> <span>Strategy Route Mapping</span>
+        </h2>
+        <a href="/" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-300 font-medium transition duration-200">
+            Back to Telemetry Overview
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-gray-800/50 backdrop-blur-sm border border-gray-700 p-6 rounded-xl flex flex-col justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold text-blue-400">1. Upload Track Profile</h3>
+                <p class="text-xs text-gray-400 mt-1">Upload a KML path profile to safely inspect underlying structural layers without executing calculation matrices prematurely.</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <input type="file" id="kmlFileInput" accept=".kml" 
+                       class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer"/>
+                <button onclick="uploadKML()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-sm font-semibold rounded-md text-white transition">
+                    Inspect File
+                </button>
+            </div>
+        </div>
+
+        <div id="selectionPanel" class="bg-gray-800/50 backdrop-blur-sm border border-gray-700 p-6 rounded-xl flex flex-col justify-between gap-4 opacity-40 pointer-events-none transition-all duration-300">
+            <div>
+                <h3 class="text-lg font-semibold text-emerald-400">2. Select Targeted Route Layer</h3>
+                <p class="text-xs text-gray-400 mt-1">Choose the folder container path and the target placemark data tracking segment.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Target Folder Choice</label>
+                    <select id="folderSelect" onchange="updatePlacemarkOptions()" class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-white focus:outline-none focus:border-blue-500"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Target Track Segment</label>
+                    <select id="placemarkSelect" class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-white focus:outline-none focus:border-blue-500"></select>
+                </div>
+            </div>
+            <button onclick="renderSelectedMapTrack()" class="w-full mt-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded-md text-white transition">
+                Generate Interactive Map View
+            </button>
+        </div>
+    </div>
+
+    <div class="w-full h-[calc(100vh-290px)] border border-gray-700 rounded-xl overflow-hidden relative bg-slate-900/40 flex items-center justify-center">
+        <div id="placeholder" class="text-center text-gray-500 z-10 p-4">
+            <span class="text-4xl block mb-2">📥</span>
+            Please select and upload a stage KML file track to initialize mapping context layers.
+        </div>
+        <iframe id="mapFrame" class="absolute inset-0 w-full h-full hidden" frameborder="0"></iframe>
+    </div>
+
+   <script>
+    let currentSessionId = "";
+    let parsedKmlOptions = [];
+
+    // --- SESSION PERSISTENCE ALIVE CHECK ---
+    window.addEventListener('DOMContentLoaded', async () => {
+        const savedMapHtml = sessionStorage.getItem('cached_map_html');
+        const savedSessionId = sessionStorage.getItem('kml_session_id');
+        const savedFolderIdx = sessionStorage.getItem('kml_folder_idx');
+        const savedPlacemarkIdx = sessionStorage.getItem('kml_placemark_idx');
+
+        // High-speed route: If the map HTML already exists in this session, inject it instantly!
+        if (savedMapHtml) {
+            renderHtmlToFrame(savedMapHtml);
+            document.getElementById('placeholder').classList.add('hidden');
+            document.getElementById('mapFrame').classList.remove('hidden');
+        }
+
+        // Restore form states in the background so selectors match the active map
+        if (savedSessionId) {
+            try {
+                const response = await fetch(`/api/get-session-options/${savedSessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    currentSessionId = savedSessionId;
+                    parsedKmlOptions = data.options;
+
+                    populateFolderSelector();
+
+                    if (savedFolderIdx !== null) {
+                        document.getElementById('folderSelect').value = savedFolderIdx;
+                        updatePlacemarkOptions();
+                        
+                        if (savedPlacemarkIdx !== null) {
+                            document.getElementById('placemarkSelect').value = savedPlacemarkIdx;
+                        }
+                    }
+                    document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                } else {
+                    if (!savedMapHtml) clearSessionStorage();
+                }
+            } catch (err) {
+                console.error("Failed to sync structural options:", err);
+            }
+        }
+    });
+
+    function clearSessionStorage() {
+        sessionStorage.clear();
+        document.getElementById('placeholder').innerText = "Please select and upload a stage KML file track to initialize mapping context layers.";
+    }
+
+    function populateFolderSelector() {
+        const folderSelect = document.getElementById('folderSelect');
+        folderSelect.innerHTML = "";
+        parsedKmlOptions.forEach(folder => {
+            let opt = document.createElement('option');
+            opt.value = folder.index;
+            opt.innerText = folder.name;
+            folderSelect.appendChild(opt);
+        });
+    }
+
+    async function uploadKML() {
+        const fileInput = document.getElementById('kmlFileInput');
+        if (!fileInput.files[0]) return alert('Please pick a valid KML file track target first.');
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        document.getElementById('placeholder').innerText = "Inspecting structural branches within KML file layout...";
+
+        try {
+            const response = await fetch('/api/upload-kml', { method: 'POST', body: formData });
+            const data = await response.json();
+            
+            if (!response.ok || data.error) return alert('Error: ' + (data.error || 'Failed to check layout files.'));
+
+            currentSessionId = data.session_id;
+            parsedKmlOptions = data.options;
+
+            sessionStorage.setItem('kml_session_id', currentSessionId);
+
+            populateFolderSelector();
+            updatePlacemarkOptions();
+            
+            document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+            if(!sessionStorage.getItem('cached_map_html')) {
+                document.getElementById('placeholder').innerText = "File parsed successfully. Please confirm choices inside Stage 2 block.";
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert('Synchronization pipeline broken during lookup step.');
+        }
+    }
+
+    function updatePlacemarkOptions() {
+        const folderIdx = document.getElementById('folderSelect').value;
+        const targetFolderData = parsedKmlOptions.find(f => f.index == folderIdx);
+        const placemarkSelect = document.getElementById('placemarkSelect');
+        
+        placemarkSelect.innerHTML = "";
+        if (targetFolderData && targetFolderData.placemarks) {
+            targetFolderData.placemarks.forEach(pm => {
+                let opt = document.createElement('option');
+                opt.value = pm.index;
+                opt.innerText = pm.name;
+                placemarkSelect.appendChild(opt);
+            });
+        }
+    }
+
+    async function renderSelectedMapTrack() {
+        const folderIdx = document.getElementById('folderSelect').value;
+        const placemarkIdx = document.getElementById('placemarkSelect').value;
+
+        if (folderIdx === "" || placemarkIdx === "") return alert("Please establish route selection criteria first.");
+
+        document.getElementById('placeholder').innerText = "Generating map...";
+        document.getElementById('placeholder').classList.remove('hidden');
+        document.getElementById('mapFrame').classList.add('hidden');
+
+        try {
+            const response = await fetch('/api/render-selected-track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionId,
+                    folder_index: parseInt(folderIdx),
+                    placemark_index: parseInt(placemarkIdx)
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok || data.error) return alert('Rendering error: ' + data.error);
+
+            // --- SAVE EVERYTHING FOR IMMEDIATE LOAD NEXT TIME ---
+            sessionStorage.setItem('cached_map_html', data.map_html);
+            sessionStorage.setItem('kml_folder_idx', folderIdx);
+            sessionStorage.setItem('kml_placemark_idx', placemarkIdx);
+
+            // Paint map frame layout
+            renderHtmlToFrame(data.map_html);
+            document.getElementById('placeholder').classList.add('hidden');
+            document.getElementById('mapFrame').classList.remove('hidden');
+
+        } catch (err) {
+            console.error(err);
+            alert('Communication channel reset while drawing visual matrix layers.');
+        }
+    }
+
+    // Helper function to cleanly flush map source code into the iframe document context safely
+    function renderHtmlToFrame(htmlContent) {
+        const iframe = document.getElementById('mapFrame');
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+    }
+</script>
+</body>
+</html>

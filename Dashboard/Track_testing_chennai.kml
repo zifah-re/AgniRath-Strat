@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document id="document">
+	<name>Track_testing_chennai.kml</name>
+	<gx:CascadingStyle kml:id="__managed_style_047EEA4E66402335E748_highlight">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>6</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>00ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_047EEA4E66402335E748_normal">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>00ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_047EEA4E66402335E748">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_047EEA4E66402335E748_normal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_047EEA4E66402335E748_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+	<gx:CascadingStyle kml:id="__managed_style_0C860CCDC140233041A8_highlight">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>6</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_0C860CCDC140233041A8_normal">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>4</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_0C860CCDC140233041A8">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_0C860CCDC140233041A8_normal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_0C860CCDC140233041A8_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Folder id="001A19DB4C40232707D9">
+		<name>Track Testing</name>
+		<open>1</open>
+		<styleUrl>#__managed_style_0C860CCDC140233041A8</styleUrl>
+		<Placemark id="029501622E4023359E7F">
+			<name>Track loop</name>
+			<LookAt>
+				<longitude>79.89524540243416</longitude>
+				<latitude>13.03565919486886</latitude>
+				<altitude>81.82399791108917</altitude>
+				<heading>0</heading>
+				<tilt>0</tilt>
+				<gx:fovy>35</gx:fovy>
+				<range>382.8566023108215</range>
+				<altitudeMode>absolute</altitudeMode>
+			</LookAt>
+			<styleUrl>#__managed_style_047EEA4E66402335E748</styleUrl>
+			<Polygon>
+				<outerBoundaryIs>
+					<LinearRing>
+						<coordinates>
+							79.89530721848911,13.03630488461299,0 79.89251217510353,13.03705542669351,0 79.89210218941629,13.03716999354023,0 79.89040607646855,13.0376164560905,0 79.88954207130811,13.03784061718988,0 79.88875710580653,13.03809550345521,0 79.88823304244255,13.03823390779114,0 79.88679757975443,13.03854982636339,0 79.88635102168936,13.03850062552203,0 79.88594244869761,13.03836626365213,0 79.88563654062681,13.03818695126571,0 79.8854123386602,13.03800185341071,0 79.88527106170632,13.03783710585179,0 79.88514169418031,13.03764273746352,0 79.8850357674971,13.03742729985892,0 79.8849526592315,13.037171669796,0 79.88490537490226,13.03691131250581,0 79.88489580366962,13.03667189584575,0 79.88492620535867,13.03646115851105,0 79.88497674588875,13.03625887353303,0 79.88505477375865,13.03604562163189,0 79.88516958379799,13.03583444682855,0 79.88530447040789,13.0356439405349,0 79.88552233220271,13.03543591737406,0 79.88575770608608,13.03525774595623,0 79.88605864105098,13.0351137021085,0 79.88634985780934,13.03503559902309,0 79.88672844082599,13.03500015447379,0 79.89233700648929,13.03460589066879,0 79.89255898435115,13.03464603524844,0 79.89270514300425,13.03474327377532,0 79.89279073394184,13.03486175713812,0 79.89286043628255,13.03506225234328,0 79.89292543454994,13.03526194704583,0 79.89301640146276,13.03538346313159,0 79.8931302521236,13.03549637701912,0 79.8932723081595,13.03555900509052,0 79.89340252364373,13.03559578454898,0 79.89355879108632,13.035590187333,0 79.89617689123807,13.03490115325557,0 79.89639734230124,13.03491918609934,0 79.89657605809292,13.03501790948777,0 79.89669682832657,13.03518809278529,0 79.89674164880569,13.03533546196984,0 79.89673599837144,13.0354940568919,0 79.8966932143334,13.035630196003,0 79.89658100787543,13.03576798296292,0 79.89644309767377,13.03586178112063,0 79.89611710211608,13.03603205397181,0 79.89573373275238,13.03617371158537,0 79.89553178851041,13.03623627432266,0 79.89542580849007,13.03626896981359,0 79.89530721848911,13.03630488461299,0 
+						</coordinates>
+					</LinearRing>
+				</outerBoundaryIs>
+			</Polygon>
+		</Placemark>
+	</Folder>
+</Document>
+</kml>
