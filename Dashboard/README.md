@@ -1,46 +1,46 @@
 # Agnirath Strategy Dashboard 🏎️📊
 
-Welcome to the **Agnirath Strategy Dashboard** repository[cite: 1]. This interactive dashboard is designed for real-time race telemetry analysis, strategy simulation, and predictive analytics for the Agnirath solar/electric racing team[cite: 1]. It helps strategists make data-driven decisions regarding energy management, speed profiles, and pit-stop optimization during competitive tracks[cite: 1].
+Welcome to the **Agnirath Strategy Dashboard** repository. This interactive dashboard is designed for real-time race telemetry analysis, strategy simulation, and predictive analytics for the Agnirath solar/electric racing team. It helps strategists make data-driven decisions regarding energy management, speed profiles, and pit-stop optimization during competitive tracks.
 
 ---
 
 ## 🚀 Key Features
 
-- **Real-Time Telemetry Visualization:** Live streaming of battery state-of-charge (SoC), cell temperatures, motor RPM, and solar array power generation[cite: 1].
-- **Predictive Energy Modeling:** Advanced ML models to forecast energy consumption based on elevation profiles, weather conditions, and track friction[cite: 1].
-- **Weather Integration:** Dynamic fetching of solar irradiance data mapped directly onto track coordinates[cite: 1].
-- **Historical Analysis:** Post-race review modules to overlay actual run profiles against theoretical optima for future continuous improvement[cite: 1].
+- **Real-Time Telemetry Visualization:** Live streaming of battery state-of-charge (SoC), cell temperatures, motor RPM, and solar array power generation.
+- **Predictive Energy Modeling:** Advanced ML models to forecast energy consumption based on elevation profiles, weather conditions, and track friction.
+- **Weather Integration:** Dynamic fetching of solar irradiance data mapped directly onto track coordinates.
+- **Historical Analysis:** Post-race review modules to overlay actual run profiles against theoretical optima for future continuous improvement.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend/Dashboard:** Built with static web assets running on a SvelteKit/Vite production build pipeline.[cite: 1]
-- **Data Visualization:** Interactive tracking and map interfaces (map.html, Google_Earth.py).[cite: 1]
-- **Backend/Analytics:** Python-based simulation engine (simulator.py, real_sim.py) and live data telemetry handling (downlink.py).[cite: 1]
+- **Frontend/Dashboard:** Built with static web assets running on a SvelteKit/Vite production build pipeline.
+- **Data Visualization:** Interactive tracking and map interfaces (map.html, Google_Earth.py).
+- **Backend/Analytics:** Python-based simulation engine (simulator.py, real_sim.py) and live data telemetry handling (downlink.py).
 
 ---
 
 ## 📦 Installation & Setup
 
 ### Prerequisites
-Make sure you have Python 3.10+ and `pip` installed[cite: 1].
+Make sure you have Python 3.10+ and `pip` installed.
 
 ### 1. Clone the Repository
 ```bash
 git clone [https://github.com/your-team/agnirath-strategy-dashboard.git](https://github.com/your-team/agnirath-strategy-dashboard.git)
 cd agnirath-strategy-dashboard
-```[cite: 1]
+```
 
 ### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
-```[cite: 1]
+```
 
 ### 5. Run the Dashboard Local Server
 ```bash
 python main.py
-```[cite: 1]
+```
 
 ---
 
@@ -76,28 +76,28 @@ agnirath-strategy-dashboard/
             ├── chunks/     # Shared .js code splits
             ├── entry/      # App entry points
             └── nodes/      # Page/Layout routing components
-```[cite: 1]
+```
 
 ---
 
 ## 📈 Usage Guide
 
-1. **Live Telemetry and Downlink:** The downlink.py script actively manages and parses incoming telemetry payloads, saving them as sequential .jsonl tracks inside the Logs/ directory.[cite: 1].
-2. **Simulation Mode:** Run strategy optimization passes by executing simulator.py or real_sim.py to compare expected vehicle speed profiles against battery performance constraints.[cite: 1].
-3. **Map Verification:** Utilize the provided .kml route strings paired with Google_Earth.py to overlay geographical telemetry profiles directly onto competitive track geometry.[cite: 1].Suffix
+1. **Live Telemetry and Downlink:** The downlink.py script actively manages and parses incoming telemetry payloads, saving them as sequential .jsonl tracks inside the Logs/ directory..
+2. **Simulation Mode:** Run strategy optimization passes by executing simulator.py or real_sim.py to compare expected vehicle speed profiles against battery performance constraints..
+3. **Map Verification:** Utilize the provided .kml route strings paired with Google_Earth.py to overlay geographical telemetry profiles directly onto competitive track geometry..Suffix
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from engineers, data scientists, and strategists on the Agnirath team![cite: 1]
-1. Create a new branch: `git checkout -b feature/awesome-strategy`[cite: 1]
-2. Commit your changes: `git commit -m 'Add some awesome strategy optimization'`[cite: 1]
-3. Push to the branch: `git push origin feature/awesome-strategy`[cite: 1]
-4. Open a Pull Request[cite: 1].
+We welcome contributions from engineers, data scientists, and strategists on the Agnirath team!
+1. Create a new branch: `git checkout -b feature/awesome-strategy`
+2. Commit your changes: `git commit -m 'Add some awesome strategy optimization'`
+3. Push to the branch: `git push origin feature/awesome-strategy`
+4. Open a Pull Request.
 
 ---
 
 ## 📜 License
 
-This project is proprietary and confidential[cite: 1]. Internal use only for the **Agnirath Racing Team**[cite: 1].
+This project is proprietary and confidential. Internal use only for the **Agnirath Racing Team**.
