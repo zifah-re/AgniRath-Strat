@@ -7,6 +7,7 @@ import urllib.error
 from datetime import datetime, timezone
 import pandas as pd
 import requests
+from pathlib import Path
 
 URL = "http://127.0.0.1:8000/api/simulate"
 
@@ -188,6 +189,8 @@ def main(df=None):
             
 
 if __name__ == "__main__":
+    SCRIPT_DIR = Path(__file__).resolve().parent
     file_name=input("File name: ")
-    df=pd.read_json(f"Logs/{file_name}",lines=True,convert_dates=False)
+    FILE_PATH=SCRIPT_DIR / "Logs" / file_name
+    df=pd.read_json(FILE_PATH,lines=True,convert_dates=False)
     main(df=df)
