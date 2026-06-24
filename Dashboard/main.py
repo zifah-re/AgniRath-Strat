@@ -97,7 +97,7 @@ PACKET_B_DIRECT_KEYS = ("Motor_Temp", "HeatSink_Temp", "DSP_Board_Temp",)
 current_data_default = {
     "metric": {
         'Pack_Voltage': 48.2,
-        'SOC_Ah': 12000,
+        'SOC_Ah': 100,
         'power_consumption': 1250.0,
         'solar_input': 450.0,
         'distance_travelled': 0.0,
@@ -209,7 +209,8 @@ current_data_default = {
         'Latitude': 0.0,
         'Longitude': 0.0,
         'Altitude': 0.0,
-        'Gradient': 0.0
+        'Gradient': 0.0,
+        'Bearing': 0.0
     },
     "historic": {
         'Timestamps': [],
@@ -250,7 +251,6 @@ current_data_default = {
     },
     "profile":{
         "Altitude": [],
-        "Distance_rounded": [],
         "Gradient": [],
         "Coordinates": [],
         "Distance": []
@@ -616,6 +616,16 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Longitude']=lon1 + f*(lon2-lon1)
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
+                    lat1_rad = math.radians(lat1)
+                    lat2_rad = math.radians(lat2)
+                    delta_lon_rad = math.radians(lon2 - lon1)
+                    x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
+                    y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
+                        math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(delta_lon_rad)
+                    )
+                    initial_bearing_rad = math.atan2(x, y)
+                    initial_bearing_deg = math.degrees(initial_bearing_rad)
+                    metric['Bearing']= (initial_bearing_deg + 360) % 360
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,
@@ -770,7 +780,7 @@ app.mount("/_app", StaticFiles(directory=os.path.join(frontend_dir, "_app")), na
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Add your Svelte dev server ports
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://192.168.1.232:5173","http://localhost:8000","http://127.0.0.1:8000"],  # Add your Svelte dev server ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -830,7 +840,8 @@ def get_live_car_gps():
                     "coordinates": [current_data['metric']["Longitude"], current_data['metric']["Latitude"]] # GeoJSON expects [Lon, Lat]
                 },
                 "properties": {
-                    "id": "live-car-pin"
+                    "id": "live-car-pin",
+                    "bearing": current_data['metric']['Bearing']
                 }
             }
         ]
@@ -987,10 +998,8 @@ async def render_selected_track(payload: SelectionPayload):
         # 'edge' padding prevents the ends of your data from dropping off to zero
         padded_gradients = np.pad(raw_gradients_arr, window_size // 2, mode='edge')
         smoothed_gradient = np.convolve(padded_gradients, window, mode='valid').tolist()'''
-        distance_profile_rounded=[round(i,2) for i in distance_profile]
         packet_c = {
             "Altitude": smoothed_altitude,
-            "Distance_rounded": distance_profile_rounded,
             "Gradient": gradient_profile,
             "Distance": distance_profile,
             "Coordinates": coordinates

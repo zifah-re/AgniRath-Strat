@@ -15,7 +15,7 @@ function Xe(ae, se) {
       , S = te( () => g(D) > 3 ? "error" : "ok");
     let f, _, w, b, l, d, c, o;
     function r(s, p="", m=1) {
-        return typeof s != "number" ? "N/A" : `${s.toFixed(m)} ${p}`
+        return typeof s != "number" ? (Array.isArray(s) ? s.map(x => Math.round(x * 10**m) / 10**m) : "N/A") : `${s.toFixed(m)} ${p}`
     }
     function h(s, p, m, Z) {
         return {
@@ -108,7 +108,7 @@ function Xe(ae, se) {
                 cDT.update("none")
             }
             if (typeof cVD !== "undefined" && cVD) {
-                cVD.data.labels = a().historic.Distance;
+                cVD.data.labels = r(a().historic.Distance,"",2);
                 cVD.data.datasets[0].data = a().historic.Speed2;
                 cVD.update("none")
             }
@@ -137,7 +137,7 @@ function Xe(ae, se) {
                 cVD = new u(eVD,{
                     type: "line",
                     data: {
-                        labels: a().historic.Distance,
+                        labels: r(a().historic.Distance,"",2),
                         datasets: [{
                             label: "Velocity",
                             data: a().historic.Speed2,
@@ -172,10 +172,8 @@ function Xe(ae, se) {
                                     color: "#fff"
                                 },
                                 ticks: {
-                                    color: "#fff",
-                                    callback: function(val, index) {
-                                        return Number(val/1000).toFixed(2);
-                                    }
+                                    color: "#fff"
+                                    
                                 },
                                 grid: {
                                     color: "#374151"

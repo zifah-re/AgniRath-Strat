@@ -156,7 +156,8 @@ const u = {
         Latitude: 0.0,
         Longitude: 0.0,
         Altitude: 0.0,
-        Gradient: 0.0
+        Gradient: 0.0,
+        Bearing: 0.0
     },
     historic: {
         Timestamps: [],
@@ -189,7 +190,6 @@ const u = {
     },
     profile: {
         Altitude: [],
-        Distance_rounded: [],
         Gradient: [],
         Coordinates: [],
         Distance: []

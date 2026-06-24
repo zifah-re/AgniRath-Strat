@@ -12,8 +12,8 @@ function De(ee, te) {
       , e = () => Te(ke, "$globalStore", ae);
     n.register(Le, Pe, Be, We, Me, Ee, Ie, Re);
     let _, y, x, S, C, j, r, l, o, d, c, v;
-    function m(s, b="", p=1) {
-        return typeof s != "number" ? "N/A" : `${s.toFixed(p)} ${b}`
+    function m(s, p="", m=1) {
+        return typeof s != "number" ? (Array.isArray(s) ? s.map(x => Math.round(x * 10**m) / 10**m) : "N/A") : `${s.toFixed(m)} ${p}`
     }
     function u(s, b, p, N, O=!1, he) {
         return {
@@ -158,18 +158,18 @@ function De(ee, te) {
 
         // 2. 🔥 FIX: Accurate Chart.js property paths for Distance profiles
         const profileData = e().profile;
-        if (profileData && profileData.Distance_rounded && profileData.Distance_rounded.length > 0) {
+        if (profileData && profileData.Distance && profileData.Distance.length > 0) {
             
             if (window.chartAD) {
                 if (window.chartAD.data.datasets[0].data.length === 0){
-                    window.chartAD.data.labels = e().profile.Distance_rounded;
+                    window.chartAD.data.labels = m(e().profile.Distance,"",2);
                     window.chartAD.data.datasets[0].data = e().profile.Altitude || []; 
                     window.chartAD.update("none");
                 }
             }
             if (window.chartGD) {
                 if (window.chartGD.data.datasets[0].data.length === 0){
-                window.chartGD.data.labels = e().profile.Distance_rounded;
+                window.chartGD.data.labels = m(e().profile.Distance);
                 window.chartGD.data.datasets[0].data = e().profile.Gradient || []; 
                 window.chartGD.update("none");
                 }
@@ -178,7 +178,7 @@ function De(ee, te) {
     }
     xe( () => {
         const hasHistory = e().historic?.Timestamps?.length > 0;
-        const hasProfile = e().profile?.Distance_rounded?.length > 0;
+        const hasProfile = e().profile?.Distance?.length > 0;
         if (hasHistory || hasProfile) {
             re();
         }
@@ -195,7 +195,7 @@ function De(ee, te) {
             window.chartGD = new n(cGD,{
                 type: "line",
                 data: {
-                    labels: e().profile?.Distance_rounded || [],
+                    labels: m(e().profile?.Distance,"",2) || [],
                     datasets: [{
                         label: "Gradient",
                         data: e().profile?.Gradient || [],
@@ -224,7 +224,7 @@ function De(ee, te) {
             window.chartAD = new n(cAD,{
                 type: "line",
                 data: {
-                    labels: e().profile?.Distance_rounded || [],
+                    labels: m(e().profile?.Distance,"",2) || [],
                     datasets: [{
                         label: "Altitude",
                         data: e().profile?.Altitude || [],
