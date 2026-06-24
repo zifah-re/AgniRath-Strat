@@ -8,7 +8,8 @@ from shapely.geometry import LineString
 import numpy as np
 import folium
 from folium.plugins import Realtime
-import json
+from folium import JsCode
+from pathlib import Path
 
 def main(route_name,new_coordinates):
     url="https://earth.google.com/web/"
@@ -160,10 +161,58 @@ def main(route_name,new_coordinates):
     # 5. Drop the Start/End markers
     folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
     folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)
+    # Read your downloaded file and encode it
+    SCRIPT_DIR = Path(__file__).resolve().parent
+
+    # 2. Point to the icon relative to this script
+    ICON_PATH = SCRIPT_DIR / "prodbuild/navigation_arrow.svg"
+    with open(ICON_PATH, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+
+    # Create a data URI string
+    # (Change 'image/svg+xml' to 'image/png' if using a PNG)
+    base64_icon = f"data:image/svg+xml;base64,{encoded_string}"
     Realtime(
         "http://localhost:8000/api/live-car-gps",  # Your backend URL supplying the coordinate JSON
         get_feature_id="function(f) { return f.properties.id; }",
-        interval=2000,  # Auto-refresh interval in milliseconds (2 seconds)
+        point_to_layer=JsCode(f"""
+            (f, latlng) => {{
+                // 1. Calculate your heading angle
+                let angle = (f.properties.bearing !== undefined) ? (f.properties.bearing - 45) : 0;
+                
+                // 2. Inject your base64 image inside a divIcon wrapper
+                let carIcon = L.divIcon({{
+                    html: `<img src="{base64_icon}" style="width: 24px; height: 24px; transform: rotate(${{angle}}deg); display: block;" />`,
+                    className: 'custom-png-icon', // Keeps Leaflet from adding a white background box
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                }});
+                
+                return L.marker(latlng, {{ icon: carIcon }});
+            }}
+        """),# 2. CRITICAL FIX: This runs on EVERY incoming real-time data update
+        update_feature=JsCode("""
+            (feature, oldLayer) => {
+                if (!oldLayer) { return; }
+                
+                // Move coordinates natively
+                oldLayer.setLatLng([feature.geometry.coordinates[1], feature.geometry.coordinates[0]]);
+                
+                if (feature.properties && feature.properties.bearing !== undefined) {
+                    let angle = feature.properties.bearing - 45;
+                    let container = oldLayer.getElement();
+                    if (container) {
+                        let img = container.querySelector('img');
+                        if (img) {
+                            img.style.setProperty('transform', `rotate(${angle}deg)`, 'important');
+                        }
+                    }
+                }
+                
+                return oldLayer;
+            }
+        """),
+        interval=1500,  # Auto-refresh interval in milliseconds (1.5 seconds)
     ).add_to(m)
     # 6. Include a Layer Control button to alternate views dynamically
     folium.LayerControl(position="topright").add_to(m)
