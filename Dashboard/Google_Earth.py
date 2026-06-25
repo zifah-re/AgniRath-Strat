@@ -32,9 +32,6 @@ def main(route_name,new_coordinates):
     key_list=re.findall(r"\"(AIzaSy[^\"]*)",data)
     key_list=set(key_list)
     key_list=list(key_list)
-    client_token="EgsxMC4xMDkuODEuNRgDIgJJTg"
-    server_token="CAMSgwENdYulhx_8yJsdA_eo9gMD2Z4qA-3TAgP6ogEDjt0MA921HgO0mgYD5NgWA6qWAwPdhAgDs9UFA5JuA43YBqYLsKUDA8WdAwOj3QED1-cGA8G4AwP4wA4D0OsBA53GAwOgngQD1pADA76kAwP87g8D85oAAxUKs76QELGqmRz03BGNQg=="
-    
     original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
     total_shapely_length = original_line.length
     google_matched_coordinates = []
@@ -83,7 +80,8 @@ def main(route_name,new_coordinates):
         }
     }
     encoded_payload = blackboxprotobuf.encode_message(payload, message_type=message_type)
-    for api_key in key_list:
+    for i in range(len(key_list)):
+        api_key=key_list[i]
         url="https://earth-pa.clients6.google.com/v1/earth/elevation?alt=proto"
         headers={
             "Content-Type": "application/x-protobuf",
@@ -91,14 +89,15 @@ def main(route_name,new_coordinates):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0",
             "Referer":"https://earth.google.com/",
             "X-Goog-Api-Key": api_key,
-            "X-Goog-Earth-Client-Metadata": client_token,
             "X-Goog-Encode-Response-If-Executable": "base64"
         }
         req=requests.post(url=url,data=encoded_payload,headers=headers)
         if not "blocked" in req.text.lower():
             break
         else:
-            print("Trying next key")
+            print(f"Trying api key ({i+1}/{len(key_list)})")
+    else:
+        print("No valid api key found")
 
     x_distances = [0.0]  # Start point is always 0 km/meters
     total_distance = 0.0
