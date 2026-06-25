@@ -11,7 +11,7 @@ from folium.plugins import Realtime
 from folium import JsCode
 from pathlib import Path
 
-def main(route_name,new_coordinates):
+def main(route_info,new_coordinates,relevant_points):
     url="https://earth.google.com/web/"
     headers={
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -151,15 +151,18 @@ def main(route_name,new_coordinates):
     # 4. Draw your 999-point path line (A bright neon green pops nicely on both map styles)
     folium.PolyLine(
         locations=path_coordinates,
-        color="#00ff66",       
-        weight=5,
-        opacity=0.9,
-        tooltip=route_name
+        color=route_info["colour"],       
+        weight=route_info["width"],
+        opacity=route_info["opacity"],
+        tooltip=route_info["name"]
     ).add_to(m)
 
     # 5. Drop the Start/End markers
-    folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
-    folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)
+    for point in relevant_points:
+        folium.Marker([point["coordinates"][0], point["coordinates"][1]], popup=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"],icon=folium.CustomIcon(icon_image=point["url"],icon_size=(32,32),icon_anchor=(32-int(point["anchor"][0]),32-int(point["anchor"][1])),popup_anchor=(0,-32))).add_to(m)
+    if len(relevant_points)==0:
+        folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
+        folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)
     # Read your downloaded file and encode it
     SCRIPT_DIR = Path(__file__).resolve().parent
 

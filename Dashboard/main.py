@@ -26,7 +26,7 @@ from fastapi import UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from Google_Earth import main as maps_main
-from geopy.distance import great_circle
+from geopy.distance import geodesic
 from geopy.point import Point
 
 # Key Lists
@@ -309,7 +309,33 @@ def analyze_kml_structure(kml_bytes: bytes):
         })
         
     return root, available_folders
-
+def get_icon_url(root,point):
+    icon_style=point.find("styleUrl").text.lstrip("#")
+    icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
+    icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
+    icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+    icon_url=icon_tag.find("IconStyle/Icon/href").text
+    icon_anchor=icon_tag.find("IconStyle/hotSpot")
+    icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
+    return icon_url,icon_anchor
+def get_line_colour(root,point):
+    try:
+        icon_style=point.find("styleUrl").text.lstrip("#")
+        icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
+        icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
+        icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+        colour=icon_tag.find("LineStyle/color").text
+        opacity=colour[:2]
+        opacity=int(opacity,16)/255
+        b=colour[2:4]
+        g=colour[4:6]
+        r=colour[6:8]
+        colour=r+g+b
+        width=int(icon_tag.find("LineStyle/width").text)
+    except:
+        return None,None,None
+    return colour,width,opacity
+    
 # WebSocket connection manager
 
 class ConnectionManager:
@@ -922,19 +948,35 @@ async def render_selected_track(payload: SelectionPayload):
                 
         # Resolve user choice using the explicit indexes sent back from the web page
         folder = root.findall('Document' + ('/Folder') * depth)[payload.folder_index]
-        path_element = folder.findall("Placemark")[payload.placemark_index]
-        route_name=path_element.find("name").text
+        files=folder.findall("Placemark")
+        points_list=[]
+        for file in files:
+            if file.find("Point") is not None:
+                points_list.append(file)
+        path_element = files[payload.placemark_index]
+        route_name=path_element.find("name").text+":\n"+path_element.find("description").text if path_element.find("description") is not None else path_element.find("name").text
         coords_text = path_element.find("LineString/coordinates").text if path_element.find("LineString/coordinates") is not None else path_element.find("Polygon/outerBoundaryIs/LinearRing/coordinates").text
         coords_split = coords_text.split()
-        
+        colour,width,opacity=get_line_colour(root,path_element)
+        colour="#"+colour if colour is not None else "#00ff66"
+        width=5 if width is None else width
+        opacity=0.9 if opacity is None else opacity
+        route_info={"name":route_name,"colour":colour,"width":width,"opacity":opacity}
         coordinates = []
+        relevant_points=[]
         for pair in coords_split:
             lon, lat, *_ = pair.split(",")
-            coordinates.append((float(lat), float(lon)))
-            
+            lat,lon=float(lat),float(lon)
+            coordinates.append((lat,lon))
+            for point in points_list:
+                p_lon,p_lat,_=point.find("Point/coordinates").text.split(",")
+                p_lat,p_lon=float(p_lat),float(p_lon)
+                icon_url,icon_anchor=get_icon_url(root,point)
+                if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5 and not {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor} in relevant_points:
+                    relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
         # Pass the cleanly parsed layout array directly into your pipeline execution framework
         # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
-        map_html,altitude_profile,distance_profile,coordinates = maps_main(route_name,coordinates)
+        map_html,altitude_profile,distance_profile,coordinates = maps_main(route_info,coordinates,relevant_points)
         total_distance = distance_profile[-1]*1000  # Total length of the loop in meters
         # 1. DYNAMICALLY CALCULATE WINDOW SIZE
         # Goal: We want the smoothing window to span roughly 45 meters of trail.
@@ -985,19 +1027,6 @@ async def render_selected_track(payload: SelectionPayload):
                 gradient = 0.0
                 
             gradient_profile.append(gradient)
-        '''gradient_profile=[]
-        for i in range(len(altitude_profile)-1):
-            gradient_profile.append(((smoothed_altitude[i+1]-smoothed_altitude[i])/(distance_profile[i+1]-distance_profile[i]))*0.1)
-        gradient_profile=[0]+gradient_profile
-        raw_gradients_arr = np.array(gradient_profile)
-        # Define your window size and weights
-        window_size = 3
-        window = np.ones(window_size) / window_size
-
-        # Apply the moving average
-        # 'edge' padding prevents the ends of your data from dropping off to zero
-        padded_gradients = np.pad(raw_gradients_arr, window_size // 2, mode='edge')
-        smoothed_gradient = np.convolve(padded_gradients, window, mode='valid').tolist()'''
         packet_c = {
             "Altitude": smoothed_altitude,
             "Gradient": gradient_profile,
