@@ -33,7 +33,7 @@ def main(route_name,new_coordinates):
     key_list=set(key_list)
     key_list=list(key_list)
     client_token="EgsxMC4xMDkuODEuNRgDIgJJTg"
-    server_token="CAMSdw1hi6WHH_zImx0D96j2AwPZnioD7dMCA_qiAQPuiyIDtJoGA-TYFgOqlgMD3YQIA7PVBQOSbgON2AamC7ClAwPFnQMDo90BA9fnBgPBuAMD-MAOA9frAQOmxgMDoJ4EA5-iFgPhmgADFQqzvpAQsaqZHPTcEY1C"
+    server_token="CAMSgwENdYulhx_8yJsdA_eo9gMD2Z4qA-3TAgP6ogEDjt0MA921HgO0mgYD5NgWA6qWAwPdhAgDs9UFA5JuA43YBqYLsKUDA8WdAwOj3QED1-cGA8G4AwP4wA4D0OsBA53GAwOgngQD1pADA76kAwP87g8D85oAAxUKs76QELGqmRz03BGNQg=="
     
     original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
     total_shapely_length = original_line.length
@@ -92,8 +92,8 @@ def main(route_name,new_coordinates):
             "Referer":"https://earth.google.com/",
             "X-Goog-Api-Key": api_key,
             "X-Goog-Earth-Client-Metadata": client_token,
-            "X-Goog-Encode-Response-If-Executable": "base64",
-            "X-Server-Token": server_token
+            "X-Goog-Encode-Response-If-Executable": "base64"
+            #"X-Server-Token": server_token
         }
         req=requests.post(url=url,data=encoded_payload,headers=headers)
         if not "blocked" in req.text.lower():
