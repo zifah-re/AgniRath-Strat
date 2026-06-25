@@ -30,8 +30,7 @@ def main(route_name,new_coordinates):
     req=requests.get(url=url,headers=headers,cookies=cookies)
     data=req.text
     key_list=re.findall(r"\"(AIzaSy[^\"]*)",data)
-    key_list=set(key_list)
-    key_list=list(key_list)
+    key_list=[*{*key_list}]
     original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
     total_shapely_length = original_line.length
     google_matched_coordinates = []
