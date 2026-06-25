@@ -93,11 +93,12 @@ def main(route_name,new_coordinates):
             "X-Goog-Api-Key": api_key,
             "X-Goog-Earth-Client-Metadata": client_token,
             "X-Goog-Encode-Response-If-Executable": "base64"
-            #"X-Server-Token": server_token
         }
         req=requests.post(url=url,data=encoded_payload,headers=headers)
         if not "blocked" in req.text.lower():
             break
+        else:
+            print("Trying next key")
 
     x_distances = [0.0]  # Start point is always 0 km/meters
     total_distance = 0.0
