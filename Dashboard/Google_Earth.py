@@ -138,12 +138,26 @@ def main(route_info,new_coordinates,relevant_points):
         overlay=False,
         control=True
     ).add_to(m)
-
+    folium.TileLayer(
+        tiles="https://mt1.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}",
+        attr="Google Maps Traffic",
+        name="Google Standard with Traffic",
+        overlay=False,
+        control=True
+    ).add_to(m)
+    
     # 3. Add Google Hybrid Tiles (Satellite + Road Names & Labels)
     folium.TileLayer(
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Hybrid",
         name="Google Satellite (With Roads)",
+        overlay=False,
+        control=True
+    ).add_to(m)
+    folium.TileLayer(
+        tiles="https://mt1.google.com/vt/lyrs=y@221097413,traffic&x={x}&y={y}&z={z}",
+        attr="Google Hybrid Traffic",
+        name="Google Sattelite with Traffic",
         overlay=False,
         control=True
     ).add_to(m)
