@@ -192,7 +192,8 @@ const u = {
         Altitude: [],
         Gradient: [],
         Coordinates: [],
-        Distance: []
+        Distance: [],
+        SpeedLimit: []
     }
 }
   , c = f([]);

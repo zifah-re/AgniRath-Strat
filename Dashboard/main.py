@@ -253,7 +253,8 @@ current_data_default = {
         "Altitude": [],
         "Gradient": [],
         "Coordinates": [],
-        "Distance": []
+        "Distance": [],
+        "SpeedLimit": []
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -976,7 +977,7 @@ async def render_selected_track(payload: SelectionPayload):
                     relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
         # Pass the cleanly parsed layout array directly into your pipeline execution framework
         # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
-        map_html,altitude_profile,distance_profile,coordinates = maps_main(route_info,coordinates,relevant_points)
+        map_html,altitude_profile,distance_profile,coordinates,speed_limit = maps_main(route_info,coordinates,relevant_points)
         total_distance = distance_profile[-1]*1000  # Total length of the loop in meters
         # 1. DYNAMICALLY CALCULATE WINDOW SIZE
         # Goal: We want the smoothing window to span roughly 45 meters of trail.
@@ -1029,9 +1030,10 @@ async def render_selected_track(payload: SelectionPayload):
             gradient_profile.append(gradient)
         packet_c = {
             "Altitude": smoothed_altitude,
-            "Gradient": gradient_profile,
+            "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5),
             "Distance": distance_profile,
-            "Coordinates": coordinates
+            "Coordinates": coordinates,
+            "SpeedLimit": speed_limit
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}
