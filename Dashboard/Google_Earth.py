@@ -58,23 +58,24 @@ def main(route_info,new_coordinates,relevant_points):
 
     # 3. Explicitly append the absolute final destination point
     google_matched_coordinates.append(new_coordinates[-1])
-    google_matched_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
-    print(len(google_matched_coordinates))
-    print(f"ETA: {eta//3600:.0f} Hour {(eta%3600)/60:.2f} Minutes")
-    print(f"Total distance {d/1000:.2f}")
-    print(f"Calculated distance {d1/1000:.2f}")
+    snapped_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
+    if d1/d <0.1:
+        eta=eta*d/d1
+        print(f"ETA: {eta//3600:.0f} Hour {(eta%3600)/60:.2f} Minutes")
+        print(f"Total distance {d/1000:.2f}")
+        print(f"Calculated distance {d1/1000:.2f}")
     splits=[]
-    if len(google_matched_coordinates)>999:
+    if len(snapped_coordinates)>999:
         k=0
         j=0
-        for i in range(int(len(google_matched_coordinates)//999)):
-            j=min(999*(i+1),len(google_matched_coordinates))
-            splits.append(google_matched_coordinates[k:j])
+        for i in range(int(len(snapped_coordinates)//999)):
+            j=min(999*(i+1),len(snapped_coordinates))
+            splits.append(snapped_coordinates[k:j])
             k=j
-        if k!=len(google_matched_coordinates):
-            splits.append(google_matched_coordinates[k:len(google_matched_coordinates)])
+        if k!=len(snapped_coordinates):
+            splits.append(snapped_coordinates[k:len(snapped_coordinates)])
     else:
-        splits.append(google_matched_coordinates)
+        splits.append(snapped_coordinates)
     altitude_list=[]
     for coordinates in splits:
         payload = {
@@ -118,24 +119,22 @@ def main(route_info,new_coordinates,relevant_points):
         while i <= len(raw) - 8:
             val = struct.unpack('d', raw[i:i+8])[0]
             # Check for valid elevation range and explicitly skip zero data
-            if 0.0 <= val < 9000.0:
+            if 0.0 < val < 9000.0:
                 altitude_list.append(val)
                 i += 8  # Jump ahead by a full 8-byte float chunk
             else:
                 i += 1  # Slide forward to find the next valid stream alignment
-
-    path_coordinates = google_matched_coordinates
+    path_coordinates = snapped_coordinates
     start_lat, start_lon = path_coordinates[0]
     end_lat, end_lon = path_coordinates[-1]
     x_distances = [0.0]  # Start point is always 0 km/meters
     total_distance = 0.0
 
-    for i in range(1, len(google_matched_coordinates)):
+    for i in range(1, len(snapped_coordinates)):
         # Calculate geodesic distance between consecutive pairs in kilometers
-        segment_dist = geodesic(google_matched_coordinates[i-1], google_matched_coordinates[i]).kilometers
+        segment_dist = geodesic(snapped_coordinates[i-1], snapped_coordinates[i]).kilometers
         total_distance += segment_dist
         x_distances.append(total_distance)
-
     # 1. Initialize the map centered at your starting coordinates
     m = folium.Map(
         location=[path_coordinates[len(path_coordinates)//2][0], path_coordinates[len(path_coordinates)//2][1]], 

@@ -1030,7 +1030,7 @@ async def render_selected_track(payload: SelectionPayload):
             gradient_profile.append(gradient)
         packet_c = {
             "Altitude": smoothed_altitude,
-            "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5),
+            "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5).tolist(),
             "Distance": distance_profile,
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit

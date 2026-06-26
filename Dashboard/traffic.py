@@ -3,10 +3,10 @@ import copy
 import math
 from geopy.distance import geodesic
 import json
-API_KEY="G1kaSNVPFPVBwoMDyBgUvEUcoqYiKUJi"
+API_LIST=["nt0WpoWFNPf7PxPWE2qcHgjtthK73CPY","G1kaSNVPFPVBwoMDyBgUvEUcoqYiKUJi"]
 fields="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
-url=f"https://api.tomtom.com/snapToRoads/1?key={API_KEY}&fields={fields}&vehicleType=PassengerCar&measurementSystem=metric&offroadMargin=50"
-
+url="https://api.tomtom.com/snapToRoads/1?key={0}&fields={fields}&vehicleType=PassengerCar&measurementSystem=metric&offroadMargin=100"
+headers={"Origin":"https://developer.tomtom.com","Referer":"https://developer.tomtom.com"}
 def main(coordinates):
     distances = [0.0]
     total_distance = 0.0
@@ -15,12 +15,12 @@ def main(coordinates):
         total_distance += segment_dist
         distances.append(total_distance)
     splits=[]
-    if total_distance>90:
+    if total_distance>70:
         OVERLAP=0
         k=0
         j=0
-        for i in range(int(total_distance//90)):
-            while j<len(distances) and distances[j]<90*(i+1):
+        for i in range(int(total_distance//70)):
+            while j<len(distances) and distances[j]<70*(i+1):
                 j+=1
             splits.append(coordinates[k-OVERLAP if k>OVERLAP else k:j])
             k=j
@@ -33,7 +33,7 @@ def main(coordinates):
     eta=0
     d=0
     d1=0
-    for coordinates_split in splits:
+    for j,coordinates_split in enumerate(splits):
         headings=[]
         for i in range(0,len(coordinates_split)-1):
             lat1,lon1,lat2,lon2=coordinates_split[i][0],coordinates_split[i][1],coordinates_split[i+1][0],coordinates_split[i+1][1]
@@ -47,7 +47,20 @@ def main(coordinates):
             initial_bearing_rad = math.atan2(x, y)
             initial_bearing_deg = math.degrees(initial_bearing_rad)
             headings.append((initial_bearing_deg + 360) % 360)
-        headings.append(0)
+        if j<len(splits)-1:
+            lat1,lon1,lat2,lon2=coordinates_split[-1][0],coordinates_split[-1][1],splits[j+1][0][0],splits[j+1][0][1]
+            lat1_rad = math.radians(lat1)
+            lat2_rad = math.radians(lat2)
+            delta_lon_rad = math.radians(lon2 - lon1)
+            x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
+            y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
+                math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(delta_lon_rad)
+            )
+            initial_bearing_rad = math.atan2(x, y)
+            initial_bearing_deg = math.degrees(initial_bearing_rad)
+            headings.append((initial_bearing_deg + 360) % 360)
+        else:
+            headings.append(0)
         schema={"points":[]}
         features={
         "type": "Feature",
@@ -64,8 +77,13 @@ def main(coordinates):
             tmp["geometry"]["coordinates"]=[lon,lat]
             tmp["properties"]["heading"]=headings[i]
             schema["points"].append(tmp)
-        req=requests.post(url,json=schema)
-        data=req.json()
+        for i,API_KEY in enumerate(API_LIST):
+            req=requests.post(url.format(API_KEY,fields=fields),json=schema,headers=headers)
+            data=req.json()
+            if data.get("route"):
+                break
+            else:
+                print(f"Trying api key ({i+1}/{len(API_LIST)})")
         if not data["route"]:
             return coordinates,[],0,0,0
         units={"kmph":5/18,"km":1000,"m":1}
