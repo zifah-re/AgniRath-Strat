@@ -135,6 +135,7 @@ def main(route_info,new_coordinates,relevant_points):
         tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
         attr="Google Maps",
         name="Google Standard Roadmap",
+        max_zoom=20,
         overlay=False,
         control=True
     ).add_to(m)
@@ -142,6 +143,7 @@ def main(route_info,new_coordinates,relevant_points):
         tiles="https://mt1.google.com/vt/lyrs=m@221097413,traffic&x={x}&y={y}&z={z}",
         attr="Google Maps Traffic",
         name="Google Standard with Traffic",
+        max_zoom=20,
         overlay=False,
         control=True
     ).add_to(m)
@@ -151,6 +153,7 @@ def main(route_info,new_coordinates,relevant_points):
         tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         attr="Google Hybrid",
         name="Google Satellite (With Roads)",
+        max_zoom=20,
         overlay=False,
         control=True
     ).add_to(m)
@@ -158,6 +161,7 @@ def main(route_info,new_coordinates,relevant_points):
         tiles="https://mt1.google.com/vt/lyrs=y@221097413,traffic&x={x}&y={y}&z={z}",
         attr="Google Hybrid Traffic",
         name="Google Sattelite with Traffic",
+        max_zoom=20,
         overlay=False,
         control=True
     ).add_to(m)
