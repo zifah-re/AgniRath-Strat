@@ -978,35 +978,10 @@ async def render_selected_track(payload: SelectionPayload):
         # Pass the cleanly parsed layout array directly into your pipeline execution framework
         # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
         map_html,altitude_profile,distance_profile,coordinates,speed_limit = maps_main(route_info,coordinates,relevant_points)
-        total_distance = distance_profile[-1]*1000  # Total length of the loop in meters
-        # 1. DYNAMICALLY CALCULATE WINDOW SIZE
-        # Goal: We want the smoothing window to span roughly 45 meters of trail.
-        DESIRED_SMOOTHING_DISTANCE = 200  # in meters
-        # Calculate how many meters are between each of your 999 points
-        '''meters_per_point = total_distance / len(altitude_profile)
-        # Determine how many points are needed to cover that distance
-        calculated_window = int(DESIRED_SMOOTHING_DISTANCE / meters_per_point)
-
-        # The window size MUST be at least 3, and it MUST be an odd number for symmetrical padding
-        window_size = max(3, calculated_window)
-        if window_size % 2 == 0:
-            window_size += 1
-        # 2. PRE-SMOOTH ALTITUDE WITH THE DYNAMIC WINDOW
-        window = np.ones(window_size) / window_size
-        padded_altitude = np.pad(altitude_profile, window_size // 2, mode='edge')
-        smoothed_altitude = np.convolve(padded_altitude, window, mode='valid').tolist()'''
+    
         smoothed_altitude = savgol_filter(altitude_profile, window_length=11, polyorder=3).tolist()
-        m_per_point = total_distance / len(altitude_profile)
-        points_in_window = int(DESIRED_SMOOTHING_DISTANCE / m_per_point)
-
-        # Ensure window size is at least 3 and odd
-        if points_in_window < 3: points_in_window = 3
-        if points_in_window % 2 == 0: points_in_window += 1
-
-        half_win = points_in_window // 2
+        
         gradient_profile = []
-
-        # 2. Compute slope using Linear Regression (Polyfit)
         for i in range(1,len(smoothed_altitude)):
             # Determine window boundaries around point i
             rise=(altitude_profile[i]-altitude_profile[i-1])
