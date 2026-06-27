@@ -59,7 +59,7 @@ def main(route_info,new_coordinates,relevant_points):
     # 3. Explicitly append the absolute final destination point
     google_matched_coordinates.append(new_coordinates[-1])
     snapped_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
-    if d1/d <0.1:
+    if d1/d >0.90:
         eta=eta*d/d1
         print(f"ETA: {eta//3600:.0f} Hour {(eta%3600)/60:.2f} Minutes")
         print(f"Total distance {d/1000:.2f}")
@@ -113,8 +113,9 @@ def main(route_info,new_coordinates,relevant_points):
         else:
             print("No valid api key found")
 
-        # x_distances now holds the exact X-axis coordinates for your plot!
         raw = base64.b64decode(req.text.strip().replace("\n", ""))
+        x,_=blackboxprotobuf.decode_message(raw)
+        raw=x['1']
         i = 0
         while i <= len(raw) - 8:
             val = struct.unpack('d', raw[i:i+8])[0]
