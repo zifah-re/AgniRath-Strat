@@ -35,7 +35,7 @@ def main(route_info,new_coordinates,relevant_points):
     original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
     total_shapely_length = original_line.length
     google_matched_coordinates = []
-    target_points = 999
+    target_points = max(len(new_coordinates),999)
 
     # 2. Distribute points proportionally across each individual segment
     for i in range(len(new_coordinates) - 1):
@@ -189,7 +189,7 @@ def main(route_info,new_coordinates,relevant_points):
 
     # 5. Drop the Start/End markers
     for point in relevant_points:
-        folium.Marker([point["coordinates"][0], point["coordinates"][1]], popup=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"],icon=folium.CustomIcon(icon_image=point["url"],icon_size=(32,32),icon_anchor=(32-int(point["anchor"][0]),32-int(point["anchor"][1])),popup_anchor=(0,-32))).add_to(m)
+        folium.Marker([point["coordinates"][0], point["coordinates"][1]],tooltip=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"], popup=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"],icon=folium.CustomIcon(icon_image=point["url"],icon_size=(32,32),icon_anchor=(32-int(point["anchor"][0]),32-int(point["anchor"][1])),popup_anchor=(0,-32))).add_to(m)
     if len(relevant_points)==0:
         folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
         folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)

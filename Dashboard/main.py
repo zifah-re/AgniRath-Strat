@@ -981,9 +981,9 @@ async def render_selected_track(payload: SelectionPayload):
         total_distance = distance_profile[-1]*1000  # Total length of the loop in meters
         # 1. DYNAMICALLY CALCULATE WINDOW SIZE
         # Goal: We want the smoothing window to span roughly 45 meters of trail.
-        DESIRED_SMOOTHING_DISTANCE = 100  # in meters
+        DESIRED_SMOOTHING_DISTANCE = 200  # in meters
         # Calculate how many meters are between each of your 999 points
-        meters_per_point = total_distance / len(altitude_profile)
+        '''meters_per_point = total_distance / len(altitude_profile)
         # Determine how many points are needed to cover that distance
         calculated_window = int(DESIRED_SMOOTHING_DISTANCE / meters_per_point)
 
@@ -994,7 +994,8 @@ async def render_selected_track(payload: SelectionPayload):
         # 2. PRE-SMOOTH ALTITUDE WITH THE DYNAMIC WINDOW
         window = np.ones(window_size) / window_size
         padded_altitude = np.pad(altitude_profile, window_size // 2, mode='edge')
-        smoothed_altitude = np.convolve(padded_altitude, window, mode='valid').tolist()
+        smoothed_altitude = np.convolve(padded_altitude, window, mode='valid').tolist()'''
+        smoothed_altitude = savgol_filter(altitude_profile, window_length=11, polyorder=3).tolist()
         m_per_point = total_distance / len(altitude_profile)
         points_in_window = int(DESIRED_SMOOTHING_DISTANCE / m_per_point)
 
@@ -1006,28 +1007,13 @@ async def render_selected_track(payload: SelectionPayload):
         gradient_profile = []
 
         # 2. Compute slope using Linear Regression (Polyfit)
-        for i in range(len(smoothed_altitude)):
+        for i in range(1,len(smoothed_altitude)):
             # Determine window boundaries around point i
-            start = max(0, i - half_win)
-            end = min(len(smoothed_altitude), i + half_win + 1)
-            
-            window_dist_km = distance_profile[start:end]
-            window_alt_m = smoothed_altitude[start:end]
-            
-            # Convert distances from km to meters so units match altitude
-            window_dist_meters = [d * 1000 for d in window_dist_km]
-            
-            if len(window_dist_meters) >= 2:
-                # np.polyfit(x, y, 1) fits a straight line (degree 1: y = mx + c)
-                # It returns [slope, intercept]. We just want the slope (index 0).
-                slope, intercept = np.polyfit(window_dist_meters, window_alt_m, 1)
-                
-                # Convert slope to a percentage
-                gradient = slope * 100
-            else:
-                gradient = 0.0
-                
+            rise=(altitude_profile[i]-altitude_profile[i-1])
+            run=(distance_profile[i]-distance_profile[i-1])
+            gradient=(rise/run)*0.1 if run!=0 else 0
             gradient_profile.append(gradient)
+        gradient_profile=savgol_filter(gradient_profile,window_length=11,polyorder=3)
         packet_c = {
             "Altitude": smoothed_altitude,
             "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5).tolist(),

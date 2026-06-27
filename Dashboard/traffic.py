@@ -3,7 +3,7 @@ import copy
 import math
 from geopy.distance import geodesic
 import json
-API_LIST=["nt0WpoWFNPf7PxPWE2qcHgjtthK73CPY","G1kaSNVPFPVBwoMDyBgUvEUcoqYiKUJi"]
+from constants import MAX_SPEED,API_LIST
 fields="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
 url="https://api.tomtom.com/snapToRoads/1?key={0}&fields={fields}&vehicleType=PassengerCar&measurementSystem=metric&offroadMargin=100"
 headers={"Origin":"https://developer.tomtom.com","Referer":"https://developer.tomtom.com"}
@@ -89,11 +89,11 @@ def main(coordinates):
         units={"kmph":5/18,"km":1000,"m":1}
         for feature in data["route"]:
             try:
-                eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/(feature["properties"]["speedProfile"]["value"]*units[feature["properties"]["speedProfile"]["unit"]])
+                eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/(min(feature["properties"]["speedProfile"]["value"],MAX_SPEED)*units[feature["properties"]["speedProfile"]["unit"]])
                 d1+=feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]]
             except:
                 try:
-                    eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/(feature["properties"]["speedLimits"]["value"]*units[feature["properties"]["speedProfile"]["unit"]])
+                    eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/(min(feature["properties"]["speedLimits"]["value"],MAX_SPEED)*units[feature["properties"]["speedProfile"]["unit"]])
                 except:
                     pass
             for lon,lat in feature["geometry"]["coordinates"]:
