@@ -61,7 +61,7 @@ def main(route_info,new_coordinates,relevant_points):
     snapped_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
     if d1/d >0.90:
         eta=eta*d/d1
-        print(f"ETA: {eta//3600:.0f} Hour {(eta%3600)/60:.2f} Minutes")
+        print(f"ETA: {eta//3600:.0f} Hour{'s' if eta//3600!=1 else ''} {(eta%3600)//60:.0f} Minutes")
         print(f"Total distance {d/1000:.2f}")
         print(f"Calculated distance {d1/1000:.2f}")
     splits=[]
