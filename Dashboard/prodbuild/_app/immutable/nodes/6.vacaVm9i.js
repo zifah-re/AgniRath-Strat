@@ -151,7 +151,7 @@ function De(ee, te) {
     function re() {
         // 1. Existing live telemetry charts update logic (r, l, o updates here...)
         if (e().historic?.Timestamps?.length > 0) {
-            r && (r.data.labels = e().historic.Timestamps, r.data.datasets[0].data = e().historic.Speed, r.update("none"));
+            r && (r.data.labels = e().historic.Timestamps, r.data.datasets[0].data = e().historic.Speed, r.data.datasets[1].data= e().historic.Speed2, r.update("none"));
             l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
             o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
         }
