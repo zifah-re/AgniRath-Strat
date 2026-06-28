@@ -11,7 +11,7 @@ from folium.plugins import Realtime
 from folium import JsCode
 from pathlib import Path
 from traffic import main as traffic_main
-
+from constants import NO_SNAP_TO_ROAD
 def main(route_info,new_coordinates,relevant_points):
     url="https://earth.google.com/web/"
     headers={
@@ -35,7 +35,12 @@ def main(route_info,new_coordinates,relevant_points):
     original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
     total_shapely_length = original_line.length
     google_matched_coordinates = []
-    target_points = max(len(new_coordinates),999)
+    total_distance = 0.0
+    for i in range(1, len(new_coordinates)):
+        # Calculate geodesic distance between consecutive pairs in kilometers
+        segment_dist = geodesic(new_coordinates[i-1], new_coordinates[i]).meters
+        total_distance += segment_dist
+    target_points = max(len(new_coordinates),int(total_distance//100))
 
     # 2. Distribute points proportionally across each individual segment
     for i in range(len(new_coordinates) - 1):
@@ -45,7 +50,6 @@ def main(route_info,new_coordinates,relevant_points):
         # Create a mini-line for just this single segment
         segment = LineString([(p1[1], p1[0]), (p2[1], p2[0])])
         
-        # Calculate how many of our 999 points belong to this segment's length
         proportion = segment.length / total_shapely_length
         num_points_for_segment = max(2, int(round(proportion * target_points)))
         
@@ -58,12 +62,17 @@ def main(route_info,new_coordinates,relevant_points):
 
     # 3. Explicitly append the absolute final destination point
     google_matched_coordinates.append(new_coordinates[-1])
-    snapped_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
-    if d1/d >0.90:
-        eta=eta*d/d1
-        print(f"ETA: {eta//3600:.0f} Hour{'s' if eta//3600!=1 else ''} {(eta%3600)//60:.0f} Minutes")
-        print(f"Total distance {d/1000:.2f}")
-        print(f"Calculated distance {d1/1000:.2f}")
+    if route_info["name"] not in NO_SNAP_TO_ROAD:
+        snapped_coordinates,speed_limit,eta,d,d1=traffic_main(google_matched_coordinates)
+        if d1/d >0.90:
+            eta=eta*d/d1
+            print(f"ETA: {eta//3600:.0f} Hour{'s' if eta//3600!=1 else ''} {(eta%3600)//60:.0f} Minutes")
+            print(f"Total distance {d/1000:.2f}")
+            print(f"Calculated distance {d1/1000:.2f}")
+    else:
+        snapped_coordinates=google_matched_coordinates
+        speed_limit=[]
+        eta=d=d1=0
     splits=[]
     if len(snapped_coordinates)>999:
         k=0
