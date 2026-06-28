@@ -2,7 +2,7 @@ import requests
 import copy
 import math
 from geopy.distance import geodesic
-import json
+from datetime import timedelta,timezone,datetime
 from constants import MAX_SPEED,API_LIST
 fields="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
 url="https://api.tomtom.com/snapToRoads/1?key={0}&fields={fields}&vehicleType=PassengerCar&measurementSystem=metric&offroadMargin=100"
@@ -33,6 +33,9 @@ def main(coordinates):
     eta=0
     d=0
     d1=0
+    curr_time=datetime.now(timezone.utc)
+    start_pos=splits[0][0]
+    dist=0
     for j,coordinates_split in enumerate(splits):
         headings=[]
         for i in range(0,len(coordinates_split)-1):
@@ -69,14 +72,20 @@ def main(coordinates):
             "coordinates": []
         },
         "properties": {
-            "heading": 0
+            "heading": 0,
+            "timestamp":"",
         }
         }
         for i,(lat,lon) in enumerate(coordinates_split):
+            curr_pos=(lat,lon)
+            dist=geodesic(start_pos,curr_pos).kilometers
+            curr_time+=timedelta(seconds=max((dist/100)*3600,1))
             tmp=copy.deepcopy(features)
             tmp["geometry"]["coordinates"]=[lon,lat]
             tmp["properties"]["heading"]=headings[i]
+            tmp["properties"]["timestamp"]=curr_time.strftime('%Y-%m-%dT%H:%M:%SZ')
             schema["points"].append(tmp)
+            start_pos=curr_pos
         for i,API_KEY in enumerate(API_LIST):
             req=requests.post(url.format(API_KEY,fields=fields),json=schema,headers=headers)
             data=req.json()
@@ -94,8 +103,13 @@ def main(coordinates):
             except:
                 try:
                     eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/(min(feature["properties"]["speedLimits"]["value"],MAX_SPEED)*units[feature["properties"]["speedProfile"]["unit"]])
+                    d1+=feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]]
                 except:
-                    pass
+                    try:
+                        eta+=(feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]])/((MAX_SPEED)*(5/18))
+                        d1+=feature["properties"]["traveledDistance"]["value"]*units[feature["properties"]["traveledDistance"]["unit"]]
+                    except:
+                        pass
             for lon,lat in feature["geometry"]["coordinates"]:
                 snapped_coords.append((lat,lon))
                 try:

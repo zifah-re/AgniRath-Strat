@@ -210,7 +210,8 @@ current_data_default = {
         'Longitude': 0.0,
         'Altitude': 0.0,
         'Gradient': 0.0,
-        'Bearing': 0.0
+        'Bearing': 0.0,
+        'ETA': 0
     },
     "historic": {
         'Timestamps': [],
@@ -639,12 +640,22 @@ async def update_processor(queue: asyncio.Queue):
                     alt2=current_data['profile']['Altitude'][i+1]
                     grad1=current_data['profile']['Gradient'][i]
                     grad2=current_data['profile']['Gradient'][i+1]
-                    metric['Latitude']=lat1 + f*(lat2-lat1)
-                    metric['Longitude']=lon1 + f*(lon2-lon1)
+                    lat1_rad, lon1_rad = math.radians(lat1), math.radians(lon1)
+                    lat2_rad, lon2_rad = math.radians(lat2), math.radians(lon2)
+                    cos_delta = math.sin(lat1_rad) * math.sin(lat2_rad) + math.cos(lat1_rad) * math.cos(lat2_rad) * math.cos(lon2_rad - lon1_rad)
+                    cos_delta = max(-1.0, min(1.0, cos_delta))
+                    delta = math.acos(cos_delta)
+                    a = math.sin((1 - f) * delta) / math.sin(delta)
+                    b = math.sin(f * delta) / math.sin(delta)
+                    x = a * math.cos(lat1_rad) * math.cos(lon1_rad) + b * math.cos(lat2_rad) * math.cos(lon2_rad)
+                    y = a * math.cos(lat1_rad) * math.sin(lon1_rad) + b * math.cos(lat2_rad) * math.sin(lon2_rad)
+                    z = a * math.sin(lat1_rad) + b * math.sin(lat2_rad)
+                    interp_lat = math.atan2(z, math.sqrt(x**2 + y**2))
+                    interp_lon = math.atan2(y, x)
+                    metric['Latitude'] = math.degrees(interp_lat)
+                    metric['Longitude'] = math.degrees(interp_lon)
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
-                    lat1_rad = math.radians(lat1)
-                    lat2_rad = math.radians(lat2)
                     delta_lon_rad = math.radians(lon2 - lon1)
                     x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
                     y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
@@ -977,7 +988,7 @@ async def render_selected_track(payload: SelectionPayload):
                     relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
         # Pass the cleanly parsed layout array directly into your pipeline execution framework
         # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
-        map_html,altitude_profile,distance_profile,coordinates,speed_limit = maps_main(route_info,coordinates,relevant_points)
+        map_html,altitude_profile,distance_profile,coordinates,speed_limit,eta = maps_main(route_info,coordinates,relevant_points)
     
         smoothed_altitude = savgol_filter(altitude_profile, window_length=11, polyorder=3).tolist()
         
