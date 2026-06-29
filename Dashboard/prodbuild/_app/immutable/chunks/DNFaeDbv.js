@@ -194,7 +194,8 @@ const u = {
         Gradient: [],
         Coordinates: [],
         Distance: [],
-        SpeedLimit: []
+        SpeedLimit: [],
+        SpeedProfile:[]
     }
 }
   , c = f([]);
@@ -285,8 +286,6 @@ function w() {
                         if (t.profile && t.profile[o] != null) {
                             r.profile[o] || (r.profile[o] = []);
                             r.profile[o] = [...r.profile[o], t.profile[o]];
-                            const n = 1e3;
-                            r.profile[o].length > n && (r.profile[o] = r.profile[o].slice(-n))
                         }
                     }
                     ),

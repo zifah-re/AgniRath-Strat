@@ -20,6 +20,7 @@ import numpy as np
 import copy
 
 from downlink import main as run_downlink
+from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED
 import uuid
 import xml.etree.ElementTree as ET
 from fastapi import UploadFile, File, HTTPException
@@ -28,6 +29,7 @@ from pydantic import BaseModel
 from Google_Earth import main as maps_main
 from geopy.distance import geodesic
 from geopy.point import Point
+
 
 # Key Lists
 PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
@@ -255,7 +257,8 @@ current_data_default = {
         "Gradient": [],
         "Coordinates": [],
         "Distance": [],
-        "SpeedLimit": []
+        "SpeedLimit": [],
+        "SpeedProfile":[]       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -365,109 +368,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-SOC_CURVE = [
-    (115.36, 100.0),
-    (114.38, 99.0),
-    (113.40, 98.0),
-    (112.70, 97.0),
-    (112.00, 96.0),
-    (111.44, 95.0),
-    (110.88, 94.0),
-    (110.60, 93.0),
-    (110.32, 92.0),
-    (110.04, 91.0),
-    (109.76, 90.0),
-    (109.48, 89.0),
-    (109.20, 88.0),
-    (108.92, 87.0),
-    (108.64, 86.0),
-    (108.36, 85.0),
-    (108.08, 84.0),
-    (107.80, 83.0),
-    (107.52, 82.0),
-    (107.24, 81.0),
-    (106.96, 80.0),
-    (106.75, 79.0),
-    (106.54, 78.0),
-    (106.33, 77.0),
-    (106.12, 76.0),
-    (105.91, 75.0),
-    (105.70, 74.0),
-    (105.49, 73.0),
-    (105.28, 72.0),
-    (105.07, 71.0),
-    (104.86, 70.0),
-    (104.65, 69.0),
-    (104.44, 68.0),
-    (104.16, 67.0),
-    (103.88, 66.0),
-    (103.60, 65.0),
-    (103.32, 64.0),
-    (103.04, 63.0),
-    (102.76, 62.0),
-    (102.48, 61.0),
-    (102.20, 60.0),
-    (101.92, 59.0),
-    (101.64, 58.0),
-    (101.36, 57.0),
-    (101.08, 56.0),
-    (100.80, 55.0),
-    (100.52, 54.0),
-    (100.24, 53.0),
-    (99.96, 52.0),
-    (99.61, 51.0),
-    (99.26, 50.0),
-    (98.91, 49.0),
-    (98.56, 48.0),
-    (98.21, 47.0),
-    (97.86, 46.0),
-    (97.51, 45.0),
-    (97.16, 44.0),
-    (96.81, 43.0),
-    (96.46, 42.0),
-    (96.11, 41.0),
-    (95.76, 40.0),
-    (95.41, 39.0),
-    (95.06, 38.0),
-    (94.71, 37.0),
-    (94.36, 36.0),
-    (93.94, 35.0),
-    (93.52, 34.0),
-    (93.10, 33.0),
-    (92.68, 32.0),
-    (92.26, 31.0),
-    (91.84, 30.0),
-    (91.42, 29.0),
-    (91.00, 28.0),
-    (90.51, 27.0),
-    (90.02, 26.0),
-    (89.53, 25.0),
-    (89.04, 24.0),
-    (88.55, 23.0),
-    (88.06, 22.0),
-    (87.57, 21.0),
-    (87.08, 20.0),
-    (86.52, 19.0),
-    (85.96, 18.0),
-    (85.40, 17.0),
-    (84.84, 16.0),
-    (84.14, 15.0),
-    (83.44, 14.0),
-    (82.74, 13.0),
-    (82.04, 12.0),
-    (81.20, 11.0),
-    (80.36, 10.0),
-    (79.52, 9.0),
-    (78.68, 8.0),
-    (77.56, 7.0),
-    (76.44, 6.0),
-    (74.90, 5.0),
-    (73.36, 4.0),
-    (71.40, 3.0),
-    (69.44, 2.0),
-    (69.02, 1.0),
-    (68.60, 0.0),
-]
 
 def get_initial_soc(pack_voltage):
     if pack_voltage >= 115.36: return 100.0
@@ -481,10 +381,6 @@ def get_initial_soc(pack_voltage):
             return soc_lower + ratio * (soc_upper - soc_lower)
     return 0.0
 
-BATTERY_CAPACITY_WH = 3528.0  # Nominal capacity: 5.0Ah * 4.2V * 28S = 588Wh
-BATTERY_CAPACITY_AH= 30.0 #5.0Ah * 28
-# CMU reports cell voltage in mV; dashboard displays volts (valid ~2.5–4.2 V).
-INVALID_CELL_MV = 10_000.0
 
 
 def cell_voltage_mv_to_v(raw) -> float | None:
@@ -633,6 +529,17 @@ async def update_processor(queue: asyncio.Queue):
                     i=-1
                     while i<len(current_data['profile']['Distance'])-1 and distance>=current_data['profile']['Distance'][i+1]:
                         i+=1
+                    seg_dist,eta=current_data['profile']['Distance'][i+1]-distance,0
+                    for j in range(i,len(current_data['profile']['Distance'])-1):
+                        if j!=i:
+                            seg_dist=current_data['profile']['Distance'][j+1]-current_data['profile']['Distance'][j]
+                        if current_data['profile']['SpeedLimit'][j]!=0 and current_data['profile']['SpeedProfile'][j]!=0:
+                            eta+=(seg_dist*1000)/(min((MAX_SPEED,current_data['profile']['SpeedLimit'][j],current_data['profile']['SpeedProfile'][j]))*(5/18))
+                        elif (current_data['profile']['SpeedLimit'][j]!=0) ^ (current_data['profile']['SpeedProfile'][j]!=0):
+                            eta+=(seg_dist*1000)/(min(max(current_data['profile']['SpeedProfile'][j],current_data['profile']['SpeedLimit'][j]),MAX_SPEED)*(5/18))
+                        else:
+                            eta+=(seg_dist*1000)/(MAX_SPEED*(5/18))
+                    metric["ETA"]=eta
                     f=(distance-current_data['profile']['Distance'][i])/(current_data['profile']['Distance'][i+1]-current_data['profile']['Distance'][i])
                     lat1,lon1=current_data['profile']['Coordinates'][i]
                     lat2,lon2=current_data['profile']['Coordinates'][i+1]
@@ -986,26 +893,25 @@ async def render_selected_track(payload: SelectionPayload):
                 icon_url,icon_anchor=get_icon_url(root,point)
                 if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5 and not {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor} in relevant_points:
                     relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
-        # Pass the cleanly parsed layout array directly into your pipeline execution framework
-        # maps_main(coordinates) -> modify maps_main to build your folium object and return HTML
-        map_html,altitude_profile,distance_profile,coordinates,speed_limit,eta = maps_main(route_info,coordinates,relevant_points)
-    
-        smoothed_altitude = savgol_filter(altitude_profile, window_length=11, polyorder=3).tolist()
         
+        results = maps_main(route_info,coordinates,relevant_points)
+        map_html,smoothed_altitude,distance_profile,coordinates,speed_limit,eta=results["Map"],results["Altitude"],results["Distances"],results["Coordinates"],results["SpeedLimit"],results["ETA"]
+        speed_profile=results["SpeedProfile"]
         gradient_profile = []
         for i in range(1,len(smoothed_altitude)):
-            # Determine window boundaries around point i
-            rise=(altitude_profile[i]-altitude_profile[i-1])
+            rise=(smoothed_altitude[i]-smoothed_altitude[i-1])
             run=(distance_profile[i]-distance_profile[i-1])
             gradient=(rise/run)*0.1 if run!=0 else 0
             gradient_profile.append(gradient)
         gradient_profile=savgol_filter(gradient_profile,window_length=11,polyorder=3)
+        current_data['metric']["ETA"]=eta
         packet_c = {
             "Altitude": smoothed_altitude,
             "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5).tolist(),
             "Distance": distance_profile,
             "Coordinates": coordinates,
-            "SpeedLimit": speed_limit
+            "SpeedLimit": speed_limit,
+            "SpeedProfile": speed_profile
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}
