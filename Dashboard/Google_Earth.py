@@ -18,7 +18,7 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
     url="https://earth.google.com/web/"
     headers={
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-GB,en;q=0.9",
         "Host": "earth.google.com",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0"
