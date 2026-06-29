@@ -72,7 +72,7 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
             print(f"Calculated distance {d1/1000:.2f}")
     else:
         snapped_coordinates=google_matched_coordinates
-        speed_limit=[]
+        speed_limit,speed_profile=[],[]
         eta=d=d1=0
     splits=[]
     if len(snapped_coordinates)>999:
