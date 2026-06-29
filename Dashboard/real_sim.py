@@ -179,7 +179,7 @@ def main(df=None):
                     # Print occasionally so terminal isn't overwhelmed by 10Hz
                     if random.random() < 0.1:
                         calc_motor_power = pkt_a['Bus_Current'] * pkt_a['Bus_Voltage']
-                        print(f"[{datetime.fromisoformat(pkt_a['Timestamp']).strftime('%H:%M:%S')}] SENT | Speed: {pkt_a['Speed']:.1f} km/h | Pack: {pkt_a['Pack_Voltage']/1000:.1f}V | Motor Pwr: {calc_motor_power/1000:.1f}kW")
+                        print(f"[{datetime.fromisoformat(pkt_a['Timestamp']).strftime('%H:%M:%S')}] SENT | Speed: {pkt_a['Vehicle_Velocity']*(18/5):.1f} km/h | Pack: {pkt_a['Pack_Voltage']/1000:.1f}V | Motor Pwr: {calc_motor_power/1000:.1f}kW")
                 else:
                     print(f"[{datetime.fromisoformat(pkt_a['Timestamp']).strftime('%H:%M:%S')}] Connection refused. Is main.py running?")
             except Exception as e:

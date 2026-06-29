@@ -5,7 +5,7 @@ import {g as ke, s as V, c as Ae} from "../chunks/DNFaeDbv.js";
 import {b as f} from "../chunks/CqHrAp-I.js";
 import {s as Te, a as $e} from "../chunks/DkIwFic-.js";
 import {C as n, a as Le, L as Pe, P as Be, b as We, c as Me, p as Ee, d as Ie, e as Re} from "../chunks/DHTsbXwT.js";
-var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div></div>');
+var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div></div>');
 function De(ee, te) {
     ye(te, !0);
     const [ae,se] = $e()
@@ -14,6 +14,16 @@ function De(ee, te) {
     let _, y, x, S, C, j, r, l, o, d, c, v;
     function m(s, p="", m=1) {
         return typeof s != "number" ? (Array.isArray(s) ? s.map(x => Math.round(x * 10**m) / 10**m) : "N/A") : `${s.toFixed(m)} ${p}`
+    }
+    function time_format(s) {
+        var hrs=Math.floor(s/3600);
+        var mins=Math.floor((s%3600)/60);
+        if (hrs === 0) {
+            return `${mins} min`;
+        } else {
+            var hrLabel = hrs > 1 ? "hrs" : "hr";
+            return `${hrs} ${hrLabel} ${mins} min`;
+        }
     }
     function u(s, b, p, N, O=!1, he) {
         return {
@@ -151,7 +161,7 @@ function De(ee, te) {
     function re() {
         // 1. Existing live telemetry charts update logic (r, l, o updates here...)
         if (e().historic?.Timestamps?.length > 0) {
-            r && (r.data.labels = e().historic.Timestamps, r.data.datasets[0].data = e().historic.Speed, r.update("none"));
+            r && (r.data.labels = e().historic.Timestamps, r.data.datasets[0].data = e().historic.Speed, r.data.datasets[1].data= e().historic.Speed2, r.update("none"));
             l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
             o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
         }
@@ -324,7 +334,7 @@ function De(ee, te) {
     a(U),
     a(Q),
     a(T),
-    Ce( (s, b, p, N, O) => {
+    Ce( (s, b, p, N, O,etaVal) => {
         V(w, 1, `metric-card col-span-1 md:col-span-2 ${g(A) === "ok" ? "status-ok" : "status-error"} border-2`, "svelte-14ry3bj"),
         V(le, 1, `w-4 h-4 rounded-full ${g(A) === "ok" ? "bg-green-500" : "bg-red-500"}`),
         h(oe, s),
@@ -333,8 +343,13 @@ function De(ee, te) {
         h(ce, p),
         h(ve, N),
         h(ne, O)
+        if (ne && ne.parentNode) {
+            // Find the 4th metric card's value slot relative to the 3rd one (ne)
+            const etaNode = ne.parentNode.parentNode.parentNode.querySelector('.metric-card:nth-child(4) .metric-value');
+            if (etaNode) etaNode.textContent = etaVal;
+        }
     }
-    , [ () => m(e().metric.Speed, "km/h"), () => m(e().metric.predicted, "km/h"), () => m(g(Y), "km/h"), () => m(e().historic.Acceleration[-1] || 0, "m/s²"), () => m(e().metric.SOC_Ah, "%", 0)]),
+    , [ () => m(e().metric.Speed, "km/h"), () => m(e().metric.predicted, "km/h"), () => m(g(Y), "km/h"), () => m(e().historic.Acceleration[-1] || 0, "m/s²"), () => m(e().metric.SOC_Ah, "%", 0), () => time_format(e().metric.ETA)]),
     je(ee, T),
     we(),
     se()

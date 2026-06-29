@@ -1,1 +1,374 @@
-import"../chunks/Bzak7iHL.js";import{i as tt}from"../chunks/BaVNoogA.js";import{o as rt,a as at}from"../chunks/NmWs3qIF.js";import{Y as it,aa as J,ab as st,_ as X,$ as K,a0 as Q,a1 as lt,a2 as i,a3 as r,u as l,a5 as o,t as a,A as f,W as x,a6 as t,a7 as c,v as ye}from"../chunks/B2hAlVi-.js";import{e as he,i as Ce}from"../chunks/T28DYXdB.js";import{g as vt,s as Me}from"../chunks/DNFaeDbv.js";import{b as A}from"../chunks/CqHrAp-I.js";import{a as ot,s as dt}from"../chunks/DkIwFic-.js";import{C as h,a as ct,L as _t,P as mt,b as nt,c as ut,p as pt,d as bt,e as gt}from"../chunks/DHTsbXwT.js";var ft=X('<div class="flex items-center justify-center space-x-1"><div></div> <span class="text-xs text-gray-300"> </span></div>'),xt=X('<div class="flex items-center justify-center space-x-1"><div></div> <span class="text-xs text-gray-300"> </span></div>'),wt=X('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="metric-card svelte-1wa4b97"><div class="metric-value text-green-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Motor RPM</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-blue-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Velocity</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-orange-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Road Slope</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-cyan-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Heatsink Temperature</div></div></div> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4"><div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current A</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current B</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current C</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-yellow-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Voltage</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-red-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Current</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-orange-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Power</div></div></div> <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">Motor Limit Status:</span></div> <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4"></div></div> <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">Motor Error Status:</span></div> <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-phaseB" class="w-full h-80"></canvas></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-phaseC" class="w-full h-80"></canvas></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-heatsink" class="w-full h-80"></canvas></div></div>');function Lt(Pe,ke){it(ke,!1);const[Be,Ae]=ot(),e=()=>dt(vt,"$globalStore",Be),S=f(),L=f();let C=f(),M=f(),P=f(),k=f(),n,w,u,p,chartB,chartC,chartH;function d(s,v="",m=1){return typeof s!="number"?"N/A":`${s.toFixed(m)} ${v}`}function B(s,v,m,_){return{type:"line",data:{labels:e().historic.Timestamps,datasets:[{label:s,data:v,borderColor:m,backgroundColor:m+"20",borderWidth:2,fill:!1,tension:.1}]},options:{responsive:!0,maintainAspectRatio:!1,scales:{y:{beginAtZero:s==="Battery Level",max:s==="Battery Level"?100:void 0,title:{display:!0,text:_,color:"#fff"},ticks:{color:"#fff"},grid:{color:"#374151"}},x:{title:{display:!0,text:"Time",color:"#fff"},ticks:{color:"#fff"},grid:{color:"#374151"}}},plugins:{legend:{labels:{color:"#fff"}},title:{display:!0,text:`${s} vs Time`,color:"#fff"}}}}}function Se(){e().historic.Timestamps.length!==0&&(n&&(n.data.labels=e().historic.Timestamps,n.data.datasets[0].data=e().historic.Bus_Power,n.update("none")),w&&(w.data.labels=e().historic.Timestamps,w.data.datasets[0].data=e().historic.PhaseA_Current,w.update("none")),chartB&&(chartB.data.labels=e().historic.Timestamps,chartB.data.datasets[0].data=e().historic.PhaseB_Current,chartB.update("none")),chartC&&(chartC.data.labels=e().historic.Timestamps,chartC.data.datasets[0].data=e().historic.PhaseC_Current,chartC.update("none")),chartH&&(chartH.data.labels=e().historic.Timestamps,chartH.data.datasets[0].data=e().historic.HeatSink_Temp,chartH.update("none")),u&&(u.data.labels=e().historic.Timestamps,u.data.datasets[0].data=e().historic.Motor_Velocity,u.update("none")),p&&(p.data.labels=e().historic.Timestamps,p.data.datasets[0].data=e().historic.Speed2,p.update("none")))}rt(()=>{h.register(ct,_t,mt,nt,ut,pt,bt,gt),a(C)&&(n=new h(a(C),B("Bus Power",e().historic.Bus_Power,"#f59e0b","Bus Power (W)"))),a(M)&&(w=new h(a(M),B("Phase A Current",e().historic.PhaseA_Current,"#ab47bc","Phase A Current (A)"))),setTimeout(()=>{let cb=document.getElementById("new-canvas-phaseB");if(cb) chartB=new h(cb,B("Phase B Current",e().historic.PhaseB_Current,"#3b82f6","Phase B Current (A)"));let cc=document.getElementById("new-canvas-phaseC");if(cc) chartC=new h(cc,B("Phase C Current",e().historic.PhaseC_Current,"#10b981","Phase C Current (A)"));let ch=document.getElementById("new-canvas-heatsink");if(ch) chartH=new h(ch,B("Heatsink Temp",e().historic.HeatSink_Temp,"#ef4444","Temp (°C)"));}, 50),a(P)&&(u=new h(a(P),B("Motor RPM",e().historic.Motor_Velocity,"#10b981","Motor RPM vs Time"))),a(k)&&(p=new h(a(k),B("Vehicle Speed (km/h)",e().historic.Speed2,"#3b82f6","Vehicle Speed vs Time")))}),at(()=>{n&&n.destroy(),u&&u.destroy(),p&&p.destroy()});const Le=[{key:"ipm_temp_limit",label:"IPM Temp Limit"},{key:"bus_voltage_lower_limit",label:"Bus V Lower Limit"},{key:"bus_voltage_upper_limit",label:"Bus V Upper Limit"},{key:"bus_current_limit",label:"Bus Current Limit"},{key:"velocity_limit",label:"Velocity Limit"},{key:"motor_current_limit",label:"Motor Current Limit"},{key:"output_voltage_pwm_limit",label:"Output PWM"}],Ve=[{key:"motor_over_speed",label:"Motor Over Speed"},{key:"desaturation_fault",label:"Desaturation"},{key:"rail_15v_uvlo",label:"15V UVLO"},{key:"config_read_error",label:"Config Error"},{key:"watchdog_reset",label:"Watchdog"},{key:"bad_motor_position",label:"Bad Motor Position"},{key:"dc_bus_over_voltage",label:"DC Bus Over Voltage"},{key:"software_over_current",label:"Software Over Current"},{key:"hardware_over_current",label:"Hardware Over Current"}];J(()=>e(),()=>{e().historic.Timestamps.length>0&&Se()}),J(()=>e(),()=>{x(S,{ipm_temp_limit:e().metric.MotorLimits.ipm_temp_limit,bus_voltage_lower_limit:e().metric.MotorLimits.bus_voltage_lower_limit,bus_voltage_upper_limit:e().metric.MotorLimits.bus_voltage_upper_limit,bus_current_limit:e().metric.MotorLimits.bus_current_limit,velocity_limit:e().metric.MotorLimits.velocity_limit,motor_current_limit:e().metric.MotorLimits.motor_current_limit,output_voltage_pwm_limit:e().metric.MotorLimits.output_voltage_pwm_limit})}),J(()=>e(),()=>{x(L,{motor_over_speed:e().metric.MotorErrors.motor_over_speed,desaturation_fault:e().metric.MotorErrors.desaturation_fault,rail_15v_uvlo:e().metric.MotorErrors.rail_15v_uvlo,config_read_error:e().metric.MotorErrors.config_read_error,watchdog_reset:e().metric.MotorErrors.watchdog_reset,bad_motor_position:e().metric.MotorErrors.bad_motor_position,dc_bus_over_voltage:e().metric.MotorErrors.dc_bus_over_voltage,software_over_current:e().metric.MotorErrors.software_over_current,hardware_over_current:e().metric.MotorErrors.hardware_over_current})}),st(),tt();var V=wt(),T=r(V),E=r(T),ee=r(E),Te=r(ee,!0);t(ee),c(2),t(E);var $=i(E,2),te=r($),Ee=r(te,!0);t(te),c(2),t($);var W=i($,2),re=r(W),$e=r(re,!0);t(re),c(2),t(W);var ae=i(W,2),ie=r(ae),We=r(ie,!0);t(ie),c(2),t(ae),t(T);var R=i(T,2),O=r(R),se=r(O),Re=r(se,!0);t(se),c(2),t(O);var H=i(O,2),le=r(H),Oe=r(le,!0);t(le),c(2),t(H);var j=i(H,2),ve=r(j),He=r(ve,!0);t(ve),c(2),t(j);var D=i(j,2),oe=r(D),je=r(oe,!0);t(oe),c(2),t(D);var F=i(D,2),de=r(F),De=r(de,!0);t(de),c(2),t(F);var ce=i(F,2),_e=r(ce),Fe=r(_e,!0);t(_e),c(2),t(ce),t(R);var q=i(R,2),me=i(r(q),2);he(me,5,()=>Le,Ce,(s,v)=>{const m=ye(()=>(a(S),a(v),l(()=>a(S)[a(v).key])));var _=ft(),b=r(_),g=i(b,2),y=r(g,!0);t(g),t(_),K(()=>{Me(b,1,`w-3 h-3 rounded-full ${a(m)?"bg-yellow-500":"bg-gray-500"} flex-shrink-0`),o(y,(a(v),l(()=>a(v).label)))}),Q(s,_)}),t(me),t(q);var I=i(q,2),ne=i(r(I),2);he(ne,5,()=>Ve,Ce,(s,v)=>{const m=ye(()=>(a(L),a(v),l(()=>a(L)[a(v).key])));var _=xt(),b=r(_),g=i(b,2),y=r(g,!0);t(g),t(_),K(()=>{Me(b,1,`w-3 h-3 rounded-full ${a(m)?"bg-red-500":"bg-gray-500"} flex-shrink-0`),o(y,(a(v),l(()=>a(v).label)))}),Q(s,_)}),t(ne),t(I);var N=i(I,2),qe=r(N);A(qe,s=>x(C,s),()=>a(C)),t(N);var U=i(N,2),Ie=r(U);A(Ie,s=>x(k,s),()=>a(k)),t(U);var Y=i(U,2),Z=r(Y),Ne=r(Z);A(Ne,s=>x(M,s),()=>a(M)),t(Z);var ue=i(Z,2),Ue=r(ue);A(Ue,s=>x(P,s),()=>a(P)),t(ue),t(Y);t(V),K((s,v,m,_,b,g,y,Ge,Je,Ke)=>{o(Te,s),o(Ee,v),o($e,m),o(We,_),o(Re,b),o(Oe,g),o(He,y),o(je,Ge),o(De,Je),o(Fe,Ke)},[()=>(e(),l(()=>d(e().metric.Motor_Velocity,"RPM",0))),()=>(e(),l(()=>d(e().metric.Speed2,"km/h"))),()=>(e(),l(()=>d(e().metric.Motor_Temp,"°",3))),()=>(e(),l(()=>d(e().metric.HeatSink_Temp,"°C"))),()=>(e(),l(()=>d(e().metric.PhaseA_Current,"A"))),()=>(e(),l(()=>d(e().metric.PhaseB_Current,"A"))),()=>(e(),l(()=>d(e().metric.PhaseC_Current,"A"))),()=>(e(),l(()=>d(e().metric.Bus_Voltage,"V"))),()=>(e(),l(()=>d(e().metric.Bus_Current,"A"))),()=>(e(),l(()=>d(e().metric.Bus_Power,"W",0)))]),Q(Pe,V),lt(),Ae()}export{Lt as component};
+import "../chunks/Bzak7iHL.js";
+import {i as tt} from "../chunks/BaVNoogA.js";
+import {o as rt, a as at} from "../chunks/NmWs3qIF.js";
+import {Y as it, aa as J, ab as st, _ as X, $ as K, a0 as Q, a1 as lt, a2 as i, a3 as r, u as l, a5 as o, t as a, A as f, W as x, a6 as t, a7 as c, v as ye} from "../chunks/B2hAlVi-.js";
+import {e as he, i as Ce} from "../chunks/T28DYXdB.js";
+import {g as vt, s as Me} from "../chunks/DNFaeDbv.js";
+import {b as A} from "../chunks/CqHrAp-I.js";
+import {a as ot, s as dt} from "../chunks/DkIwFic-.js";
+import {C as h, a as ct, L as _t, P as mt, b as nt, c as ut, p as pt, d as bt, e as gt} from "../chunks/DHTsbXwT.js";
+var ft = X('<div class="flex items-center justify-center space-x-1"><div></div> <span class="text-xs text-gray-300"> </span></div>')
+  , xt = X('<div class="flex items-center justify-center space-x-1"><div></div> <span class="text-xs text-gray-300"> </span></div>')
+  , wt = X('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div class="metric-card svelte-1wa4b97"><div class="metric-value text-green-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Motor RPM</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-blue-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Velocity</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-orange-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Road Slope</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-cyan-400 text-2xl svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Heatsink Temperature</div></div></div> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4"><div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current A</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current B</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-purple-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Phase Current C</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-yellow-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Voltage</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-red-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Current</div></div> <div class="metric-card svelte-1wa4b97"><div class="metric-value text-orange-400 svelte-1wa4b97"> </div> <div class="metric-label svelte-1wa4b97">Bus Power</div></div></div> <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">Motor Limit Status:</span></div> <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4"></div></div> <div class="bg-gray-800 rounded-lg p-4 border border-gray-700"><div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-400">Motor Error Status:</span></div> <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-1wa4b97"><canvas class="w-full h-80"></canvas></div></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-phaseB" class="w-full h-80"></canvas></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-phaseC" class="w-full h-80"></canvas></div><div class="plot-container svelte-1wa4b97 mt-6"><canvas id="new-canvas-heatsink" class="w-full h-80"></canvas></div></div>');
+function Lt(Pe, ke) {
+    it(ke, !1);
+    const [Be,Ae] = ot()
+      , e = () => dt(vt, "$globalStore", Be)
+      , S = f()
+      , L = f();
+    let C = f(), M = f(), P = f(), k = f(), n, w, u, p, chartB, chartC, chartH;
+    function d(s, v="", m=1) {
+        return typeof s != "number" ? "N/A" : `${s.toFixed(m)} ${v}`
+    }
+    function B(s, v, m, _) {
+        return {
+            type: "line",
+            data: {
+                labels: e().historic.Timestamps,
+                datasets: [{
+                    label: s,
+                    data: v,
+                    borderColor: m,
+                    backgroundColor: m + "20",
+                    borderWidth: 2,
+                    fill: !1,
+                    tension: .1
+                }]
+            },
+            options: {
+                responsive: !0,
+                maintainAspectRatio: !1,
+                scales: {
+                    y: {
+                        beginAtZero: s === "Battery Level",
+                        max: s === "Battery Level" ? 100 : void 0,
+                        title: {
+                            display: !0,
+                            text: _,
+                            color: "#fff"
+                        },
+                        ticks: {
+                            color: "#fff"
+                        },
+                        grid: {
+                            color: "#374151"
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: !0,
+                            text: "Time",
+                            color: "#fff"
+                        },
+                        ticks: {
+                            color: "#fff"
+                        },
+                        grid: {
+                            color: "#374151"
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: "#fff"
+                        }
+                    },
+                    title: {
+                        display: !0,
+                        text: `${s} vs Time`,
+                        color: "#fff"
+                    }
+                }
+            }
+        }
+    }
+    function Se() {
+        e().historic.Timestamps.length !== 0 && (n && (n.data.labels = e().historic.Timestamps,
+        n.data.datasets[0].data = e().historic.Bus_Power,
+        n.update("none")),
+        w && (w.data.labels = e().historic.Timestamps,
+        w.data.datasets[0].data = e().historic.PhaseA_Current,
+        w.update("none")),
+        chartB && (chartB.data.labels = e().historic.Timestamps,
+        chartB.data.datasets[0].data = e().historic.PhaseB_Current,
+        chartB.update("none")),
+        chartC && (chartC.data.labels = e().historic.Timestamps,
+        chartC.data.datasets[0].data = e().historic.PhaseC_Current,
+        chartC.update("none")),
+        chartH && (chartH.data.labels = e().historic.Timestamps,
+        chartH.data.datasets[0].data = e().historic.HeatSink_Temp,
+        chartH.update("none")),
+        u && (u.data.labels = e().historic.Timestamps,
+        u.data.datasets[0].data = e().historic.Motor_Velocity,
+        u.update("none")),
+        p && (p.data.labels = e().historic.Timestamps,
+        p.data.datasets[0].data = e().historic.Speed2,
+        p.update("none")))
+    }
+    rt( () => {
+        h.register(ct, _t, mt, nt, ut, pt, bt, gt),
+        a(C) && (n = new h(a(C),B("Bus Power", e().historic.Bus_Power, "#f59e0b", "Bus Power (W)"))),
+        a(M) && (w = new h(a(M),B("Phase A Current", e().historic.PhaseA_Current, "#ab47bc", "Phase A Current (A)"))),
+        setTimeout( () => {
+            let cb = document.getElementById("new-canvas-phaseB");
+            if (cb)
+                chartB = new h(cb,B("Phase B Current", e().historic.PhaseB_Current, "#3b82f6", "Phase B Current (A)"));
+            let cc = document.getElementById("new-canvas-phaseC");
+            if (cc)
+                chartC = new h(cc,B("Phase C Current", e().historic.PhaseC_Current, "#10b981", "Phase C Current (A)"));
+            let ch = document.getElementById("new-canvas-heatsink");
+            if (ch)
+                chartH = new h(ch,B("Heatsink Temp", e().historic.HeatSink_Temp, "#ef4444", "Temp (°C)"));
+        }
+        , 50),
+        a(P) && (u = new h(a(P),B("Motor RPM", e().historic.Motor_Velocity, "#10b981", "Motor RPM vs Time"))),
+        a(k) && (p = new h(a(k),B("Vehicle Speed (km/h)", e().historic.Speed2, "#3b82f6", "Vehicle Speed vs Time")))
+    }
+    ),
+    at( () => {
+        n && n.destroy(),
+        u && u.destroy(),
+        p && p.destroy()
+    }
+    );
+    const Le = [{
+        key: "ipm_temp_limit",
+        label: "IPM Temp Limit"
+    }, {
+        key: "bus_voltage_lower_limit",
+        label: "Bus V Lower Limit"
+    }, {
+        key: "bus_voltage_upper_limit",
+        label: "Bus V Upper Limit"
+    }, {
+        key: "bus_current_limit",
+        label: "Bus Current Limit"
+    }, {
+        key: "velocity_limit",
+        label: "Velocity Limit"
+    }, {
+        key: "motor_current_limit",
+        label: "Motor Current Limit"
+    }, {
+        key: "output_voltage_pwm_limit",
+        label: "Output PWM"
+    }]
+      , Ve = [{
+        key: "motor_over_speed",
+        label: "Motor Over Speed"
+    }, {
+        key: "desaturation_fault",
+        label: "Desaturation"
+    }, {
+        key: "rail_15v_uvlo",
+        label: "15V UVLO"
+    }, {
+        key: "config_read_error",
+        label: "Config Error"
+    }, {
+        key: "watchdog_reset",
+        label: "Watchdog"
+    }, {
+        key: "bad_motor_position",
+        label: "Bad Motor Position"
+    }, {
+        key: "dc_bus_over_voltage",
+        label: "DC Bus Over Voltage"
+    }, {
+        key: "software_over_current",
+        label: "Software Over Current"
+    }, {
+        key: "hardware_over_current",
+        label: "Hardware Over Current"
+    }];
+    J( () => e(), () => {
+        e().historic.Timestamps.length > 0 && Se()
+    }
+    ),
+    J( () => e(), () => {
+        x(S, {
+            ipm_temp_limit: e().metric.MotorLimits.ipm_temp_limit,
+            bus_voltage_lower_limit: e().metric.MotorLimits.bus_voltage_lower_limit,
+            bus_voltage_upper_limit: e().metric.MotorLimits.bus_voltage_upper_limit,
+            bus_current_limit: e().metric.MotorLimits.bus_current_limit,
+            velocity_limit: e().metric.MotorLimits.velocity_limit,
+            motor_current_limit: e().metric.MotorLimits.motor_current_limit,
+            output_voltage_pwm_limit: e().metric.MotorLimits.output_voltage_pwm_limit
+        })
+    }
+    ),
+    J( () => e(), () => {
+        x(L, {
+            motor_over_speed: e().metric.MotorErrors.motor_over_speed,
+            desaturation_fault: e().metric.MotorErrors.desaturation_fault,
+            rail_15v_uvlo: e().metric.MotorErrors.rail_15v_uvlo,
+            config_read_error: e().metric.MotorErrors.config_read_error,
+            watchdog_reset: e().metric.MotorErrors.watchdog_reset,
+            bad_motor_position: e().metric.MotorErrors.bad_motor_position,
+            dc_bus_over_voltage: e().metric.MotorErrors.dc_bus_over_voltage,
+            software_over_current: e().metric.MotorErrors.software_over_current,
+            hardware_over_current: e().metric.MotorErrors.hardware_over_current
+        })
+    }
+    ),
+    st(),
+    tt();
+    var V = wt()
+      , T = r(V)
+      , E = r(T)
+      , ee = r(E)
+      , Te = r(ee, !0);
+    t(ee),
+    c(2),
+    t(E);
+    var $ = i(E, 2)
+      , te = r($)
+      , Ee = r(te, !0);
+    t(te),
+    c(2),
+    t($);
+    var W = i($, 2)
+      , re = r(W)
+      , $e = r(re, !0);
+    t(re),
+    c(2),
+    t(W);
+    var ae = i(W, 2)
+      , ie = r(ae)
+      , We = r(ie, !0);
+    t(ie),
+    c(2),
+    t(ae),
+    t(T);
+    var R = i(T, 2)
+      , O = r(R)
+      , se = r(O)
+      , Re = r(se, !0);
+    t(se),
+    c(2),
+    t(O);
+    var H = i(O, 2)
+      , le = r(H)
+      , Oe = r(le, !0);
+    t(le),
+    c(2),
+    t(H);
+    var j = i(H, 2)
+      , ve = r(j)
+      , He = r(ve, !0);
+    t(ve),
+    c(2),
+    t(j);
+    var D = i(j, 2)
+      , oe = r(D)
+      , je = r(oe, !0);
+    t(oe),
+    c(2),
+    t(D);
+    var F = i(D, 2)
+      , de = r(F)
+      , De = r(de, !0);
+    t(de),
+    c(2),
+    t(F);
+    var ce = i(F, 2)
+      , _e = r(ce)
+      , Fe = r(_e, !0);
+    t(_e),
+    c(2),
+    t(ce),
+    t(R);
+    var q = i(R, 2)
+      , me = i(r(q), 2);
+    he(me, 5, () => Le, Ce, (s, v) => {
+        const m = ye( () => (a(S),
+        a(v),
+        l( () => a(S)[a(v).key])));
+        var _ = ft()
+          , b = r(_)
+          , g = i(b, 2)
+          , y = r(g, !0);
+        t(g),
+        t(_),
+        K( () => {
+            Me(b, 1, `w-3 h-3 rounded-full ${a(m) ? "bg-yellow-500" : "bg-gray-500"} flex-shrink-0`),
+            o(y, (a(v),
+            l( () => a(v).label)))
+        }
+        ),
+        Q(s, _)
+    }
+    ),
+    t(me),
+    t(q);
+    var I = i(q, 2)
+      , ne = i(r(I), 2);
+    he(ne, 5, () => Ve, Ce, (s, v) => {
+        const m = ye( () => (a(L),
+        a(v),
+        l( () => a(L)[a(v).key])));
+        var _ = xt()
+          , b = r(_)
+          , g = i(b, 2)
+          , y = r(g, !0);
+        t(g),
+        t(_),
+        K( () => {
+            Me(b, 1, `w-3 h-3 rounded-full ${a(m) ? "bg-red-500" : "bg-gray-500"} flex-shrink-0`),
+            o(y, (a(v),
+            l( () => a(v).label)))
+        }
+        ),
+        Q(s, _)
+    }
+    ),
+    t(ne),
+    t(I);
+    var N = i(I, 2)
+      , qe = r(N);
+    A(qe, s => x(C, s), () => a(C)),
+    t(N);
+    var U = i(N, 2)
+      , Ie = r(U);
+    A(Ie, s => x(k, s), () => a(k)),
+    t(U);
+    var Y = i(U, 2)
+      , Z = r(Y)
+      , Ne = r(Z);
+    A(Ne, s => x(M, s), () => a(M)),
+    t(Z);
+    var ue = i(Z, 2)
+      , Ue = r(ue);
+    A(Ue, s => x(P, s), () => a(P)),
+    t(ue),
+    t(Y);
+    t(V),
+    K( (s, v, m, _, b, g, y, Ge, Je, Ke) => {
+        o(Te, s),
+        o(Ee, v),
+        o($e, m),
+        o(We, _),
+        o(Re, b),
+        o(Oe, g),
+        o(He, y),
+        o(je, Ge),
+        o(De, Je),
+        o(Fe, Ke)
+    }
+    , [ () => (e(),
+    l( () => d(e().metric.Motor_Velocity, "RPM", 0))), () => (e(),
+    l( () => d(e().metric.Speed2, "km/h"))), () => (e(),
+    l( () => d(e().metric.Gradient, "%", 3))), () => (e(),
+    l( () => d(e().metric.HeatSink_Temp, "°C"))), () => (e(),
+    l( () => d(e().metric.PhaseA_Current, "A"))), () => (e(),
+    l( () => d(e().metric.PhaseB_Current, "A"))), () => (e(),
+    l( () => d(e().metric.PhaseC_Current, "A"))), () => (e(),
+    l( () => d(e().metric.Bus_Voltage, "V"))), () => (e(),
+    l( () => d(e().metric.Bus_Current, "A"))), () => (e(),
+    l( () => d(e().metric.Bus_Power, "W", 0)))]),
+    Q(Pe, V),
+    lt(),
+    Ae()
+}
+export {Lt as component};

@@ -157,7 +157,8 @@ const u = {
         Longitude: 0.0,
         Altitude: 0.0,
         Gradient: 0.0,
-        Bearing: 0.0
+        Bearing: 0.0,
+        ETA: 0
     },
     historic: {
         Timestamps: [],
@@ -192,7 +193,9 @@ const u = {
         Altitude: [],
         Gradient: [],
         Coordinates: [],
-        Distance: []
+        Distance: [],
+        SpeedLimit: [],
+        SpeedProfile:[]
     }
 }
   , c = f([]);
@@ -283,8 +286,6 @@ function w() {
                         if (t.profile && t.profile[o] != null) {
                             r.profile[o] || (r.profile[o] = []);
                             r.profile[o] = [...r.profile[o], t.profile[o]];
-                            const n = 1e3;
-                            r.profile[o].length > n && (r.profile[o] = r.profile[o].slice(-n))
                         }
                     }
                     ),
