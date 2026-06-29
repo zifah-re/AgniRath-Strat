@@ -34,8 +34,6 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
     data=req.text
     key_list=re.findall(r"\"(AIzaSy[^\"]*)",data)
     key_list=[*{*key_list}]
-    original_line = LineString([(lon, lat) for lat, lon in new_coordinates])
-    total_shapely_length = original_line.length
     google_matched_coordinates = []
     total_distance = 0.0
     for i in range(1, len(new_coordinates)):
