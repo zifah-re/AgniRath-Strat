@@ -259,7 +259,8 @@ current_data_default = {
         "Distance": [],
         "SpeedLimit": [],
         "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
-        "Headings":[]
+        "Headings":[],
+        "TargetProfile": []
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -567,6 +568,9 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
                     metric['Heading']=current_data['profile']['Headings'][i]
+                    if current_data['profile']['TargetProfile']:
+                        v1,v2=current_data['profile']['TargetProfile'][i],current_data['profile']['TargetProfile'][i+1]
+                        metric['predicted']=v1 + f*(v2-v1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,

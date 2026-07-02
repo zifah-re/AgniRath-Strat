@@ -185,7 +185,7 @@ def main(df=None):
             except Exception as e:
                     print(f"Error: {e}")
                     
-            time.sleep(2)  # 10Hz update rate
+            time.sleep(0.1)  # 10Hz update rate
             
 
 if __name__ == "__main__":
