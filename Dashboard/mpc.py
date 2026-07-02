@@ -23,8 +23,8 @@ N = 10                     # 10-step horizon
 def pad_or_truncate(arr, default_val):
     arr = list(arr) if arr is not None else []
     if len(arr) < N:
-        return np.pad(arr, (0, N - len(arr)), 'constant', constant_values=default_val)
-    return np.array(arr[:N])
+        return np.pad(arr, (0, N +1- len(arr)), 'constant', constant_values=default_val)
+    return np.array(arr[:N+1])
 
 def slice_profiles(profile,distance_profile,d_current,default_val):
     profile_distance=distance_profile[-1]
@@ -42,7 +42,7 @@ def calculate_net_power(v_current, v_next, slope_rad, solar_irradiance,seg_len):
     f_drag = 0.5 * RHO * CDA * (v_current ** 2)
     f_rolling = MASS * G * CRR * np.cos(slope_rad)
     f_gravity = MASS * G * np.sin(slope_rad)
-    dt=(seg_len/v_current)*3600
+    dt=max((seg_len/v_current)*1000,0.01)
     f_acceleration = MASS * (v_next - v_current) / dt
     
     f_total = f_drag + f_rolling + f_gravity + f_acceleration
@@ -66,8 +66,8 @@ def mpc_cost_function(v_horizon, current_soc, current_v, target_profile, terrain
         v_next = v_horizon[i-1]
         seg_len=distance_profile[i]-distance_profile[i-1]
         p_net = calculate_net_power(v_prev, v_next, terrain_profile[i-1], solar_profile[i-1],seg_len)
-        dt=seg_len/v_prev
-        energy_change_wh = (p_net * dt)
+        dt=max((seg_len/v_prev)*1000,0.01)
+        energy_change_wh = (p_net * dt)/3600
         soc += (energy_change_wh / BATT_CAPACITY_WH) * 100.0
         
         # Penalties
@@ -108,11 +108,10 @@ def main():
 
     profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance","TargetProfile","Distance"])
     distance_profile=profiles.get("Distance")
-    terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile))
-    target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile))
-    solar_profile = profiles.get("SolarIrradiance", [500.0]*len(distance_profile))
+    terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
+    target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)
+    solar_profile = profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile)
     
-
     terrain_profile=slice_profiles(terrain_profile,distance_profile,current_distance,0)
     target_profile=slice_profiles(target_profile,distance_profile,current_distance,current_speed)
     target_profile=target_profile*(5/18)

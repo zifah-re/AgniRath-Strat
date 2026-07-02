@@ -22,7 +22,7 @@ def get_profile(profile_list:list)->dict:
     data=req.json()
     result={}
     for profile in profile_list:
-        if profile in data.keys():
+        if profile in data['profile'].keys():
             result[profile]=data['profile'][profile]
     return result
     
