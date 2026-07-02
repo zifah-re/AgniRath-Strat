@@ -13,6 +13,7 @@ from pathlib import Path
 from traffic import main as traffic_main
 from scipy.signal import savgol_filter
 from constants import NO_SNAP_TO_ROAD
+import math
 
 def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_points:list)->dict:
     url="https://earth.google.com/web/"
@@ -63,7 +64,6 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
         d1=results["road_dist"]
         speed_limit=results["SpeedLimit"]
         speed_profile=results["SpeedProfile"]
-        heading_profile=results["Headings"]
         if d1/d >0.90:
             eta=eta*d/d1
             print(f"ETA: {eta//3600:.0f} Hour{'s' if eta//3600!=1 else ''} {(eta%3600)//60:.0f} Minutes")
@@ -139,8 +139,20 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
     end_lat, end_lon = path_coordinates[-1]
     x_distances = [0.0]  # Start point is always 0 km/meters
     total_distance = 0.0
+    heading_profile=[]
     for i in range(1, len(snapped_coordinates)):
         # Calculate geodesic distance between consecutive pairs in kilometers
+        curr_lat,curr_lon,prev_lat,prev_lon=snapped_coordinates[i][0],snapped_coordinates[i][1],snapped_coordinates[i-1][0],snapped_coordinates[i-1][1]
+        lat1_rad = math.radians(prev_lat)
+        lat2_rad = math.radians(curr_lat)
+        delta_lon_rad = math.radians(curr_lon - prev_lon)
+        x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
+        y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
+            math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(delta_lon_rad)
+        )
+        initial_bearing_rad = math.atan2(x, y)
+        initial_bearing_deg = math.degrees(initial_bearing_rad)
+        heading_profile.append((initial_bearing_deg + 360) % 360)
         segment_dist = geodesic(snapped_coordinates[i-1], snapped_coordinates[i]).meters
         true_seg_dist=(segment_dist**2 + (altitude_list[i]-altitude_list[i-1])**2)**0.5
         total_distance += true_seg_dist/1000
