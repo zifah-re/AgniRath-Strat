@@ -87,7 +87,7 @@ def compute_optimal_velocity(current_v, current_soc, target_profile, terrain_pro
     )
     
     if result.success:
-        return float(result.x)
+        return result.x
     return u_guess # Fallback to current speed if solver fails
 
 def runMPC():
