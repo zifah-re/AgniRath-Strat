@@ -63,15 +63,15 @@ def mpc_cost_function(v_horizon, current_soc, current_v, target_profile, terrain
     v_prev = current_v
     
     for i in range(1,N+1):
-        v_next = v_horizon[i]
+        v_next = v_horizon[i-1]
         seg_len=distance_profile[i]-distance_profile[i-1]
-        p_net = calculate_net_power(v_prev, v_next, terrain_profile[i], solar_profile[i],seg_len)
+        p_net = calculate_net_power(v_prev, v_next, terrain_profile[i-1], solar_profile[i-1],seg_len)
         dt=seg_len/v_prev
         energy_change_wh = (p_net * dt)
         soc += (energy_change_wh / BATT_CAPACITY_WH) * 100.0
         
         # Penalties
-        cost += 1.0 * (v_next - target_profile[i]) ** 2
+        cost += 1.0 * (v_next - target_profile[i-1]) ** 2
         if soc < 20.0:
             cost += 1000.0 * (20.0 - soc) ** 2
         cost += 0.5 * (v_next - v_prev) ** 2
@@ -107,10 +107,11 @@ def main():
     current_distance = results['Distance']
 
     profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance","TargetProfile","Distance"])
-    terrain_profile = profiles.get("Gradient", [0.0]*N)
-    target_profile = profiles.get("TargetProfile", [current_speed]*N)
-    solar_profile = profiles.get("SolarIrradiance", [500.0]*N)
     distance_profile=profiles.get("Distance")
+    terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile))
+    target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile))
+    solar_profile = profiles.get("SolarIrradiance", [500.0]*len(distance_profile))
+    
 
     terrain_profile=slice_profiles(terrain_profile,distance_profile,current_distance,0)
     target_profile=slice_profiles(target_profile,distance_profile,current_distance,current_speed)
