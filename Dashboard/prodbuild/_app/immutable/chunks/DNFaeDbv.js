@@ -196,7 +196,8 @@ const u = {
         Distance: [],
         SpeedLimit: [],
         SpeedProfile:[],
-        Headings:[]
+        Headings:[],
+        TargetProfile: []
     }
 }
   , c = f([]);
