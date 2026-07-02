@@ -530,17 +530,19 @@ async def update_processor(queue: asyncio.Queue):
                     i=-1
                     while i<len(current_data['profile']['Distance'])-1 and distance>=current_data['profile']['Distance'][i+1]:
                         i+=1
-                    seg_dist,eta=current_data['profile']['Distance'][i+1]-distance,0
-                    for j in range(i,len(current_data['profile']['Distance'])-1):
-                        if j!=i:
-                            seg_dist=current_data['profile']['Distance'][j+1]-current_data['profile']['Distance'][j]
-                        if current_data['profile']['SpeedLimit'][j]!=0 and current_data['profile']['SpeedProfile'][j]!=0:
-                            eta+=(seg_dist*1000)/(min((MAX_SPEED,current_data['profile']['SpeedLimit'][j],current_data['profile']['SpeedProfile'][j]))*(5/18))
-                        elif (current_data['profile']['SpeedLimit'][j]!=0) ^ (current_data['profile']['SpeedProfile'][j]!=0):
-                            eta+=(seg_dist*1000)/(min(max(current_data['profile']['SpeedProfile'][j],current_data['profile']['SpeedLimit'][j]),MAX_SPEED)*(5/18))
-                        else:
-                            eta+=(seg_dist*1000)/(MAX_SPEED*(5/18))
-                    metric["ETA"]=eta
+                    if len(current_data['profile']['SpeedLimit'])>0:
+                        seg_dist,eta=current_data['profile']['Distance'][i+1]-distance,0
+                        for j in range(i,len(current_data['profile']['Distance'])-1):
+                            if j!=i:
+                                seg_dist=current_data['profile']['Distance'][j+1]-current_data['profile']['Distance'][j]
+                            if current_data['profile']['SpeedLimit'][j]!=0 and current_data['profile']['SpeedProfile'][j]!=0:
+                                eta+=(seg_dist*1000)/(min((MAX_SPEED,current_data['profile']['SpeedLimit'][j],current_data['profile']['SpeedProfile'][j]))*(5/18))
+                            elif (current_data['profile']['SpeedLimit'][j]!=0) ^ (current_data['profile']['SpeedProfile'][j]!=0):
+                                eta+=(seg_dist*1000)/(min(max(current_data['profile']['SpeedProfile'][j],current_data['profile']['SpeedLimit'][j]),MAX_SPEED)*(5/18))
+                            else:
+                                eta+=(seg_dist*1000)/(MAX_SPEED*(5/18))
+                        metric["ETA"]=eta
+
                     f=(distance-current_data['profile']['Distance'][i])/(current_data['profile']['Distance'][i+1]-current_data['profile']['Distance'][i])
                     lat1,lon1=current_data['profile']['Coordinates'][i]
                     lat2,lon2=current_data['profile']['Coordinates'][i+1]
