@@ -212,7 +212,7 @@ current_data_default = {
         'Longitude': 0.0,
         'Altitude': 0.0,
         'Gradient': 0.0,
-        'Bearing': 0.0,
+        'Heading': 0.0,
         'ETA': 0
     },
     "historic": {
@@ -258,7 +258,8 @@ current_data_default = {
         "Coordinates": [],
         "Distance": [],
         "SpeedLimit": [],
-        "SpeedProfile":[]       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
+        "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
+        "Headings":[]
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -563,14 +564,7 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Longitude'] = math.degrees(interp_lon)
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
-                    delta_lon_rad = math.radians(lon2 - lon1)
-                    x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
-                    y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
-                        math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(delta_lon_rad)
-                    )
-                    initial_bearing_rad = math.atan2(x, y)
-                    initial_bearing_deg = math.degrees(initial_bearing_rad)
-                    metric['Bearing']= (initial_bearing_deg + 360) % 360
+                    metric['Heading']=current_data['profile']['Headings'][i]
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,
@@ -786,7 +780,7 @@ def get_live_car_gps():
                 },
                 "properties": {
                     "id": "live-car-pin",
-                    "bearing": current_data['metric']['Bearing']
+                    "bearing": current_data['metric']['Heading']
                 }
             }
         ]
@@ -911,7 +905,8 @@ async def render_selected_track(payload: SelectionPayload):
             "Distance": distance_profile,
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit,
-            "SpeedProfile": speed_profile
+            "SpeedProfile": speed_profile,
+            "Headings":results["Heading"]
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}

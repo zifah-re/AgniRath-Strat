@@ -157,7 +157,7 @@ const u = {
         Longitude: 0.0,
         Altitude: 0.0,
         Gradient: 0.0,
-        Bearing: 0.0,
+        Heading: 0.0,
         ETA: 0
     },
     historic: {
@@ -195,7 +195,8 @@ const u = {
         Coordinates: [],
         Distance: [],
         SpeedLimit: [],
-        SpeedProfile:[]
+        SpeedProfile:[],
+        Headings:[]
     }
 }
   , c = f([]);
