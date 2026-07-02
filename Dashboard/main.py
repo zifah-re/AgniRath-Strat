@@ -906,7 +906,7 @@ async def render_selected_track(payload: SelectionPayload):
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit,
             "SpeedProfile": speed_profile,
-            "Headings":results["Heading"]
+            "Headings":results["Headings"]
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}
