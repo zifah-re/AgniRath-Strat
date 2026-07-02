@@ -742,6 +742,12 @@ async def get_historical_data():
         'metric': current_data["metric"],
         'historic': current_data["historic"]
     }
+@app.get("/api/data/profile")
+async def get_profile_data():
+    """Get all cached profile data for solvers"""
+    return {
+        'profile':current_data['profile']
+    }
 
 @app.get("/api/data/clear")
 async def clear_historical_data():
