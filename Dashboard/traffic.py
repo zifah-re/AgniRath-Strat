@@ -108,7 +108,12 @@ def main(coordinates:list[tuple[float,float]])->dict:
                     except:
                         pass
             for lon,lat in feature["geometry"]["coordinates"]:
-                snapped_coords.append((lat,lon))
+                if len(snapped_coords)>0 and snapped_coords[-1]!=(lat,lon):
+                    snapped_coords.append((lat,lon))
+                elif len(snapped_coords)==0:
+                    snapped_coords.append((lat,lon))
+                else:
+                    continue
                 try:
                     speed_limits.append(feature["properties"]["speedLimits"]["value"])
                 except:
