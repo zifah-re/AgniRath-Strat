@@ -1,4 +1,4 @@
-# mpc.py
+from helper import get_current_state, get_profile
 import numpy as np
 from scipy.optimize import minimize
 
@@ -87,5 +87,18 @@ def compute_optimal_velocity(current_v, current_soc, target_profile, terrain_pro
     )
     
     if result.success:
-        return float(result.x[0])
-    return current_v # Fallback to current speed if solver fails
+        return float(result.x)
+    return u_guess # Fallback to current speed if solver fails
+
+def runMPC():
+    results = get_current_state()
+    current_speed = results['Speed']  
+    current_soc = results['SoC']
+    current_distance = results['Distance']
+
+    profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance","TargetProfile"])
+    terrain_profile = profiles.get("Gradient", [0.0]*N)
+    target_profile = profiles.get("TargetProfile", [current_speed]*N)
+    solar_profile = profiles.get("SolarIrradiance", [500.0]*N)
+
+    return compute_optimal_velocity(current_speed, current_soc, target_profile, terrain_profile, solar_profile)
