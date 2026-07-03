@@ -125,7 +125,6 @@ def main(results=None,profiles=None):
     solar_profile = profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile)
     if isinstance(target_profile[0],(tuple,list)):
         target_profile=[i for _,i in target_profile]
-        print(target_profile)
     terrain_profile=slice_profiles(terrain_profile,distance_profile,current_distance,0)
     target_profile=slice_profiles(target_profile,distance_profile,current_distance,current_speed)
     target_profile=target_profile*(5/18)
