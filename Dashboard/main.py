@@ -859,6 +859,19 @@ async def upload_kml(file: UploadFile = File(...)):
         return {"session_id": session_id, "options": structural_options}
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": f"Failed to inspect KML: {str(e)}"})
+@app.post("/api/save")
+async def save(request: Request):
+    try:
+        data = await request.json()
+        data['profile']=copy.deepcopy(current_data['profile'])
+        if 'MPCProfile' in data['profile'].keys():
+            data['profile'].pop('MPCProfile')
+            data['profile'].pop("TargetProfile")
+        with open(data['file_name']+'_'+data['folder_index']+'_'+data['placemark_index']+".kml.save","w") as file:
+            file.write(json.dump(data))
+        return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Failed to save KML: {str(e)}"})
 
 
 class SelectionPayload(BaseModel):

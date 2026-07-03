@@ -103,7 +103,7 @@ function Lt(Pe, ke) {
         u.data.datasets[0].data = e().historic.Motor_Velocity,
         u.update("none")),
         p && (p.data.labels = e().historic.Timestamps,
-        p.data.datasets[0].data = e().historic.Speed2,
+        p.data.datasets[0].data = e().historic.Speed,
         p.update("none")))
     }
     rt( () => {
@@ -123,7 +123,7 @@ function Lt(Pe, ke) {
         }
         , 50),
         a(P) && (u = new h(a(P),B("Motor RPM", e().historic.Motor_Velocity, "#10b981", "Motor RPM vs Time"))),
-        a(k) && (p = new h(a(k),B("Vehicle Speed (km/h)", e().historic.Speed2, "#3b82f6", "Vehicle Speed vs Time")))
+        a(k) && (p = new h(a(k),B("Vehicle Speed (km/h)", e().historic.Speed, "#3b82f6", "Vehicle Speed vs Time")))
     }
     ),
     at( () => {
@@ -358,7 +358,7 @@ function Lt(Pe, ke) {
     }
     , [ () => (e(),
     l( () => d(e().metric.Motor_Velocity, "RPM", 0))), () => (e(),
-    l( () => d(e().metric.Speed2, "km/h"))), () => (e(),
+    l( () => d(e().metric.Speed, "km/h"))), () => (e(),
     l( () => d(e().metric.Gradient, "%", 3))), () => (e(),
     l( () => d(e().metric.HeatSink_Temp, "°C"))), () => (e(),
     l( () => d(e().metric.PhaseA_Current, "A"))), () => (e(),
