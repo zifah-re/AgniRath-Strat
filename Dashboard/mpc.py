@@ -88,6 +88,7 @@ def compute_optimal_velocity(current_v, current_soc, targets, terrain, solar,dis
     """
     history_v=[current_v]
     history_soc=[current_soc]
+    dt_array=[0]
     for i in range(1,N+1):
         speed_bounds = [(0, 25.0) for _ in range(N)] # Bounds between ~60 and 90 km/h
         u_guess = np.ones(N) * current_v
@@ -99,23 +100,25 @@ def compute_optimal_velocity(current_v, current_soc, targets, terrain, solar,dis
         )
         
         if result.success:
-            history_v.append(result.x[0])
+            history_v.append(float(result.x[0]))
         else:
-            history_v.append(u_guess[0]) # Fallback to current speed if solver fails
+            history_v.append(float(u_guess[0])) # Fallback to current speed if solver fails
         seg_len=distance[i]-distance[i-1]
         p_net_actual = calculate_net_power(history_v[-2], history_v[-1], terrain[i-1], solar[i-1],seg_len)
         dt=max((seg_len/history_v[-2])*1000,0.01)
+        dt_array.append(dt_array[-1]+dt)
         history_soc.append(current_soc + ((p_net_actual * dt) / 3600.0 / BATT_CAPACITY_WH) * 100.0)
     history_v=np.array(history_v)
-    return (history_v*(18/5)).tolist()
+    return list(zip(dt_array,(history_v*(18/5)).tolist()))
 
-def main():
-    results = get_current_state()
+def main(results=None,profiles=None):
+    if not results:
+        results = get_current_state()
     current_speed = results['Speed']
     current_soc = results['SoC']
     current_distance = results['Distance']
-
-    profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance","TargetProfile","Distance"])
+    if not profiles:
+        profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance","TargetProfile","Distance"])
     distance_profile=profiles.get("Distance")
     terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)

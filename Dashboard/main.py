@@ -30,6 +30,7 @@ from Google_Earth import main as maps_main
 from geopy.distance import geodesic
 from geopy.point import Point
 
+from mpc import main as solver_main
 
 # Key Lists
 PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
@@ -217,6 +218,7 @@ current_data_default = {
     },
     "historic": {
         'Timestamps': [],
+        'Time_seconds': [], 
         'Speed': [],
         'Battery': [],
         'Power': [],
@@ -260,7 +262,8 @@ current_data_default = {
         "SpeedLimit": [],
         "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
         "Headings":[],
-        "TargetProfile": []
+        "TargetProfile": [],
+        "MPCProfile": []
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -573,6 +576,7 @@ async def update_processor(queue: asyncio.Queue):
                         metric['predicted']=v1 + f*(v2-v1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
+                    'Time_seconds': float(rx_dt.timestamp()),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,
                     'Battery': tracker_state["current_soc_percentage"],
                     'Power': output_power,
@@ -616,7 +620,23 @@ async def update_processor(queue: asyncio.Queue):
                     'Latitudes': metric['Latitude'] if metric['Latitude'] else pdata['Latitude'],
                     'Longitudes': metric['Longitude'] if metric['Longitude'] else pdata['Longitude'],
                 }
-
+                if current_data['profile']['Coordinates']:
+                    try:
+                        results={
+                            "Speed": current_data['metric']['Speed'],
+                            "SoC": current_data['metric']['SOC_Ah'],
+                            "Distance": current_data['metric']['distance_travelled']
+                        }
+                        profiles={
+                            "Gradient":current_data['profile']['Gradient'],
+                            "SpeedProfile":current_data['profile']['SpeedProfile'],
+                            "TargetProfile":current_data['profile']['TargetProfile'],
+                            "Distance":current_data['profile']['Distance']
+                        }
+                        MPCProfile=solver_main(results=results,profiles=profiles)
+                        current_data['profile']['MPCProfile']=[(t+historic['Time_seconds'],speed) for t,speed in MPCProfile]
+                    except:
+                        pass
                 for k in current_data['historic']:
                     if k in historic:
                         current_data['historic'][k].append(historic[k])

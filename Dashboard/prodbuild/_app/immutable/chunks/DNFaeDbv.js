@@ -162,6 +162,7 @@ const u = {
     },
     historic: {
         Timestamps: [],
+        Time_seconds: [],
         Speed: [],
         Battery: [],
         Power: [],
@@ -197,7 +198,8 @@ const u = {
         SpeedLimit: [],
         SpeedProfile:[],
         Headings:[],
-        TargetProfile: []
+        TargetProfile: [],
+        MPCProfile: []
     }
 }
   , c = f([]);
@@ -287,7 +289,7 @@ function w() {
                     t.profile && Object.keys(t.profile).forEach(o => {
                         if (t.profile && t.profile[o] != null) {
                             r.profile[o] || (r.profile[o] = []);
-                            r.profile[o] = [...r.profile[o], t.profile[o]];
+                            r.profile[o] = [...t.profile[o]];
                         }
                     }
                     ),
