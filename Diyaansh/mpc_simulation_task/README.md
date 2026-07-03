@@ -1,4 +1,4 @@
-# Solar Car Race — MPC Simulation
+# MPC Simulation 
 
 **Route:** Sasolburg → Zeerust | Base route without control stop loops
 
