@@ -225,8 +225,8 @@
             body: JSON.stringify({
                 map:sessionStorage.getItem('cached_map_html'),
                 file_name:sessionStorage.getItem('file_name'),
-                folder_index:parseInt(folderIdx),
-                placemark_index:parseInt(placemarkIdx)
+                folder_index:parseInt(sessionStorage.getItem('kml_folder_idx')),
+                placemark_index:parseInt(sessionStorage.getItem('kml_placemark_idx'))
             })
         });
     }
