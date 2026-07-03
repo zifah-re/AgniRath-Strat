@@ -572,7 +572,7 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Gradient']=grad1 + f*(grad2-grad1)
                     metric['Heading']=current_data['profile']['Headings'][i]
                     if current_data['profile']['TargetProfile']:
-                        v1,v2=current_data['profile']['TargetProfile'][i],current_data['profile']['TargetProfile'][i+1]
+                        v1,v2=current_data['profile']['TargetProfile'][i][1],current_data['profile']['TargetProfile'][i+1][1]
                         metric['predicted']=v1 + f*(v2-v1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
@@ -635,8 +635,8 @@ async def update_processor(queue: asyncio.Queue):
                         }
                         MPCProfile=solver_main(results=results,profiles=profiles)
                         current_data['profile']['MPCProfile']=[(t+historic['Time_seconds'],speed) for t,speed in MPCProfile]
-                    except:
-                        pass
+                    except Exception as e:
+                        raise e
                 for k in current_data['historic']:
                     if k in historic:
                         current_data['historic'][k].append(historic[k])

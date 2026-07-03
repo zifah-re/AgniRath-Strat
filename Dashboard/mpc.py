@@ -11,7 +11,7 @@ CRR = 0.007           # Rolling resistance coefficient
 RHO = 1.2             # Air density (kg/m^3)
 G = 9.81              # Gravity (m/s^2)
 
-SOLAR_AREA = 6.0      # m^2
+SOLAR_AREA = 5.95      # m^2
 SOLAR_EFF = 0.22      # 22%
 MOTOR_EFF = 0.95      # 95%
 REGEN_EFF = 0.70      # 70%
@@ -123,7 +123,9 @@ def main(results=None,profiles=None):
     terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)
     solar_profile = profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile)
-    
+    if isinstance(target_profile[0],(tuple,list)):
+        target_profile=[i for _,i in target_profile]
+        print(target_profile)
     terrain_profile=slice_profiles(terrain_profile,distance_profile,current_distance,0)
     target_profile=slice_profiles(target_profile,distance_profile,current_distance,current_speed)
     target_profile=target_profile*(5/18)

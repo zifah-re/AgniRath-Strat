@@ -117,15 +117,17 @@ function De(ee, te) {
                     backgroundColor: "#3b82f620",
                     borderWidth: 2,
                     fill: !1,
-                    tension: .1
+                    tension: .1,
+                    order:2
                 }, {
                     label: "Offline model speed",
-                    data: zipToCoords(historicalData.Time_seconds, e().profile.TargetProfile || []),
+                    data: zipToCoordsMPC(e().profile.TargetProfile),
                     borderColor: "#ef4444",
                     backgroundColor: "#ef444420",
                     borderWidth: 2,
                     fill: !1,
-                    tension: .1
+                    tension: .1,
+                    order:3
                 }, {
                     label: "Real time model speed",
                     data: zipToCoordsMPC(e().profile.MPCProfile),
@@ -133,7 +135,8 @@ function De(ee, te) {
                     backgroundColor: "#ef444420",
                     borderWidth: 2,
                     fill: !1,
-                    tension: .1
+                    tension: .1,
+                    order:1
                 }]
             },
             options: {
@@ -211,7 +214,7 @@ function De(ee, te) {
     function re() {
         // 1. Existing live telemetry charts update logic (r, l, o updates here...)
         if (e().historic?.Timestamps?.length > 0) {
-            r && ( r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoords(e().historic.Time_seconds, e().profile.TargetProfile || []),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.update("none"));
+            r && ( r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoordsMPC(e().profile.TargetProfile),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.update("none"));
             l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
             o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
             console.log(e().profile.MPCProfile);
