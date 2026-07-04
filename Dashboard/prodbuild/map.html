@@ -50,7 +50,7 @@
                     <select id="placemarkSelect" class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-white focus:outline-none focus:border-blue-500"></select>
                 </div>
             </div>
-            <button onclick="renderSelectedMapTrack()" class="w-full mt-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded-md text-white transition">
+            <button id="generateMap" onclick="renderSelectedMapTrack()" class="w-full mt-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded-md text-white transition">
                 Generate Interactive Map View
             </button>
         </div>
@@ -74,7 +74,9 @@
         const savedMapHtml = sessionStorage.getItem('cached_map_html');
         const savedSessionId = sessionStorage.getItem('kml_session_id');
         const savedFolderIdx = sessionStorage.getItem('kml_folder_idx');
+        const savedFolderName = sessionStorage.getItem('kml_folder_name');
         const savedPlacemarkIdx = sessionStorage.getItem('kml_placemark_idx');
+        const savedPlacemarkName = sessionStorage.getItem('kml_placemark_name');
 
         // High-speed route: If the map HTML already exists in this session, inject it instantly!
         if (savedMapHtml) {
@@ -90,19 +92,38 @@
                 if (response.ok) {
                     const data = await response.json();
                     currentSessionId = savedSessionId;
-                    parsedKmlOptions = data.options;
+                    if (!data.map_html){
+                        parsedKmlOptions = data.options;
 
-                    populateFolderSelector();
+                        populateFolderSelector();
 
-                    if (savedFolderIdx !== null) {
-                        document.getElementById('folderSelect').value = savedFolderIdx;
-                        updatePlacemarkOptions();
-                        
-                        if (savedPlacemarkIdx !== null) {
-                            document.getElementById('placemarkSelect').value = savedPlacemarkIdx;
+                        if (savedFolderIdx !== null) {
+                            document.getElementById('folderSelect').value = savedFolderIdx;
+                            updatePlacemarkOptions();
+                            
+                            if (savedPlacemarkIdx !== null) {
+                                document.getElementById('placemarkSelect').value = savedPlacemarkIdx;
+                            }
                         }
+                        document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
                     }
-                    document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                    else{
+                        const folderSelect = document.getElementById('folderSelect');
+                        folderSelect.innerHTML="";
+                        let opt =document.createElement('option');
+                        opt.value=data.folderIdx
+                        opt.innerText=data.folderName
+                        folderSelect.appendChild(opt)
+                        const placemarkSelect = document.getElementById('placemarkSelect');
+                        placemarkSelect.innerHTML="";
+                        let opt2 =document.createElement('option');
+                        opt2.value=data.placemarkIdx
+                        opt2.innerText=data.placemarkName
+                        placemarkSelect.appendChild(opt2)
+                        document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                        document.getElementById('generateMap').classList.add('opacity-40', 'pointer-events-none');
+                    }
+                    
                 } else {
                     if (!savedMapHtml) clearSessionStorage();
                 }
@@ -147,10 +168,26 @@
                 sessionStorage.setItem('kml_session_id',currentSessionId);
                 sessionStorage.setItem('cached_map_html', data.map_html);
                 sessionStorage.setItem('kml_folder_idx', data.folderIdx);
+                sessionStorage.setItem('kml_folder_name',data.folderName);
                 sessionStorage.setItem('kml_placemark_idx', data.placemarkIdx);
+                sessionStorage.setItem('kml_placemark_name',data.placemarkName);
+                const folderSelect = document.getElementById('folderSelect');
+                folderSelect.innerHTML="";
+                let opt =document.createElement('option');
+                opt.value=data.folderIdx
+                opt.innerText=data.folderName
+                folderSelect.appendChild(opt)
+                const placemarkSelect = document.getElementById('placemarkSelect');
+                placemarkSelect.innerHTML="";
+                let opt2 =document.createElement('option');
+                opt2.value=data.placemarkIdx
+                opt2.innerText=data.placemarkName
+                placemarkSelect.appendChild(opt2)
+                document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
                 renderHtmlToFrame(data.map_html);
                 document.getElementById('placeholder').classList.add('hidden');
                 document.getElementById('mapFrame').classList.remove('hidden');
+                document.getElementById('generateMap').classList.add('opacity-40', 'pointer-events-none');
 
             }
             else{
@@ -166,6 +203,7 @@
                 if(!sessionStorage.getItem('cached_map_html')) {
                     document.getElementById('placeholder').innerText = "File parsed successfully. Please confirm choices inside Stage 2 block.";
                 }
+                document.getElementById('generateMap').classList.remove('opacity-40', 'pointer-events-none');
             }
             
 
@@ -193,7 +231,11 @@
 
     async function renderSelectedMapTrack() {
         const folderIdx = document.getElementById('folderSelect').value;
+        let folderList = [...document.getElementById('folderSelect').childNodes]
+        const folderName = folderList.find(f => f.value==document.getElementById('folderSelect').value).innerText;
         const placemarkIdx = document.getElementById('placemarkSelect').value;
+        let placemarkList = [...document.getElementById('placemarkSelect').childNodes]
+        const placemarkName = placemarkList.find(f => f.value==document.getElementById('placemarkSelect').value).innerText;
 
         if (folderIdx === "" || placemarkIdx === "") return alert("Please establish route selection criteria first.");
 
@@ -218,7 +260,9 @@
             // --- SAVE EVERYTHING FOR IMMEDIATE LOAD NEXT TIME ---
             sessionStorage.setItem('cached_map_html', data.map_html);
             sessionStorage.setItem('kml_folder_idx', folderIdx);
+            sessionStorage.setItem('kml_folder_name',folderName);
             sessionStorage.setItem('kml_placemark_idx', placemarkIdx);
+            sessionStorage.setItem('kml_placemark_name',placemarkName);
 
             // Paint map frame layout
             renderHtmlToFrame(data.map_html);
@@ -239,7 +283,9 @@
                 map:sessionStorage.getItem('cached_map_html'),
                 file_name:sessionStorage.getItem('file_name'),
                 folder_index:parseInt(sessionStorage.getItem('kml_folder_idx')),
-                placemark_index:parseInt(sessionStorage.getItem('kml_placemark_idx'))
+                folder_name:sessionStorage.getItem('kml_folder_name'),
+                placemark_index:parseInt(sessionStorage.getItem('kml_placemark_idx')),
+                placemark_name:sessionStorage.getItem('kml_placemark_name')
             })
         });
     }

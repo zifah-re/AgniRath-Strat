@@ -262,8 +262,9 @@ current_data_default = {
         "SpeedLimit": [],
         "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
         "Headings":[],
-        "TargetProfile": [],
-        "MPCProfile": []
+        "TargetProfile": [],     # List of tuples (unix time, speed)
+        "MPCProfile": [],        # List of tuples (unix time, speed)
+        "SolarIrradiance":[]
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -794,6 +795,11 @@ async def get_session_options(session_id: str):
         # Session expired on backend server (e.g., server restarted)
         raise HTTPException(status_code=404, detail="Session expired")
     try:
+        try:
+            data=json.loads(kml_bytes)
+            return {'map_html':data['map'],'fileName':data['fileName'],'folderIdx':data['folder_index'],'folderName':data['folder_name'],'placemarkIdx':data['placemark_index'],'placemarkName':data['placemark_name']}
+        except:
+            pass
         _, structural_options = analyze_kml_structure(kml_bytes)
         return {"options": structural_options}
     except Exception as e:
@@ -855,7 +861,8 @@ async def upload_kml(file: UploadFile = File(...)):
             if data['profile']:
                 await app.state.queue.put(("C", data['profile']))
             session_id = str(uuid.uuid4())
-            return {'map_html':data['map'],'folderIdx':data['folder_index'],'placemarkIdx':data['placemark_index'],'session_id':session_id}
+            TRACK_SESSIONS[session_id] = kml_bytes
+            return {'map_html':data['map'],'fileName':data['file_name'],'folderIdx':data['folder_index'],'folderName':data['folder_name'],'placemarkIdx':data['placemark_index'],'placemarkName':data['placemark_name'],'session_id':session_id}
         except:
             pass
         _, structural_options = analyze_kml_structure(kml_bytes)
@@ -876,7 +883,8 @@ async def save(request: Request):
         if 'MPCProfile' in data['profile'].keys():
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
-        with open(SCRIPT_DIR / data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_index'])+'_'+str(data['placemark_index'])+".kml.save","w") as file:
+        file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
+        with open(SCRIPT_DIR / file_name ,"w") as file:
             json.dump(data,file)
         return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
     except Exception as e:
