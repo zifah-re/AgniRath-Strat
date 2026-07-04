@@ -18,7 +18,7 @@ from pprint import pprint
 import pandas as pd
 import numpy as np
 import copy
-
+from pathlib import Path
 from downlink import main as run_downlink
 from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED
 import uuid
@@ -850,6 +850,14 @@ async def upload_kml(file: UploadFile = File(...)):
     try:
         kml_bytes = await file.read()
         # Parse once to ensure structure is clean and gather selectable parameters
+        try:
+            data=json.loads(kml_bytes)
+            if data['profile']:
+                await app.state.queue.put(("C", data['profile']))
+            session_id = str(uuid.uuid4())
+            return {'map_html':data['map'],'folderIdx':data['folder_index'],'placemarkIdx':data['placemark_index'],'session_id':session_id}
+        except:
+            pass
         _, structural_options = analyze_kml_structure(kml_bytes)
         
         # Issue a temporary session identifier
@@ -864,10 +872,11 @@ async def save(request: Request):
     try:
         data = await request.json()
         data['profile']=copy.deepcopy(current_data['profile'])
+        SCRIPT_DIR = Path(__file__).resolve().parent
         if 'MPCProfile' in data['profile'].keys():
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
-        with open(data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_index'])+'_'+str(data['placemark_index'])+".kml.save","w") as file:
+        with open(SCRIPT_DIR / data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_index'])+'_'+str(data['placemark_index'])+".kml.save","w") as file:
             json.dump(data,file)
         return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
     except Exception as e:

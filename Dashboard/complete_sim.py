@@ -16,18 +16,17 @@ distance_profle=np.array(distance_profle)*1000
 offline_model.loc[:, "timestamp_secs"] = (
     pd.to_datetime(offline_model["_rx_time"]).astype("int64").astype("float") / 10**9
 )
-velocity_mps = offline_model["Vehicle_Velocity"]
+velocity_mps = offline_model["Vehicle_Velocity"].clip(lower=0)
 dt = offline_model["timestamp_secs"].diff().fillna(0)
 step_distances = 0.5 * (velocity_mps + velocity_mps.shift(0).fillna(0)) * dt
 offline_model.loc[:, "distance"] = step_distances.cumsum()
 interpolated_secs = np.interp(distance_profle, offline_model["distance"], offline_model["timestamp_secs"]).tolist()
-interpolated_velocity = (np.interp(distance_profle, offline_model["distance"], offline_model["Vehicle_Velocity"])*(18/5))
+interpolated_velocity = (np.interp(distance_profle, offline_model["distance"], offline_model["Vehicle_Velocity"])*(18/5)).tolist()
 target_profile=list(zip(interpolated_secs,interpolated_velocity))
 URL="http://127.0.0.1:8000/api/simulate"
 pkt={
     "type":"C",
     "TargetProfile":target_profile
 }
-print(isinstance(target_profile[0],tuple))
 req=requests.post(URL,json=pkt)
 real_sim_main(df=df)
