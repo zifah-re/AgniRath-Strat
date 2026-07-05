@@ -264,7 +264,7 @@ current_data_default = {
         "Headings":[],
         "TargetProfile": [],     # List of tuples (unix time, speed)
         "MPCProfile": [],        # List of tuples (unix time, speed)
-        "SolarIrradiance":[]
+        "SolarIrradiance":{}
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -626,16 +626,19 @@ async def update_processor(queue: asyncio.Queue):
                         results={
                             "Speed": current_data['metric']['Speed'],
                             "SoC": current_data['metric']['SOC_Ah'],
-                            "Distance": current_data['metric']['distance_travelled']
+                            "Distance": current_data['metric']['distance_travelled'],
+                            "Time_seconds": historic['Time_seconds']
                         }
                         profiles={
                             "Gradient":current_data['profile']['Gradient'],
                             "SpeedProfile":current_data['profile']['SpeedProfile'],
                             "TargetProfile":current_data['profile']['TargetProfile'],
-                            "Distance":current_data['profile']['Distance']
+                            "Distance":current_data['profile']['Distance'],
+                            "Coordinates":current_data['profile']['Coordinates'],
+                            "Headings":current_data['profile']['Headings'],
+                            "SolarIrradiance":current_data['profile']['SolarIrradiance']
                         }
-                        MPCProfile=solver_main(results=results,profiles=profiles)
-                        current_data['profile']['MPCProfile']=[(t+historic['Time_seconds'],speed) for t,speed in MPCProfile]
+                        current_data['profile']['MPCProfile']=solver_main(results=results,profiles=profiles)
                     except Exception as e:
                         raise e
                 for k in current_data['historic']:
@@ -700,7 +703,7 @@ async def update_processor(queue: asyncio.Queue):
                 }
             if ptype == "C":
                 for key in pdata:
-                    current_data['profile'][key]=pdata[key]  
+                    current_data['profile'][key]=pdata[key]
             current_data['metric'] = metric
             update_packet['metric'] = {**metric}
             update_packet['profile']={**current_data['profile']}

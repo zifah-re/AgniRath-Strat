@@ -159,8 +159,8 @@ function De(ee, te) {
                     },
                     x: {
                         type: "linear",
-                        bounds:'data',
-                        grace: 0,
+                        min:e().historic.Time_seconds.at(-1)-120,
+                        max:e().historic.Time_seconds.at(-1)+900,
                         title: {
                             display: !0,
                             text: "Time",
@@ -184,6 +184,16 @@ function De(ee, te) {
                     }
                 },
                 plugins: {
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'x', // Allow scrolling left and right along the x-axis
+                        },
+                        zoom: {
+                            wheel: { enabled: true }, // Scroll to zoom in/out
+                            mode: 'x'
+                        }
+                    },
                     legend: {
                         labels: {
                             color: "#fff"
@@ -214,10 +224,9 @@ function De(ee, te) {
     function re() {
         // 1. Existing live telemetry charts update logic (r, l, o updates here...)
         if (e().historic?.Timestamps?.length > 0) {
-            r && ( r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoordsMPC(e().profile.TargetProfile),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.update("none"));
+            r && (r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoordsMPC(e().profile.TargetProfile),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.options.scales.x.min=e().historic.Time_seconds.at(-1)-120,r.options.scales.x.max=e().historic.Time_seconds.at(-1)+900, r.update("none"));
             l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
             o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
-            console.log(e().profile.MPCProfile);
         }
 
         // 2. 🔥 FIX: Accurate Chart.js property paths for Distance profiles

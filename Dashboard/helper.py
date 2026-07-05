@@ -8,7 +8,8 @@ def get_current_state()->dict:
     result={
         "Speed": data['metric']['Speed'],
         "SoC": data['metric']['SOC_Ah'],
-        "Distance": data['metric']['distance_travelled']
+        "Distance": data['metric']['distance_travelled'],
+        "Time_seconds": data['historic']['Time_seconds'][-1]
     }
     return result
 

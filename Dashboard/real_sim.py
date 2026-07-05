@@ -165,7 +165,7 @@ def main(df=None):
                         pkt_a[col]=row[col]
                     #pkt_b["Timestamp"]=row['_rx_time']
                     success=send_data(pkt_a)
-                else:
+                elif 'error' not in row:
                     pkt_b={
                         "type": "B",
                         "Timestamp":row['_rx_time']
@@ -183,8 +183,7 @@ def main(df=None):
                 else:
                     print(f"[{datetime.fromisoformat(pkt_a['Timestamp']).strftime('%H:%M:%S')}] Connection refused. Is main.py running?")
             except Exception as e:
-                    print(f"Error: {e}")
-                    
+                    print(f"Error: {e}")    
             time.sleep(0.1)  # 10Hz update rate
             
 
