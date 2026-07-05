@@ -5,7 +5,7 @@ from helper import get_profile
 import numpy as np
 import requests
 import json
-import time
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 file_name=input("File name: ")
 FILE_PATH=SCRIPT_DIR / "Logs" / file_name
@@ -21,7 +21,7 @@ offline_model.dropna(subset=['Vehicle_Velocity'],inplace=True)
 distance_profle=get_profile(["Distance"])["Distance"]
 distance_profle=np.array(distance_profle)*1000
 offline_model.loc[:, "timestamp_secs"] = (
-    pd.to_datetime(offline_model["_rx_time"]).astype("int64").astype("float") / 10**9
+    pd.to_datetime(offline_model["_rx_time"]).map(pd.Timestamp.timestamp)
 )
 velocity_mps = offline_model["Vehicle_Velocity"].clip(lower=0)
 dt = offline_model["timestamp_secs"].diff().fillna(0)

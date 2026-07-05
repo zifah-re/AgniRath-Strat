@@ -4,7 +4,6 @@ from scipy.optimize import minimize
 from solar_table import SolarIrradiance
 import pvlib
 import pandas as pd
-from numba import njit
 
 # ==========================================
 # VEHICLE CONFIGURATION & CONSTANTS
@@ -49,7 +48,7 @@ def slice_profiles(profile, distance_profile, d_current, default_val):
         return pad_or_truncate(profile, profile[-1])
     return pad_or_truncate(profile, default_val)
 
-@njit
+
 def calculate_net_power(v_current, v_next, slope, solar_irradiance, seg_len):
     grad = slope / 100
     f_drag = 0.5 * RHO * CDA * (v_current ** 2)
