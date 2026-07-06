@@ -59,20 +59,16 @@ class SolarIrradiance:
     def _get_closest_coord_idx(self, target_coord):
         if len(self._coords) <= 1:
             return 0
-        # Cache-friendly quick-distance check
         dist = [geodesic(target_coord, c).kilometers for c in self._coords]
         return np.argmin(dist)
 
     def __getitem__(self, key):
-        # Determine if we received a joint coordinate + time query
         if isinstance(key, tuple) and len(key) == 2 and not isinstance(key[0], (float, int)):
             x, y = key
         else:
             x, y = key, None
 
-        # --- FAST PATH: Joint coordinate and time lookup (Bypasses all class instantiations) ---
         if y is not None:
-            # Normalize so 'coord_val' is the location and 'time_val' is the timestamp
             if hasattr(x, '__iter__') and not isinstance(x, (str, bytes)):
                 coord_val, time_val = x, y
             else:
@@ -81,7 +77,6 @@ class SolarIrradiance:
             t_target = datetime.fromisoformat(time_val).timestamp() if isinstance(time_val, str) else float(time_val)
             coord_idx = self._get_closest_coord_idx(coord_val)
             
-            # Compute interpolation bounds via math indexing
             n = int((t_target - self._t0) // self._interval)
             n = max(0, min(n, len(self._time_list) - 2)) # Safety bound check
             
@@ -96,7 +91,6 @@ class SolarIrradiance:
                 
             return SolarResultProxy(coord_results)
 
-        # --- SLOW PATH: Individual Slicing (Preserved for compatibility/instantiation) ---
         if hasattr(x, '__iter__') and not isinstance(x, (str, bytes)):
             idx = self._get_closest_coord_idx(x)
             closest_coord = self._coords[idx]

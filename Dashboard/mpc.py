@@ -4,26 +4,7 @@ from scipy.optimize import minimize
 from solar_table import SolarIrradiance
 import pvlib
 import pandas as pd
-
-# ==========================================
-# VEHICLE CONFIGURATION & CONSTANTS
-# ==========================================
-MASS = 300.0          # Total car + driver mass (kg)
-CDA = 0.16            # Aerodynamic drag area (Cd * A)
-CRR = 0.007           # Rolling resistance coefficient
-RHO = 1.2             # Air density (kg/m^3)
-G = 9.81              # Gravity (m/s^2)
-
-SOLAR_AREA = 5.95     # m^2
-SOLAR_EFF = 0.18      # 18%
-MOTOR_EFF = 0.95      # 95%
-REGEN_EFF = 0.70      # 70%
-POWER_LOSS = 70.0
-PANEL_TILT = 4
-ALBEDO = 0.2
-
-BATT_CAPACITY_WH = 3528.0  # Battery Pack Capacity
-N = 10                     # 10-step horizon
+from constants import MASS,CDA,CRR,RHO,G,SOLAR_AREA,SOLAR_EFF,MOTOR_EFF,REGEN_EFF,POWER_LOSS,PANEL_TILT,ALBEDO,BATTERY_CAPACITY_WH,N
 
 def pad_or_truncate(arr, default_val):
     arr = list(arr) if arr is not None else []
@@ -127,7 +108,7 @@ def mpc_cost_function(v_horizon, current_soc, current_v, target_profile, terrain
         p_net, dt = calculate_net_power(v_prev, v_next, terrain_profile[i - 1], solar_irradiance, seg_len)
         
         energy_change_wh = (p_net * dt) / 3600
-        soc += (energy_change_wh / BATT_CAPACITY_WH) * 100.0
+        soc += (energy_change_wh / BATTERY_CAPACITY_WH) * 100.0
         
         # Penalties
         cost += 1.0 * (v_next - target_profile[i - 1]) ** 2

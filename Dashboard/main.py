@@ -887,7 +887,7 @@ async def save(request: Request):
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
         file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
-        with open(SCRIPT_DIR / file_name ,"w") as file:
+        with open(SCRIPT_DIR / "Saves" / file_name ,"w") as file:
             json.dump(data,file)
         return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
     except Exception as e:
