@@ -169,7 +169,7 @@ def compute_optimal_velocity(current_v, current_soc, current_time, targets, terr
         p_net_actual, dt = calculate_net_power(history_v[-2], history_v[-1], terrain[i - 1], solar_irradiance, seg_len)
         
         dt_array.append(dt_array[-1] + dt)
-        history_soc.append(current_soc + ((p_net_actual * dt) / 3600.0 / BATT_CAPACITY_WH) * 100.0)
+        history_soc.append(current_soc + ((p_net_actual * dt) / 3600.0 / BATTERY_CAPACITY_WH) * 100.0)
         
     history_v = np.array(history_v)
     return list(zip(dt_array, (history_v * (18 / 5)).tolist()))
