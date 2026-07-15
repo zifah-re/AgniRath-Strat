@@ -29,6 +29,8 @@ from pydantic import BaseModel
 from Google_Earth import main as maps_main
 from geopy.distance import geodesic
 from geopy.point import Point
+import requests
+import struct
 
 from mpc import main as solver_main
 
@@ -321,28 +323,57 @@ def analyze_kml_structure(kml_bytes: bytes):
         
     return root, available_folders
 def get_icon_url(root,point):
-    icon_style=point.find("styleUrl").text.lstrip("#")
-    icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
-    icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
-    icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
-    icon_url=icon_tag.find("IconStyle/Icon/href").text
-    icon_anchor=icon_tag.find("IconStyle/hotSpot")
-    icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
-    return icon_url,icon_anchor
+    try:
+        icon_style=point.find("styleUrl").text.lstrip("#")
+        icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
+        icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
+        try:
+            icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+            icon_url=icon_tag.find("IconStyle/Icon/href").text
+            icon_anchor=icon_tag.find("IconStyle/hotSpot")
+            icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
+        except:
+            ns = {
+                'gx': 'http://www.google.com/kml/ext/2.2',
+                'kml': 'http://www.opengis.net/kml/2.2'
+            }
+            icon_tag=root.find(f"Document/CascadingStyle[@{{{ns['kml']}}}id='{icon_super}']")
+            icon_url=icon_tag.find("Style/IconStyle/Icon/href").text
+            icon_url=icon_url.replace("&amp;","&")
+            icon_anchor=icon_tag.find("Style/IconStyle/hotSpot")
+            icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
+        req=requests.get(icon_url,headers={"Range": "bytes=0-23"})
+        data=req.content
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            icon_size= struct.unpack('>II', data[16:24])
+        else:
+            icon_size=(32,32)
+        return icon_url,icon_anchor,icon_size
+    except:
+        return "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png",(20,2),(32,32)
 def get_line_colour(root,point):
     try:
         icon_style=point.find("styleUrl").text.lstrip("#")
         icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
         icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
-        icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
-        colour=icon_tag.find("LineStyle/color").text
+        try:
+            icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+            colour=icon_tag.find("LineStyle/color").text
+            width=int(icon_tag.find("LineStyle/width").text)
+        except:
+            ns = {
+                'gx': 'http://www.google.com/kml/ext/2.2',
+                'kml': 'http://www.opengis.net/kml/2.2'
+            }
+            icon_tag=root.find(f"Document/CascadingStyle[@{{{ns['kml']}}}id='{icon_super}']")
+            colour=icon_tag.find("Style/LineStyle/color").text
+            width=int(icon_tag.find("Style/LineStyle/width").text)
         opacity=colour[:2]
         opacity=int(opacity,16)/255
         b=colour[2:4]
         g=colour[4:6]
         r=colour[6:8]
         colour=r+g+b
-        width=int(icon_tag.find("LineStyle/width").text)
     except:
         return None,None,None
     return colour,width,opacity
@@ -942,17 +973,22 @@ async def render_selected_track(payload: SelectionPayload):
         route_info={"name":route_name,"colour":colour,"width":width,"opacity":opacity}
         coordinates = []
         relevant_points=[]
+        used_points=[]
         for pair in coords_split:
             lon, lat, *_ = pair.split(",")
             lat,lon=float(lat),float(lon)
             coordinates.append((lat,lon))
             for point in points_list:
+                if point in used_points:
+                    continue
                 p_lon,p_lat,_=point.find("Point/coordinates").text.split(",")
                 p_lat,p_lon=float(p_lat),float(p_lon)
-                icon_url,icon_anchor=get_icon_url(root,point)
-                if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5 and not {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor} in relevant_points:
-                    relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
-        
+                if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5:
+                    icon_url,icon_anchor,icon_size=get_icon_url(root,point)
+                    if {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor,"size":icon_size} not in relevant_points:
+                        relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor,"size":icon_size})
+                        used_points.append(point)
+                        continue
         results = maps_main(route_info,coordinates,relevant_points)
         map_html,smoothed_altitude,distance_profile,coordinates,speed_limit,eta=results["Map"],results["Altitude"],results["Distances"],results["Coordinates"],results["SpeedLimit"],results["ETA"]
         speed_profile=results["SpeedProfile"]

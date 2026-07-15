@@ -42,20 +42,22 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
         segment_dist = geodesic(new_coordinates[i-1], new_coordinates[i]).meters
         total_distance += segment_dist
     target_points = max(len(new_coordinates),int(total_distance//100))
-
-    lats = [p[0] for p in new_coordinates]
-    lons = [p[1] for p in new_coordinates]
-    
-    # Create an array of index positions for original data (e.g., [0, 1, 2...])
-    original_indices = np.arange(len(new_coordinates))
-    
-    # Create 25 evenly spaced target index positions (e.g., [0.0, 0.45, 0.9...])
-    target_indices = np.linspace(0, len(new_coordinates) - 1, target_points)
-    
-    # Re-interpolate coordinates perfectly across the 25 target points
-    interp_lats = np.interp(target_indices, original_indices, lats)
-    interp_lons = np.interp(target_indices, original_indices, lons)
-    google_matched_coordinates=[(lat,lon) for lat,lon in zip(interp_lats,interp_lons)]
+    if target_points!=len(new_coordinates):
+        lats = [p[0] for p in new_coordinates]
+        lons = [p[1] for p in new_coordinates]
+        
+        # Create an array of index positions for original data (e.g., [0, 1, 2...])
+        original_indices = np.arange(len(new_coordinates))
+        
+        # Create 25 evenly spaced target index positions (e.g., [0.0, 0.45, 0.9...])
+        target_indices = np.linspace(0, len(new_coordinates) - 1, target_points)
+        
+        # Re-interpolate coordinates perfectly across the 25 target points
+        interp_lats = np.interp(target_indices, original_indices, lats)
+        interp_lons = np.interp(target_indices, original_indices, lons)
+        google_matched_coordinates=[(lat,lon) for lat,lon in zip(interp_lats,interp_lons)]
+    else:
+        google_matched_coordinates=new_coordinates
     if route_info["name"] not in NO_SNAP_TO_ROAD:
         results=traffic_main(google_matched_coordinates)
         snapped_coordinates=results["Coordinates"]
@@ -209,7 +211,7 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
 
     # 5. Drop the Start/End markers
     for point in relevant_points:
-        folium.Marker([point["coordinates"][0], point["coordinates"][1]],tooltip=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"], popup=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"],icon=folium.CustomIcon(icon_image=point["url"],icon_size=(32,32),icon_anchor=(32-int(point["anchor"][0]),32-int(point["anchor"][1])),popup_anchor=(0,-32))).add_to(m)
+        folium.Marker([point["coordinates"][0], point["coordinates"][1]],tooltip=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"], popup=point["name"]+":\n"+point["description"] if point["description"] is not None else point["name"],icon=folium.CustomIcon(icon_image=point["url"],icon_size=(32,32),icon_anchor=((point["size"][0]-int(point["anchor"][0]))*(32/point['size'][0]),(point["size"][1]-int(point["anchor"][1]))*(32/point['size'][1])),popup_anchor=(0,-32))).add_to(m)
     if len(relevant_points)==0:
         folium.Marker([start_lat, start_lon], popup="Start Point", icon=folium.Icon(color="green", icon="play")).add_to(m)
         folium.Marker([end_lat, end_lon], popup="End Point", icon=folium.Icon(color="red", icon="stop")).add_to(m)
