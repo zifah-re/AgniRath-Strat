@@ -1,6 +1,15 @@
+# ==========================================
+# CONSTANTS FOR TRAFFIC.PY
+# ==========================================
 MAX_SPEED=85 #kmph
 API_LIST=["nt0WpoWFNPf7PxPWE2qcHgjtthK73CPY","G1kaSNVPFPVBwoMDyBgUvEUcoqYiKUJi"] #Tomtom Api
 NO_SNAP_TO_ROAD=["Track loop"]
+FIELDS="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
+HEADERS={"Origin":"https://developer.tomtom.com","Referer":"https://developer.tomtom.com"}
+
+# ==========================================
+# CONSTANTS FOR MAIN.PY
+# ==========================================
 SOC_CURVE = [
     (115.36, 100.0),
     (114.38, 99.0),
@@ -108,3 +117,22 @@ BATTERY_CAPACITY_WH = 3528.0  # Nominal capacity: 5.0Ah * 4.2V * 28S = 588Wh
 BATTERY_CAPACITY_AH= 30.0 #5.0Ah * 28
 # CMU reports cell voltage in mV; dashboard displays volts (valid ~2.5–4.2 V).
 INVALID_CELL_MV = 10_000.0
+
+# ==========================================
+# CONSTANTS FOR MPC.PY
+# ==========================================
+MASS = 300.0          # Total car + driver mass (kg)
+CDA = 0.16            # Aerodynamic drag area (Cd * A)
+CRR = 0.007           # Rolling resistance coefficient
+RHO = 1.2             # Air density (kg/m^3)
+G = 9.81              # Gravity (m/s^2)
+
+SOLAR_AREA = 5.95     # m^2
+SOLAR_EFF = 0.18      # 18%
+MOTOR_EFF = 0.95      # 95%
+REGEN_EFF = 0.70      # 70%
+POWER_LOSS = 70.0
+PANEL_TILT = 4
+ALBEDO = 0.2
+
+N = 10                     # 10-step horizon

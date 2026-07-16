@@ -3,10 +3,10 @@ import copy
 import math
 from geopy.distance import geodesic
 from datetime import timedelta,timezone,datetime
-from constants import MAX_SPEED,API_LIST
-fields="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
+from constants import MAX_SPEED,API_LIST,FIELDS,HEADERS
+
 url="https://api.tomtom.com/snapToRoads/1?key={0}&fields={fields}&vehicleType=PassengerCar&measurementSystem=metric&offroadMargin=100"
-headers={"Origin":"https://developer.tomtom.com","Referer":"https://developer.tomtom.com"}
+
 def main(coordinates:list[tuple[float,float]])->dict:
     distances = [0.0]
     total_distance = 0.0
@@ -84,7 +84,7 @@ def main(coordinates:list[tuple[float,float]])->dict:
             schema["points"].append(tmp)
             start_pos=curr_pos
         for i,API_KEY in enumerate(API_LIST):
-            req=requests.post(url.format(API_KEY,fields=fields),json=schema,headers=headers)
+            req=requests.post(url.format(API_KEY,fields=FIELDS),json=schema,headers=HEADERS)
             data=req.json()
             if data.get("route"):
                 break
@@ -108,7 +108,12 @@ def main(coordinates:list[tuple[float,float]])->dict:
                     except:
                         pass
             for lon,lat in feature["geometry"]["coordinates"]:
-                snapped_coords.append((lat,lon))
+                if len(snapped_coords)>0 and snapped_coords[-1]!=(lat,lon):
+                    snapped_coords.append((lat,lon))
+                elif len(snapped_coords)==0:
+                    snapped_coords.append((lat,lon))
+                else:
+                    continue
                 try:
                     speed_limits.append(feature["properties"]["speedLimits"]["value"])
                 except:

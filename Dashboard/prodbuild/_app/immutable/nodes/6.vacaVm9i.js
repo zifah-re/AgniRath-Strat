@@ -15,6 +15,23 @@ function De(ee, te) {
     function m(s, p="", m=1) {
         return typeof s != "number" ? (Array.isArray(s) ? s.map(x => Math.round(x * 10**m) / 10**m) : "N/A") : `${s.toFixed(m)} ${p}`
     }
+    const zipToCoords = (timestamps, speeds) => {
+        if (!timestamps || !speeds || !Array.isArray(timestamps)) return [];
+        return timestamps.map((dateTimeStr, index) => ({
+            x: dateTimeStr, // Converts to absolute seconds number
+            y: speeds[index] || 0
+        }));
+    };
+    const zipToCoordsMPC = (dataPairs) => {
+        // Safety check: ensure we received a valid array
+        if (!dataPairs || !Array.isArray(dataPairs)) return [];
+        
+        // Each 'pair' is an array [timeStr, speedValue], e.g., ["11:41:35", 45]
+        return dataPairs.map((pair) => ({
+            x: pair[0], // Convert your time string token to numeric seconds
+            y: pair[1] || 0         // Grab the speed value
+        }));
+    };
     function time_format(s) {
         var hrs=Math.floor(s/3600);
         var mins=Math.floor((s%3600)/60);
@@ -89,26 +106,37 @@ function De(ee, te) {
         }
     }
     function ie() {
+        const historicalData = e().historic;
         return {
             type: "line",
             data: {
-                labels: e().historic.Timestamps,
                 datasets: [{
                     label: "Speed",
-                    data: e().historic.Speed,
+                    data: zipToCoords(historicalData.Time_seconds, historicalData.Speed),
                     borderColor: "#3b82f6",
                     backgroundColor: "#3b82f620",
                     borderWidth: 2,
                     fill: !1,
-                    tension: .1
+                    tension: .1,
+                    order:2
                 }, {
-                    label: "Speed 2",
-                    data: e().historic.Speed2 || [],
+                    label: "Offline model speed",
+                    data: zipToCoordsMPC(e().profile.TargetProfile),
                     borderColor: "#ef4444",
                     backgroundColor: "#ef444420",
                     borderWidth: 2,
                     fill: !1,
-                    tension: .1
+                    tension: .1,
+                    order:3
+                }, {
+                    label: "Real time model speed",
+                    data: zipToCoordsMPC(e().profile.MPCProfile),
+                    borderColor: "#d3d017",
+                    backgroundColor: "#ef444420",
+                    borderWidth: 2,
+                    fill: !1,
+                    tension: .1,
+                    order:1
                 }]
             },
             options: {
@@ -130,13 +158,25 @@ function De(ee, te) {
                         }
                     },
                     x: {
+                        type: "linear",
+                        min:e().historic.Time_seconds.at(-1)-120,
+                        max:e().historic.Time_seconds.at(-1)+900,
                         title: {
                             display: !0,
                             text: "Time",
                             color: "#fff"
                         },
-                        ticks: {
-                            color: "#fff"
+                        ticks: { 
+                            color: "#fff",
+                            // This turns the numeric seconds back into clean "HH:MM:SS" text for display
+                            callback: function(value) {
+                                // Multiply by 1000 to convert back to milliseconds for JS Date
+                                const dateObj = new Date(value * 1000);
+                                const hrs = dateObj.getHours().toString().padStart(2, '0');
+                                const mins = dateObj.getMinutes().toString().padStart(2, '0');
+                                const secs = dateObj.getSeconds().toString().padStart(2, '0');
+                                return `${hrs}:${mins}:${secs}`;
+                            }
                         },
                         grid: {
                             color: "#374151"
@@ -144,6 +184,16 @@ function De(ee, te) {
                     }
                 },
                 plugins: {
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'x', // Allow scrolling left and right along the x-axis
+                        },
+                        zoom: {
+                            wheel: { enabled: true }, // Scroll to zoom in/out
+                            mode: 'x'
+                        }
+                    },
                     legend: {
                         labels: {
                             color: "#fff"
@@ -153,6 +203,19 @@ function De(ee, te) {
                         display: !0,
                         text: "Speed & Speed 2 vs Time",
                         color: "#fff"
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(value) {
+                                // Multiply by 1000 to convert back to milliseconds for JS Date
+                                const val =value[0].parsed.x;
+                                const dateObj = new Date(val * 1000);
+                                const hrs = dateObj.getHours().toString().padStart(2, '0');
+                                const mins = dateObj.getMinutes().toString().padStart(2, '0');
+                                const secs = dateObj.getSeconds().toString().padStart(2, '0');
+                                return `${hrs}:${mins}:${secs}`;
+                            }
+                        }
                     }
                 }
             }
@@ -161,7 +224,7 @@ function De(ee, te) {
     function re() {
         // 1. Existing live telemetry charts update logic (r, l, o updates here...)
         if (e().historic?.Timestamps?.length > 0) {
-            r && (r.data.labels = e().historic.Timestamps, r.data.datasets[0].data = e().historic.Speed, r.data.datasets[1].data= e().historic.Speed2, r.update("none"));
+            r && (r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoordsMPC(e().profile.TargetProfile),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.options.scales.x.min=e().historic.Time_seconds.at(-1)-120,r.options.scales.x.max=e().historic.Time_seconds.at(-1)+900, r.update("none"));
             l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
             o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
         }

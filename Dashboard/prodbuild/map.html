@@ -27,10 +27,10 @@
                 <p class="text-xs text-gray-400 mt-1">Upload a KML path profile to safely inspect underlying structural layers without executing calculation matrices prematurely.</p>
             </div>
             <div class="flex items-center space-x-3">
-                <input type="file" id="kmlFileInput" accept=".kml" 
+                <input type="file" id="kmlFileInput" accept=".kml,.kml.save"  onchange="uploadKML()"
                        class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer"/>
-                <button onclick="uploadKML()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-sm font-semibold rounded-md text-white transition">
-                    Inspect File
+                <button id="saveButton" onclick="saveKML()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-sm font-semibold rounded-md text-white transition opacity-40 pointer-events-none">
+                    Save File
                 </button>
             </div>
         </div>
@@ -50,7 +50,7 @@
                     <select id="placemarkSelect" class="w-full bg-slate-900 border border-gray-700 rounded-md p-2 text-sm text-white focus:outline-none focus:border-blue-500"></select>
                 </div>
             </div>
-            <button onclick="renderSelectedMapTrack()" class="w-full mt-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded-md text-white transition">
+            <button id="generateMap" onclick="renderSelectedMapTrack()" class="w-full mt-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded-md text-white transition">
                 Generate Interactive Map View
             </button>
         </div>
@@ -70,10 +70,13 @@
 
     // --- SESSION PERSISTENCE ALIVE CHECK ---
     window.addEventListener('DOMContentLoaded', async () => {
+        const savedFileName = sessionStorage.getItem('file_name')
         const savedMapHtml = sessionStorage.getItem('cached_map_html');
         const savedSessionId = sessionStorage.getItem('kml_session_id');
         const savedFolderIdx = sessionStorage.getItem('kml_folder_idx');
+        const savedFolderName = sessionStorage.getItem('kml_folder_name');
         const savedPlacemarkIdx = sessionStorage.getItem('kml_placemark_idx');
+        const savedPlacemarkName = sessionStorage.getItem('kml_placemark_name');
 
         // High-speed route: If the map HTML already exists in this session, inject it instantly!
         if (savedMapHtml) {
@@ -89,19 +92,38 @@
                 if (response.ok) {
                     const data = await response.json();
                     currentSessionId = savedSessionId;
-                    parsedKmlOptions = data.options;
+                    if (!data.map_html){
+                        parsedKmlOptions = data.options;
 
-                    populateFolderSelector();
+                        populateFolderSelector();
 
-                    if (savedFolderIdx !== null) {
-                        document.getElementById('folderSelect').value = savedFolderIdx;
-                        updatePlacemarkOptions();
-                        
-                        if (savedPlacemarkIdx !== null) {
-                            document.getElementById('placemarkSelect').value = savedPlacemarkIdx;
+                        if (savedFolderIdx !== null) {
+                            document.getElementById('folderSelect').value = savedFolderIdx;
+                            updatePlacemarkOptions();
+                            
+                            if (savedPlacemarkIdx !== null) {
+                                document.getElementById('placemarkSelect').value = savedPlacemarkIdx;
+                            }
                         }
+                        document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
                     }
-                    document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                    else{
+                        const folderSelect = document.getElementById('folderSelect');
+                        folderSelect.innerHTML="";
+                        let opt =document.createElement('option');
+                        opt.value=data.folderIdx
+                        opt.innerText=data.folderName
+                        folderSelect.appendChild(opt)
+                        const placemarkSelect = document.getElementById('placemarkSelect');
+                        placemarkSelect.innerHTML="";
+                        let opt2 =document.createElement('option');
+                        opt2.value=data.placemarkIdx
+                        opt2.innerText=data.placemarkName
+                        placemarkSelect.appendChild(opt2)
+                        document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                        document.getElementById('generateMap').classList.add('opacity-40', 'pointer-events-none');
+                    }
+                    
                 } else {
                     if (!savedMapHtml) clearSessionStorage();
                 }
@@ -130,7 +152,8 @@
     async function uploadKML() {
         const fileInput = document.getElementById('kmlFileInput');
         if (!fileInput.files[0]) return alert('Please pick a valid KML file track target first.');
-
+        const file = fileInput.files[0];
+        const fileName = file.name;
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
         document.getElementById('placeholder').innerText = "Inspecting structural branches within KML file layout...";
@@ -140,19 +163,49 @@
             const data = await response.json();
             
             if (!response.ok || data.error) return alert('Error: ' + (data.error || 'Failed to check layout files.'));
+            if (data.map_html){
+                currentSessionId = data.session_id;
+                sessionStorage.setItem('kml_session_id',currentSessionId);
+                sessionStorage.setItem('cached_map_html', data.map_html);
+                sessionStorage.setItem('kml_folder_idx', data.folderIdx);
+                sessionStorage.setItem('kml_folder_name',data.folderName);
+                sessionStorage.setItem('kml_placemark_idx', data.placemarkIdx);
+                sessionStorage.setItem('kml_placemark_name',data.placemarkName);
+                const folderSelect = document.getElementById('folderSelect');
+                folderSelect.innerHTML="";
+                let opt =document.createElement('option');
+                opt.value=data.folderIdx
+                opt.innerText=data.folderName
+                folderSelect.appendChild(opt)
+                const placemarkSelect = document.getElementById('placemarkSelect');
+                placemarkSelect.innerHTML="";
+                let opt2 =document.createElement('option');
+                opt2.value=data.placemarkIdx
+                opt2.innerText=data.placemarkName
+                placemarkSelect.appendChild(opt2)
+                document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                renderHtmlToFrame(data.map_html);
+                document.getElementById('placeholder').classList.add('hidden');
+                document.getElementById('mapFrame').classList.remove('hidden');
+                document.getElementById('generateMap').classList.add('opacity-40', 'pointer-events-none');
 
-            currentSessionId = data.session_id;
-            parsedKmlOptions = data.options;
-
-            sessionStorage.setItem('kml_session_id', currentSessionId);
-
-            populateFolderSelector();
-            updatePlacemarkOptions();
-            
-            document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
-            if(!sessionStorage.getItem('cached_map_html')) {
-                document.getElementById('placeholder').innerText = "File parsed successfully. Please confirm choices inside Stage 2 block.";
             }
+            else{
+                currentSessionId = data.session_id;
+                parsedKmlOptions = data.options;
+
+                sessionStorage.setItem('kml_session_id', currentSessionId);
+                sessionStorage.setItem('file_name',fileName)
+                populateFolderSelector();
+                updatePlacemarkOptions();
+                
+                document.getElementById('selectionPanel').classList.remove('opacity-40', 'pointer-events-none');
+                if(!sessionStorage.getItem('cached_map_html')) {
+                    document.getElementById('placeholder').innerText = "File parsed successfully. Please confirm choices inside Stage 2 block.";
+                }
+                document.getElementById('generateMap').classList.remove('opacity-40', 'pointer-events-none');
+            }
+            
 
         } catch (err) {
             console.error(err);
@@ -178,7 +231,11 @@
 
     async function renderSelectedMapTrack() {
         const folderIdx = document.getElementById('folderSelect').value;
+        let folderList = [...document.getElementById('folderSelect').childNodes]
+        const folderName = folderList.find(f => f.value==document.getElementById('folderSelect').value).innerText;
         const placemarkIdx = document.getElementById('placemarkSelect').value;
+        let placemarkList = [...document.getElementById('placemarkSelect').childNodes]
+        const placemarkName = placemarkList.find(f => f.value==document.getElementById('placemarkSelect').value).innerText;
 
         if (folderIdx === "" || placemarkIdx === "") return alert("Please establish route selection criteria first.");
 
@@ -203,19 +260,35 @@
             // --- SAVE EVERYTHING FOR IMMEDIATE LOAD NEXT TIME ---
             sessionStorage.setItem('cached_map_html', data.map_html);
             sessionStorage.setItem('kml_folder_idx', folderIdx);
+            sessionStorage.setItem('kml_folder_name',folderName);
             sessionStorage.setItem('kml_placemark_idx', placemarkIdx);
+            sessionStorage.setItem('kml_placemark_name',placemarkName);
 
             // Paint map frame layout
             renderHtmlToFrame(data.map_html);
             document.getElementById('placeholder').classList.add('hidden');
             document.getElementById('mapFrame').classList.remove('hidden');
+            document.getElementById('saveButton').classList.remove('opacity-40', 'pointer-events-none');
 
         } catch (err) {
             console.error(err);
             alert('Communication channel reset while drawing visual matrix layers.');
         }
     }
-
+    async function saveKML() {
+        const response = await fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                map:sessionStorage.getItem('cached_map_html'),
+                file_name:sessionStorage.getItem('file_name'),
+                folder_index:parseInt(sessionStorage.getItem('kml_folder_idx')),
+                folder_name:sessionStorage.getItem('kml_folder_name'),
+                placemark_index:parseInt(sessionStorage.getItem('kml_placemark_idx')),
+                placemark_name:sessionStorage.getItem('kml_placemark_name')
+            })
+        });
+    }
     // Helper function to cleanly flush map source code into the iframe document context safely
     function renderHtmlToFrame(htmlContent) {
         const iframe = document.getElementById('mapFrame');

@@ -52,12 +52,20 @@ agnirath-strategy-dashboard/
 ├── Track_testing_chennai.kml
 ├── Track_testing_chennai_clockwise.kml
 ├── Google_Earth.py         # Code to get elevation data from google earth
+├── traffic.py              # Code to snap the route to known roads, and get speed limit info from TomTom API
 ├── downlink.py             # To be used during testing sessions along with the antenna
 ├── main.py                 # Run this to launch dashboard
 ├── real_sim.py             # File to load previous testing sessions under Logs/
+├── complete_sim.py         # File to load previous testing sessions along with creating Solar profiles and Target velocity profiles (to be used to test mpc.py)
+├── mpc.py                  # Code to to run the current MPC model
+├── constants.py            # File to globally store all constants used in calculations
+├── solar_table.py          # Custom made class to help look up solar irradiance for a specific location and/or time
 ├── simulator.py
 ├── requirements.txt        
 ├── README.md               # You are here
+├── CHANGELOG.md            # File containing changelogs for the dashboard
+├── Saves/                  # Directory housing all saves for route data
+├── Solar/                  # Directory housing all historic testing solar data
 ├── Logs/
 │   ├── Bala-10__T8.jsonl
 │   ├── abhinav12percent_T4.jsonl

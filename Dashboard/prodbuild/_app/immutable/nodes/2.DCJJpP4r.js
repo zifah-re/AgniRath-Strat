@@ -11,7 +11,7 @@ function Xe(ae, se) {
     const [ie,re] = Ee()
       , a = () => Ie(Ve, "$globalStore", ie);
     u.register(Re, Ze, je, De, Fe, Ne, Oe, Ye);
-    const D = te( () => Math.abs(a().metric.Speed2 - a().metric.predicted))
+    const D = te( () => Math.abs(a().metric.Speed - a().metric.predicted))
       , S = te( () => g(D) > 3 ? "error" : "ok");
     let f, _, w, b, l, d, c, o;
     function r(s, p="", m=1) {
@@ -84,7 +84,7 @@ function Xe(ae, se) {
         if (a().historic.Timestamps.length !== 0) {
             if (l) {
                 l.data.labels = a().historic.Timestamps;
-                l.data.datasets[0].data = a().historic.Speed2;
+                l.data.datasets[0].data = a().historic.Speed;
                 l.update("none")
             }
             if (d) {
@@ -109,7 +109,7 @@ function Xe(ae, se) {
             }
             if (typeof cVD !== "undefined" && cVD) {
                 cVD.data.labels = r(a().historic.Distance,"",2);
-                cVD.data.datasets[0].data = a().historic.Speed2;
+                cVD.data.datasets[0].data = a().historic.Speed;
                 cVD.update("none")
             }
         }
@@ -121,7 +121,7 @@ function Xe(ae, se) {
     let cDT, cVD;
     $e( () => {
         if (f)
-            l = new u(f,h("Speed", a().historic.Speed2, "#3b82f6", "Speed (km/h)"));
+            l = new u(f,h("Speed", a().historic.Speed, "#3b82f6", "Speed (km/h)"));
         if (_)
             d = new u(_,h("Battery Level", a().historic.Battery, "#10b981", "Battery Level (%)"));
         if (w)
@@ -140,7 +140,7 @@ function Xe(ae, se) {
                         labels: r(a().historic.Distance,"",2),
                         datasets: [{
                             label: "Velocity",
-                            data: a().historic.Speed2,
+                            data: a().historic.Speed,
                             borderColor: "#ec4899",
                             backgroundColor: "#ec489920",
                             borderWidth: 2,
@@ -310,7 +310,7 @@ function Xe(ae, se) {
         v(ue, ke),
         v(fe, Ce)
     }
-    , [ () => r(a().metric.Speed2, "km/h"), () => r(a().metric.predicted, "km/h"), () => r(g(D), "km/h"), () => r(a().metric.Pack_Voltage, "V"), () => r(a().metric.SOC_Ah, "%", 0), () => r(a().metric.Bus_Power, "W", 0), () => r(a().metric.solar_input, "W", 0), () => r(a().metric.distance_travelled, "km"), () => r(a().metric.Gradient, "%", 3)]),
+    , [ () => r(a().metric.Speed, "km/h"), () => r(a().metric.predicted, "km/h"), () => r(g(D), "km/h"), () => r(a().metric.Pack_Voltage, "V"), () => r(a().metric.SOC_Ah, "%", 0), () => r(a().metric.Bus_Power, "W", 0), () => r(a().metric.solar_input, "W", 0), () => r(a().metric.distance_travelled, "km"), () => r(a().metric.Gradient, "%", 3)]),
     We(ae, k),
     Ae(),
     re()

@@ -157,11 +157,12 @@ const u = {
         Longitude: 0.0,
         Altitude: 0.0,
         Gradient: 0.0,
-        Bearing: 0.0,
+        Heading: 0.0,
         ETA: 0
     },
     historic: {
         Timestamps: [],
+        Time_seconds: [],
         Speed: [],
         Battery: [],
         Power: [],
@@ -195,7 +196,10 @@ const u = {
         Coordinates: [],
         Distance: [],
         SpeedLimit: [],
-        SpeedProfile:[]
+        SpeedProfile:[],
+        Headings:[],
+        TargetProfile: [],
+        MPCProfile: []
     }
 }
   , c = f([]);
@@ -285,7 +289,7 @@ function w() {
                     t.profile && Object.keys(t.profile).forEach(o => {
                         if (t.profile && t.profile[o] != null) {
                             r.profile[o] || (r.profile[o] = []);
-                            r.profile[o] = [...r.profile[o], t.profile[o]];
+                            r.profile[o] = [...t.profile[o]];
                         }
                     }
                     ),

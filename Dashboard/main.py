@@ -18,7 +18,7 @@ from pprint import pprint
 import pandas as pd
 import numpy as np
 import copy
-
+from pathlib import Path
 from downlink import main as run_downlink
 from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED
 import uuid
@@ -29,7 +29,10 @@ from pydantic import BaseModel
 from Google_Earth import main as maps_main
 from geopy.distance import geodesic
 from geopy.point import Point
+import requests
+import struct
 
+from mpc import main as solver_main
 
 # Key Lists
 PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
@@ -212,11 +215,12 @@ current_data_default = {
         'Longitude': 0.0,
         'Altitude': 0.0,
         'Gradient': 0.0,
-        'Bearing': 0.0,
+        'Heading': 0.0,
         'ETA': 0
     },
     "historic": {
         'Timestamps': [],
+        'Time_seconds': [], 
         'Speed': [],
         'Battery': [],
         'Power': [],
@@ -258,7 +262,11 @@ current_data_default = {
         "Coordinates": [],
         "Distance": [],
         "SpeedLimit": [],
-        "SpeedProfile":[]       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
+        "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
+        "Headings":[],
+        "TargetProfile": [],     # List of tuples (unix time, speed)
+        "MPCProfile": [],        # List of tuples (unix time, speed)
+        "SolarIrradiance":{}
     }
 }
 current_data = copy.deepcopy(current_data_default)
@@ -315,28 +323,57 @@ def analyze_kml_structure(kml_bytes: bytes):
         
     return root, available_folders
 def get_icon_url(root,point):
-    icon_style=point.find("styleUrl").text.lstrip("#")
-    icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
-    icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
-    icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
-    icon_url=icon_tag.find("IconStyle/Icon/href").text
-    icon_anchor=icon_tag.find("IconStyle/hotSpot")
-    icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
-    return icon_url,icon_anchor
+    try:
+        icon_style=point.find("styleUrl").text.lstrip("#")
+        icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
+        icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
+        try:
+            icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+            icon_url=icon_tag.find("IconStyle/Icon/href").text
+            icon_anchor=icon_tag.find("IconStyle/hotSpot")
+            icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
+        except:
+            ns = {
+                'gx': 'http://www.google.com/kml/ext/2.2',
+                'kml': 'http://www.opengis.net/kml/2.2'
+            }
+            icon_tag=root.find(f"Document/CascadingStyle[@{{{ns['kml']}}}id='{icon_super}']")
+            icon_url=icon_tag.find("Style/IconStyle/Icon/href").text
+            icon_url=icon_url.replace("&amp;","&")
+            icon_anchor=icon_tag.find("Style/IconStyle/hotSpot")
+            icon_anchor=(icon_anchor.attrib['x'],icon_anchor.attrib['y'])
+        req=requests.get(icon_url,headers={"Range": "bytes=0-23"})
+        data=req.content
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            icon_size= struct.unpack('>II', data[16:24])
+        else:
+            icon_size=(32,32)
+        return icon_url,icon_anchor,icon_size
+    except:
+        return "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png",(20,2),(32,32)
 def get_line_colour(root,point):
     try:
         icon_style=point.find("styleUrl").text.lstrip("#")
         icon_tag=root.find(f"Document/StyleMap[@id='{icon_style}']")
         icon_super=icon_tag.findall("Pair")[0].find("styleUrl").text.lstrip("#")
-        icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
-        colour=icon_tag.find("LineStyle/color").text
+        try:
+            icon_tag=root.find(f"Document/Style[@id='{icon_super}']")
+            colour=icon_tag.find("LineStyle/color").text
+            width=int(icon_tag.find("LineStyle/width").text)
+        except:
+            ns = {
+                'gx': 'http://www.google.com/kml/ext/2.2',
+                'kml': 'http://www.opengis.net/kml/2.2'
+            }
+            icon_tag=root.find(f"Document/CascadingStyle[@{{{ns['kml']}}}id='{icon_super}']")
+            colour=icon_tag.find("Style/LineStyle/color").text
+            width=int(icon_tag.find("Style/LineStyle/width").text)
         opacity=colour[:2]
         opacity=int(opacity,16)/255
         b=colour[2:4]
         g=colour[4:6]
         r=colour[6:8]
         colour=r+g+b
-        width=int(icon_tag.find("LineStyle/width").text)
     except:
         return None,None,None
     return colour,width,opacity
@@ -529,17 +566,19 @@ async def update_processor(queue: asyncio.Queue):
                     i=-1
                     while i<len(current_data['profile']['Distance'])-1 and distance>=current_data['profile']['Distance'][i+1]:
                         i+=1
-                    seg_dist,eta=current_data['profile']['Distance'][i+1]-distance,0
-                    for j in range(i,len(current_data['profile']['Distance'])-1):
-                        if j!=i:
-                            seg_dist=current_data['profile']['Distance'][j+1]-current_data['profile']['Distance'][j]
-                        if current_data['profile']['SpeedLimit'][j]!=0 and current_data['profile']['SpeedProfile'][j]!=0:
-                            eta+=(seg_dist*1000)/(min((MAX_SPEED,current_data['profile']['SpeedLimit'][j],current_data['profile']['SpeedProfile'][j]))*(5/18))
-                        elif (current_data['profile']['SpeedLimit'][j]!=0) ^ (current_data['profile']['SpeedProfile'][j]!=0):
-                            eta+=(seg_dist*1000)/(min(max(current_data['profile']['SpeedProfile'][j],current_data['profile']['SpeedLimit'][j]),MAX_SPEED)*(5/18))
-                        else:
-                            eta+=(seg_dist*1000)/(MAX_SPEED*(5/18))
-                    metric["ETA"]=eta
+                    if len(current_data['profile']['SpeedLimit'])>0:
+                        seg_dist,eta=current_data['profile']['Distance'][i+1]-distance,0
+                        for j in range(i,len(current_data['profile']['Distance'])-1):
+                            if j!=i:
+                                seg_dist=current_data['profile']['Distance'][j+1]-current_data['profile']['Distance'][j]
+                            if current_data['profile']['SpeedLimit'][j]!=0 and current_data['profile']['SpeedProfile'][j]!=0:
+                                eta+=(seg_dist*1000)/(min((MAX_SPEED,current_data['profile']['SpeedLimit'][j],current_data['profile']['SpeedProfile'][j]))*(5/18))
+                            elif (current_data['profile']['SpeedLimit'][j]!=0) ^ (current_data['profile']['SpeedProfile'][j]!=0):
+                                eta+=(seg_dist*1000)/(min(max(current_data['profile']['SpeedProfile'][j],current_data['profile']['SpeedLimit'][j]),MAX_SPEED)*(5/18))
+                            else:
+                                eta+=(seg_dist*1000)/(MAX_SPEED*(5/18))
+                        metric["ETA"]=eta
+
                     f=(distance-current_data['profile']['Distance'][i])/(current_data['profile']['Distance'][i+1]-current_data['profile']['Distance'][i])
                     lat1,lon1=current_data['profile']['Coordinates'][i]
                     lat2,lon2=current_data['profile']['Coordinates'][i+1]
@@ -563,16 +602,13 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Longitude'] = math.degrees(interp_lon)
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
-                    delta_lon_rad = math.radians(lon2 - lon1)
-                    x = math.sin(delta_lon_rad) * math.cos(lat2_rad)
-                    y = math.cos(lat1_rad) * math.sin(lat2_rad) - (
-                        math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(delta_lon_rad)
-                    )
-                    initial_bearing_rad = math.atan2(x, y)
-                    initial_bearing_deg = math.degrees(initial_bearing_rad)
-                    metric['Bearing']= (initial_bearing_deg + 360) % 360
+                    metric['Heading']=current_data['profile']['Headings'][i]
+                    if current_data['profile']['TargetProfile']:
+                        v1,v2=current_data['profile']['TargetProfile'][i][1],current_data['profile']['TargetProfile'][i+1][1]
+                        metric['predicted']=v1 + f*(v2-v1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
+                    'Time_seconds': float(rx_dt.timestamp()),
                     'Speed': pdata['Vehicle_Velocity'] * 3.6,
                     'Battery': tracker_state["current_soc_percentage"],
                     'Power': output_power,
@@ -616,7 +652,26 @@ async def update_processor(queue: asyncio.Queue):
                     'Latitudes': metric['Latitude'] if metric['Latitude'] else pdata['Latitude'],
                     'Longitudes': metric['Longitude'] if metric['Longitude'] else pdata['Longitude'],
                 }
-
+                if current_data['profile']['Coordinates']:
+                    try:
+                        results={
+                            "Speed": current_data['metric']['Speed'],
+                            "SoC": current_data['metric']['SOC_Ah'],
+                            "Distance": current_data['metric']['distance_travelled'],
+                            "Time_seconds": historic['Time_seconds']
+                        }
+                        profiles={
+                            "Gradient":current_data['profile']['Gradient'],
+                            "SpeedProfile":current_data['profile']['SpeedProfile'],
+                            "TargetProfile":current_data['profile']['TargetProfile'],
+                            "Distance":current_data['profile']['Distance'],
+                            "Coordinates":current_data['profile']['Coordinates'],
+                            "Headings":current_data['profile']['Headings'],
+                            "SolarIrradiance":current_data['profile']['SolarIrradiance']
+                        }
+                        current_data['profile']['MPCProfile']=solver_main(results=results,profiles=profiles)
+                    except Exception as e:
+                        raise e
                 for k in current_data['historic']:
                     if k in historic:
                         current_data['historic'][k].append(historic[k])
@@ -679,7 +734,7 @@ async def update_processor(queue: asyncio.Queue):
                 }
             if ptype == "C":
                 for key in pdata:
-                    current_data['profile'][key]=pdata[key]  
+                    current_data['profile'][key]=pdata[key]
             current_data['metric'] = metric
             update_packet['metric'] = {**metric}
             update_packet['profile']={**current_data['profile']}
@@ -742,6 +797,12 @@ async def get_historical_data():
         'metric': current_data["metric"],
         'historic': current_data["historic"]
     }
+@app.get("/api/data/profile")
+async def get_profile_data():
+    """Get all cached profile data for solvers"""
+    return {
+        'profile':current_data['profile']
+    }
 
 @app.get("/api/data/clear")
 async def clear_historical_data():
@@ -768,6 +829,11 @@ async def get_session_options(session_id: str):
         # Session expired on backend server (e.g., server restarted)
         raise HTTPException(status_code=404, detail="Session expired")
     try:
+        try:
+            data=json.loads(kml_bytes)
+            return {'map_html':data['map'],'fileName':data['fileName'],'folderIdx':data['folder_index'],'folderName':data['folder_name'],'placemarkIdx':data['placemark_index'],'placemarkName':data['placemark_name']}
+        except:
+            pass
         _, structural_options = analyze_kml_structure(kml_bytes)
         return {"options": structural_options}
     except Exception as e:
@@ -786,7 +852,7 @@ def get_live_car_gps():
                 },
                 "properties": {
                     "id": "live-car-pin",
-                    "bearing": current_data['metric']['Bearing']
+                    "bearing": current_data['metric']['Heading']
                 }
             }
         ]
@@ -824,6 +890,15 @@ async def upload_kml(file: UploadFile = File(...)):
     try:
         kml_bytes = await file.read()
         # Parse once to ensure structure is clean and gather selectable parameters
+        try:
+            data=json.loads(kml_bytes)
+            if data['profile']:
+                await app.state.queue.put(("C", data['profile']))
+            session_id = str(uuid.uuid4())
+            TRACK_SESSIONS[session_id] = kml_bytes
+            return {'map_html':data['map'],'fileName':data['file_name'],'folderIdx':data['folder_index'],'folderName':data['folder_name'],'placemarkIdx':data['placemark_index'],'placemarkName':data['placemark_name'],'session_id':session_id}
+        except:
+            pass
         _, structural_options = analyze_kml_structure(kml_bytes)
         
         # Issue a temporary session identifier
@@ -833,6 +908,21 @@ async def upload_kml(file: UploadFile = File(...)):
         return {"session_id": session_id, "options": structural_options}
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": f"Failed to inspect KML: {str(e)}"})
+@app.post("/api/save")
+async def save(request: Request):
+    try:
+        data = await request.json()
+        data['profile']=copy.deepcopy(current_data['profile'])
+        SCRIPT_DIR = Path(__file__).resolve().parent
+        if 'MPCProfile' in data['profile'].keys():
+            data['profile'].pop('MPCProfile')
+            data['profile'].pop("TargetProfile")
+        file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
+        with open(SCRIPT_DIR / "Saves" / file_name ,"w") as file:
+            json.dump(data,file)
+        return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Failed to save KML: {str(e)}"})
 
 
 class SelectionPayload(BaseModel):
@@ -883,17 +973,22 @@ async def render_selected_track(payload: SelectionPayload):
         route_info={"name":route_name,"colour":colour,"width":width,"opacity":opacity}
         coordinates = []
         relevant_points=[]
+        used_points=[]
         for pair in coords_split:
             lon, lat, *_ = pair.split(",")
             lat,lon=float(lat),float(lon)
             coordinates.append((lat,lon))
             for point in points_list:
+                if point in used_points:
+                    continue
                 p_lon,p_lat,_=point.find("Point/coordinates").text.split(",")
                 p_lat,p_lon=float(p_lat),float(p_lon)
-                icon_url,icon_anchor=get_icon_url(root,point)
-                if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5 and not {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor} in relevant_points:
-                    relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor})
-        
+                if geodesic((lat,lon),(p_lat,p_lon)).kilometers<1.5:
+                    icon_url,icon_anchor,icon_size=get_icon_url(root,point)
+                    if {"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor,"size":icon_size} not in relevant_points:
+                        relevant_points.append({"name":point.find("name").text,"description":point.find("description").text if point.find("description") is not None else None,"coordinates":(p_lat,p_lon),"url":icon_url,"anchor":icon_anchor,"size":icon_size})
+                        used_points.append(point)
+                        continue
         results = maps_main(route_info,coordinates,relevant_points)
         map_html,smoothed_altitude,distance_profile,coordinates,speed_limit,eta=results["Map"],results["Altitude"],results["Distances"],results["Coordinates"],results["SpeedLimit"],results["ETA"]
         speed_profile=results["SpeedProfile"]
@@ -911,7 +1006,8 @@ async def render_selected_track(payload: SelectionPayload):
             "Distance": distance_profile,
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit,
-            "SpeedProfile": speed_profile
+            "SpeedProfile": speed_profile,
+            "Headings":results["Headings"]
         }
         await app.state.queue.put(("C", packet_c)) 
         return {"map_html": map_html}
