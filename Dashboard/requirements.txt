@@ -12,3 +12,4 @@ scipy==1.18.0
 Shapely==2.1.2
 uvicorn==0.50.0
 python-multipart
+casadi
