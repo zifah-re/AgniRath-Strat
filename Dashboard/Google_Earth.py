@@ -41,7 +41,7 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
         # Calculate geodesic distance between consecutive pairs in kilometers
         segment_dist = geodesic(new_coordinates[i-1], new_coordinates[i]).meters
         total_distance += segment_dist
-    target_points = max(len(new_coordinates),int(total_distance//100))
+    target_points = max(len(new_coordinates),int(total_distance//50))
     if target_points!=len(new_coordinates):
         lats = [p[0] for p in new_coordinates]
         lons = [p[1] for p in new_coordinates]

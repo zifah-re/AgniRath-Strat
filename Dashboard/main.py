@@ -32,7 +32,7 @@ from geopy.point import Point
 import requests
 import struct
 
-from mpc import main as solver_main
+from mpc_ipopt import main as solver_main
 
 # Key Lists
 PACKET_A_DIRECT_KEYS = ("SOC_Ah", "Pack_Voltage", "Pack_Current", "Bus_Voltage",
@@ -918,6 +918,7 @@ async def save(request: Request):
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
         file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
+        file_name=file_name.replace(":","")
         with open(SCRIPT_DIR / "Saves" / file_name ,"w") as file:
             json.dump(data,file)
         return JSONResponse(status_code=200, content={"success": "Successfuly saved file"})
@@ -1002,7 +1003,7 @@ async def render_selected_track(payload: SelectionPayload):
         current_data['metric']["ETA"]=eta
         packet_c = {
             "Altitude": smoothed_altitude,
-            "Gradient": np.clip(gradient_profile,min=-7.5,max=7.5).tolist(),
+            "Gradient": np.clip(gradient_profile).tolist(),
             "Distance": distance_profile,
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit,
