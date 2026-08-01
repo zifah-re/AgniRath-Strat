@@ -36,7 +36,7 @@ sns.set_theme(style="whitegrid")
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
 # Define distinct consistent colors for each optimizer
-colors = {'L-BFGS-B': '#1f77b4', 'SLSQP': '#ff770f', 'BFGS': '#2ca02c'}
+colors = {'L-BFGS-B': '#1f77b4', 'SLSQP': '#ff770f', 'BFGS': '#2ca02c', 'IPOPT': "#d12626"}
 
 # --- Plot 1: Iteration vs Time (Raw + Rolling Mean) ---
 window_size = 50
