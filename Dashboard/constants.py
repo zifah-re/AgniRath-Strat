@@ -1,7 +1,7 @@
 # ==========================================
 # CONSTANTS FOR TRAFFIC.PY
 # ==========================================
-MAX_SPEED=85 #kmph
+MAX_SPEED=90 #kmph
 API_LIST=["etKjsDvawmp7jo1fKi68ySPrPLGRZgGp","nt0WpoWFNPf7PxPWE2qcHgjtthK73CPY","G1kaSNVPFPVBwoMDyBgUvEUcoqYiKUJi"] #Tomtom Api
 NO_SNAP_TO_ROAD=["Track loop"]
 FIELDS="{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{type,geometry{type,coordinates},properties{speedLimits{value,unit,type},traveledDistance{value,unit},speedProfile{value,unit},trafficSigns{signType,chainage},trafficLight,confidence}},distances{total,road,offRoad}}"
