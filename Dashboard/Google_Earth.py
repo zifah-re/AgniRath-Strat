@@ -37,20 +37,22 @@ def main(route_info:dict,new_coordinates:list[tuple[float,float]],relevant_point
     key_list=[*{*key_list}]
     google_matched_coordinates = []
     total_distance = 0.0
+    distance_profile=[0.0]
     for i in range(1, len(new_coordinates)):
         # Calculate geodesic distance between consecutive pairs in kilometers
         segment_dist = geodesic(new_coordinates[i-1], new_coordinates[i]).meters
         total_distance += segment_dist
+        distance_profile.append(total_distance)
     target_points = max(len(new_coordinates),int(total_distance//50))
     if target_points!=len(new_coordinates):
         lats = [p[0] for p in new_coordinates]
         lons = [p[1] for p in new_coordinates]
         
         # Create an array of index positions for original data (e.g., [0, 1, 2...])
-        original_indices = np.arange(len(new_coordinates))
+        original_indices = distance_profile
         
         # Create 25 evenly spaced target index positions (e.g., [0.0, 0.45, 0.9...])
-        target_indices = np.linspace(0, len(new_coordinates) - 1, target_points)
+        target_indices = np.linspace(0, distance_profile[-1], target_points)
         
         # Re-interpolate coordinates perfectly across the 25 target points
         interp_lats = np.interp(target_indices, original_indices, lats)

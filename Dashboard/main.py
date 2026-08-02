@@ -994,12 +994,20 @@ async def render_selected_track(payload: SelectionPayload):
         map_html,smoothed_altitude,distance_profile,coordinates,speed_limit,eta=results["Map"],results["Altitude"],results["Distances"],results["Coordinates"],results["SpeedLimit"],results["ETA"]
         speed_profile=results["SpeedProfile"]
         gradient_profile = []
-        for i in range(1,len(smoothed_altitude)):
+        target_points = int((distance_profile[-1]*1000)//100)
+        original_indices = distance_profile
+        target_indices = np.linspace(0, distance_profile[-1], target_points)
+        interp_alts = np.interp(target_indices, original_indices, smoothed_altitude)
+        slopes = savgol_filter(interp_alts, window_length=15, polyorder=3, deriv=1, delta=100)
+        # Convert to percent grade
+        gradient_profile = slopes * 100
+        '''for i in range(1,len(smoothed_altitude)):
             rise=(smoothed_altitude[i]-smoothed_altitude[i-1])
             run=(distance_profile[i]-distance_profile[i-1])
             gradient=(rise/run)*0.1 if run!=0 else 0
             gradient_profile.append(gradient)
-        gradient_profile=savgol_filter(gradient_profile,window_length=11,polyorder=3)
+        gradient_profile=savgol_filter(gradient_profile,window_length=11,polyorder=3)'''
+        gradient_profile=np.interp(distance_profile,target_indices,gradient_profile)
         current_data['metric']["ETA"]=eta
         packet_c = {
             "Altitude": smoothed_altitude,

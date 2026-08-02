@@ -162,6 +162,7 @@ def compute_optimal_velocity(current_v, current_soc, current_time, targets, terr
         else:
             history_v.append(float(u_guess[0]))
             
+            
         seg_len = distance[i] - distance[i - 1]
         
         # Re-apply using the optimal selected step
