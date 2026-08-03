@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 from constants import MASS, RHO, CDA, G, MOTOR_EFF, REGEN_EFF, CRR
 
@@ -9,9 +10,9 @@ FILE_PATH = SCRIPT_DIR / "Saves" / file_name
 with open(FILE_PATH, 'r') as f:
     data = json.loads(f.read())
 
-distance_profile = data['profile']['Distance']      # kilometres
-gradient_profile = data['profile']['Gradient']       # percent
-speed_limit = data['profile']['SpeedLimit']          # km/h
+distance_profile = data['profile']['Distance']      
+gradient_profile = data['profile']['Gradient']       
+speed_limit = data['profile']['SpeedLimit']         
 coords = data['profile']['Coordinates']
 
 # =====================================================================
@@ -59,16 +60,26 @@ def patch_speed_limits(sl):
 speed_limit = patch_speed_limits(speed_limit)
 
 # --- Constants ---
-P_MOTOR_MAX = 4000.0    # 3600 W continuous (derated from 4kW peak)
+P_MOTOR_MAX = 4000.0    # W (peak motor electrical power we allow)
 CRUISE_SPEED = 90 / 3.6         # m/s — target cruising speed
 LOWEST_SPEED_HIGHWAY = 60 / 3.6 # m/s — failure floor on highways (speed_limit >= 100)
 LOWEST_SPEED_OTHER   = 40 / 3.6 # m/s — failure floor elsewhere
 TRAILER_EXIT_SPEED   = 90 / 3.6 # m/s — assumed speed after being trailered
 V_FLOOR = 5 / 3.6               # m/s — absolute minimum to prevent division by zero
 
+# NEW: realistic braking model
+# Comfortable, sustainable braking deceleration for a lightweight (300 kg)
+# solar car on open road — not panic braking. 2.5 m/s^2 ~ 0.25g.
+# This is a judgment call, not measured — tune it if you have real brake
+# test data. Lower = more conservative (car must "see" limit changes from
+# further away) = more stretches will look infeasible.
+BRAKE_DECEL_MS2 = 2.5
+
+n = len(gradient_profile)
+
 
 def get_v_limit(i):
-    """Speed limit at point i (already patched, but belt-and-suspenders)."""
+    """Legal speed limit at point i (already patched, but belt-and-suspenders)."""
     sl = speed_limit[i]
     if sl <= 0:
         return CRUISE_SPEED
@@ -78,6 +89,35 @@ def get_v_limit(i):
 def get_speed_floor(i):
     """Minimum acceptable speed at point i."""
     return LOWEST_SPEED_HIGHWAY if speed_limit[i] >= 100 else LOWEST_SPEED_OTHER
+
+
+# =====================================================================
+# Backward pass: compute the fastest speed the car could LEGALLY and
+# PHYSICALLY be going at each point, accounting for the fact that
+# braking to a lower limit ahead takes real distance.
+#
+# v_cap[i] = min(
+#     v_limit[i],                                   # the actual legal limit here
+#     sqrt(v_cap[i+1]^2 + 2 * BRAKE_DECEL * ds)      # what braking physics allows
+# )
+#
+# This is the standard backward speed-profile pass used in racing-line /
+# ADAS planning: walk from the end of the route to the start, and at each
+# step, cap the entry speed so there's enough room to brake for whatever
+# is coming next.
+# =====================================================================
+v_limit_arr = [get_v_limit(i) for i in range(n)]
+v_cap = v_limit_arr[:]  # start equal to the legal limit, then tighten backward
+
+for i in range(n - 2, -1, -1):
+    ds = (distance_profile[i + 1] - distance_profile[i]) * 1000  # metres
+    if ds <= 0:
+        # Duplicate/zero-length point in the KML — no distance to brake over,
+        # so this point inherits the next point's cap directly.
+        v_cap[i] = min(v_cap[i], v_cap[i + 1])
+        continue
+    achievable = math.sqrt(v_cap[i + 1] ** 2 + 2 * BRAKE_DECEL_MS2 * ds)
+    v_cap[i] = min(v_cap[i], achievable)
 
 
 def simulate(safe_mask):
@@ -101,10 +141,17 @@ def simulate(safe_mask):
                 v = TRAILER_EXIT_SPEED
             continue
 
+        # --- Entry clamp: this is the fix. ---
+        # v_cap already encodes "the fastest you could legally/physically be
+        # going here, given you must be able to brake for anything ahead."
+        # Clamping HERE (before any force calc, speed report, or failure
+        # check at THIS index) closes the loophole where the car could use
+        # illegal, un-braked-for kinetic energy to power through a hill.
+        v = min(v, v_cap[i])
         v = max(v, V_FLOOR)
 
         grad = gradient_profile[i] / 100.0
-        v_limit = get_v_limit(i)
+        v_limit = v_limit_arr[i]
 
         # --- Forces ---
         f_drag = 0.5 * RHO * CDA * (v ** 2)
@@ -132,31 +179,39 @@ def simulate(safe_mask):
         spd[i] = v * 3.6
         mpow[i] = p_elec
 
-        # Speed floor check — distinguish real hill failures from speed-limit
-        # transitions. A car exiting a 60 km/h zone onto a mild uphill highway
-        # is temporarily below 60 but will recover — that's not a hill problem.
+        # Speed floor check — now operating on a speed that was legal
+        # AND physically reachable to begin with, so this is no longer
+        # contaminated by borrowed illegal kinetic energy.
         #
-        # Test: can the motor sustain the floor speed on this gradient?
-        # Evaluate f_net at v=floor. If negative, the hill genuinely defeats
-        # the motor. If positive, the car can recover — it's just slow from
-        # a speed limit zone upstream.
+        # NOTE: deliberately NOT gated on "grad > 0". Real elevation data
+        # is noisy — a sustained climb can have individual samples read as
+        # flat or slightly negative due to GPS/elevation jitter, even while
+        # the car is still stalled from the climb. Gating on grad>0 let a
+        # genuinely-stalled car slip through undetected whenever a sample
+        # happened to read non-positive (this is what produced "Springbok
+        # Loop: min speed 20 km/h -> All clear", which is a contradiction).
+        # f_grav/f_roll below already reflect the ACTUAL current gradient
+        # (positive, flat, or negative), so this check still correctly
+        # leaves real downhills alone — gravity assist there makes
+        # f_net_at_floor positive on its own, without needing a grad>0 gate.
         floor = get_speed_floor(i)
-        if grad > 0 and v < floor:
+        if v < floor:
             f_drag_at_floor = 0.5 * RHO * CDA * (floor ** 2)
             f_motor_at_floor = (P_MOTOR_MAX * MOTOR_EFF) / floor
             f_net_at_floor = f_motor_at_floor - f_drag_at_floor - f_roll - f_grav
             if f_net_at_floor < 0:
-                # Motor can't sustain floor speed on this gradient → real failure
                 failed.append(i)
 
         # --- Advance ---
+        # No more end-of-loop v_limit clamp here — the NEXT iteration's
+        # entry clamp (v = min(v, v_cap[i+1])) is what enforces legality,
+        # and it does so using the braking-aware cap, not an instant snap.
         if i + 1 < len(distance_profile):
             ds = (distance_profile[i + 1] - distance_profile[i]) * 1000
             if ds > 0:
                 dt = ds / v
                 v_new = v + a * dt
                 v = max(v_new, V_FLOOR)
-                v = min(v, v_limit)
 
     return spd, mpow, failed
 
@@ -164,7 +219,6 @@ def simulate(safe_mask):
 # =====================================================================
 # Find contiguous uphill stretches
 # =====================================================================
-n = len(gradient_profile)
 stretches = []
 i = 0
 while i < n:
@@ -183,26 +237,36 @@ while i < n:
 safe = [True] * n
 MAX_ITERATIONS = 10
 
-# First pass — captures the real speeds before any trailering
-first_pass_speeds, first_pass_power, failed = simulate(safe)
-
-if failed:
-    new_failures = set(failed)
+def mark_unsafe(new_failures, safe, stretches):
+    """
+    Mark unsafe points. If a failure falls inside a recognised uphill
+    stretch, trailer the whole stretch (that's the intended strategy —
+    don't attempt a hill you can't clear). If a failure falls outside
+    any stretch (now possible since the floor check isn't gated on
+    grad>0), mark just that point — the car stalled there specifically,
+    not as part of a climb.
+    """
+    handled = set()
     for (s, e) in stretches:
         if any(j in new_failures for j in range(s, e + 1)):
             for j in range(s, e + 1):
                 safe[j] = False
+            handled.update(range(s, e + 1))
+    for j in new_failures:
+        if j not in handled:
+            safe[j] = False
 
-    # Subsequent passes — resolve cascading failures from trailering
+
+first_pass_speeds, first_pass_power, failed = simulate(safe)
+
+if failed:
+    mark_unsafe(set(failed), safe, stretches)
+
     for iteration in range(1, MAX_ITERATIONS):
         speeds, motor_power, failed = simulate(safe)
         if not failed:
             break
-        new_failures = set(failed)
-        for (s, e) in stretches:
-            if any(j in new_failures for j in range(s, e + 1)):
-                for j in range(s, e + 1):
-                    safe[j] = False
+        mark_unsafe(set(failed), safe, stretches)
     iteration_count = iteration + 1
 else:
     speeds = first_pass_speeds
@@ -210,15 +274,21 @@ else:
     iteration_count = 1
 
 # =====================================================================
-# Report — use first_pass_speeds for min_speed so we show the actual
-# speed the car had when it failed, not 0.0 from the trailered pass.
+# Report
 # =====================================================================
 unsafe_count = safe.count(False)
 if unsafe_count > 0:
     print(f"\n{unsafe_count} unsafe points (need trailer)\n")
+
+    stretch_index_set = set()
+    for (s, e) in stretches:
+        stretch_index_set.update(range(s, e + 1))
+
+    any_stretch_reported = False
     print("Failed uphill stretches:")
     for (s, e) in stretches:
         if not safe[s]:
+            any_stretch_reported = True
             peak_grad = max(gradient_profile[s:e+1])
             dist_start = distance_profile[s]
             dist_end = distance_profile[e] if e < len(distance_profile) else distance_profile[-1]
@@ -227,8 +297,28 @@ if unsafe_count > 0:
             entry_speed = first_pass_speeds[s]
             print(f"  idx {s:>5d}-{e:<5d}  |  dist {dist_start:>7.1f}-{dist_end:<7.1f} km  "
                   f"|  length {length_m:>6.0f} m  |  peak grad {peak_grad:>5.2f}%  "
-                  f"|  entry {entry_speed:>5.1f} → min {min_speed:>5.1f} km/h")
+                  f"|  entry {entry_speed:>5.1f} -> min {min_speed:>5.1f} km/h")
+    if not any_stretch_reported:
+        print("  (none)")
+
+    # Points marked unsafe that AREN'T part of any recognized uphill stretch —
+    # e.g. a genuine stall carried over onto a flat/noisy-gradient sample.
+    # Without this, unsafe_count could be >0 with nothing explaining why.
+    isolated = [i for i in range(n) if not safe[i] and i not in stretch_index_set]
+    if isolated:
+        print("\nIsolated unsafe points (not part of a recognized uphill stretch):")
+        for i in isolated:
+            print(f"  idx {i:>5d}  |  dist {distance_profile[i]:>7.1f} km  "
+                  f"|  grad {gradient_profile[i]:>5.2f}%  |  speed {first_pass_speeds[i]:>5.1f} km/h")
+
     print(f"\nConverged in {iteration_count} iteration(s)")
+
+    # Report where the braking cap actually bit (informational, so you can
+    # sanity check it against the KML instead of trusting it blindly)
+    tightened = [i for i in range(n) if v_cap[i] < v_limit_arr[i] - 0.1]
+    if tightened:
+        print(f"\n{len(tightened)} points where anticipatory braking reduced "
+              f"entry speed below the raw posted limit (BRAKE_DECEL_MS2={BRAKE_DECEL_MS2}).")
 else:
     print("\nAll clear — car can handle every hill on the route!")
     print(f"  Max gradient:    {max(gradient_profile):.2f}%")
