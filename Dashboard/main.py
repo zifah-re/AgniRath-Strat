@@ -1008,10 +1008,11 @@ async def render_selected_track(payload: SelectionPayload):
             gradient_profile.append(gradient)
         gradient_profile=savgol_filter(gradient_profile,window_length=11,polyorder=3)'''
         gradient_profile=np.interp(distance_profile,target_indices,gradient_profile)
+        gradient_profile=gradient_profile.tolist()
         current_data['metric']["ETA"]=eta
         packet_c = {
             "Altitude": smoothed_altitude,
-            "Gradient": np.clip(gradient_profile).tolist(),
+            "Gradient": gradient_profile,
             "Distance": distance_profile,
             "Coordinates": coordinates,
             "SpeedLimit": speed_limit,
