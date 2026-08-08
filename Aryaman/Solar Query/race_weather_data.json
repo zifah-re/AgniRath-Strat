@@ -1,0 +1,450 @@
+{
+    "Day 1": {
+        "date": "2024-09-13",
+        "start_time_sast": "09:00:00",
+        "distance_covered_km": 323.56,
+        "time_taken_hours": 6.15,
+        "r_max_km": 60.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 35,
+            "n_lag_bins": 11,
+            "nugget": 3.144890421507324e-29,
+            "partial_sill": 0.009192507632830953,
+            "range_km": 494.7848058117024,
+            "sse": 0.0002089045732255318,
+            "r_max_raw_km": 178.1232320039685,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -26.51561,
+                "longitude": 29.15905,
+                "ghi_wm2": 487.84,
+                "dni_wm2": 394.51,
+                "wind_speed_ms": 5.5,
+                "wind_direction_deg": 337.72
+            },
+            {
+                "cum_dist_km": 120.33,
+                "eta_hours": 2.98,
+                "latitude": -26.63215,
+                "longitude": 28.38869,
+                "ghi_wm2": 788.94,
+                "dni_wm2": 581.06,
+                "wind_speed_ms": 7.51,
+                "wind_direction_deg": 303.35
+            },
+            {
+                "cum_dist_km": 248.91,
+                "eta_hours": 6.15,
+                "latitude": -27.29761,
+                "longitude": 28.06183,
+                "ghi_wm2": 562.67,
+                "dni_wm2": 383.17,
+                "wind_speed_ms": 7.29,
+                "wind_direction_deg": 285.04
+            }
+        ]
+    },
+    "Day 2": {
+        "date": "2024-09-14",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 296.76,
+        "time_taken_hours": 6.54,
+        "r_max_km": 60.0,
+        "r_max_source": "semivariogram",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "solved",
+            "model": "spherical",
+            "n_grid_points": 54,
+            "n_lag_bins": 11,
+            "nugget": 1.1252112023164693e-21,
+            "partial_sill": 0.014368537164774363,
+            "range_km": 238.40372193631993,
+            "sse": 0.017174778003229373,
+            "r_max_raw_km": 121.00486814463027,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -26.79539,
+                "longitude": 27.82477,
+                "ghi_wm2": 226.76,
+                "dni_wm2": 147.48,
+                "wind_speed_ms": 4.86,
+                "wind_direction_deg": 347.14
+            },
+            {
+                "cum_dist_km": 120.42,
+                "eta_hours": 3.25,
+                "latitude": -25.93543,
+                "longitude": 27.4719,
+                "ghi_wm2": 822.42,
+                "dni_wm2": 700.88,
+                "wind_speed_ms": 6.34,
+                "wind_direction_deg": 340.27
+            },
+            {
+                "cum_dist_km": 242.72,
+                "eta_hours": 6.54,
+                "latitude": -25.65439,
+                "longitude": 26.54908,
+                "ghi_wm2": 665.76,
+                "dni_wm2": 516.93,
+                "wind_speed_ms": 6.13,
+                "wind_direction_deg": 341.39
+            }
+        ]
+    },
+    "Day 3": {
+        "date": "2024-09-15",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 368.98,
+        "time_taken_hours": 7.83,
+        "r_max_km": 60.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 117,
+            "n_lag_bins": 12,
+            "nugget": 8.815066555495556e-23,
+            "partial_sill": 0.0033452397552921117,
+            "range_km": 1042.221853768603,
+            "sse": 0.000589325267694912,
+            "r_max_raw_km": 356.72846263242207,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -25.54125,
+                "longitude": 26.0827,
+                "ghi_wm2": 221.46,
+                "dni_wm2": 155.64,
+                "wind_speed_ms": 3.22,
+                "wind_direction_deg": 27.11
+            },
+            {
+                "cum_dist_km": 120.26,
+                "eta_hours": 2.61,
+                "latitude": -26.17435,
+                "longitude": 25.23747,
+                "ghi_wm2": 745.13,
+                "dni_wm2": 631.94,
+                "wind_speed_ms": 1.9,
+                "wind_direction_deg": 231.46
+            },
+            {
+                "cum_dist_km": 241.02,
+                "eta_hours": 5.23,
+                "latitude": -27.01087,
+                "longitude": 24.5852,
+                "ghi_wm2": 931.59,
+                "dni_wm2": 814.77,
+                "wind_speed_ms": 2.11,
+                "wind_direction_deg": 211.79
+            },
+            {
+                "cum_dist_km": 361.12,
+                "eta_hours": 7.83,
+                "latitude": -27.44896,
+                "longitude": 23.4773,
+                "ghi_wm2": 628.58,
+                "dni_wm2": 525.55,
+                "wind_speed_ms": 2.49,
+                "wind_direction_deg": 241.67
+            }
+        ]
+    },
+    "Day 4": {
+        "date": "2024-09-16",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 373.98,
+        "time_taken_hours": 7.78,
+        "r_max_km": 60.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 84,
+            "n_lag_bins": 12,
+            "nugget": 7.805166410465022e-17,
+            "partial_sill": 0.011449377870387552,
+            "range_km": 999.586334136712,
+            "sse": 0.010633872965284761,
+            "r_max_raw_km": 333.19544474329393,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -27.47144,
+                "longitude": 23.40267,
+                "ghi_wm2": 176.92,
+                "dni_wm2": 105.23,
+                "wind_speed_ms": 3.79,
+                "wind_direction_deg": 136.12
+            },
+            {
+                "cum_dist_km": 122.31,
+                "eta_hours": 2.62,
+                "latitude": -28.1091,
+                "longitude": 22.54318,
+                "ghi_wm2": 718.63,
+                "dni_wm2": 576.11,
+                "wind_speed_ms": 1.61,
+                "wind_direction_deg": 112.32
+            },
+            {
+                "cum_dist_km": 243.19,
+                "eta_hours": 5.2,
+                "latitude": -28.38027,
+                "longitude": 21.37109,
+                "ghi_wm2": 929.84,
+                "dni_wm2": 816.06,
+                "wind_speed_ms": 1.81,
+                "wind_direction_deg": 203.88
+            },
+            {
+                "cum_dist_km": 363.68,
+                "eta_hours": 7.78,
+                "latitude": -28.6735,
+                "longitude": 20.42103,
+                "ghi_wm2": 662.34,
+                "dni_wm2": 563.58,
+                "wind_speed_ms": 2.46,
+                "wind_direction_deg": 162.52
+            }
+        ]
+    },
+    "Day 5": {
+        "date": "2024-09-17",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 310.75,
+        "time_taken_hours": 6.3,
+        "r_max_km": 60.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 72,
+            "n_lag_bins": 12,
+            "nugget": 5.912297196150944e-05,
+            "partial_sill": 0.0008320627299726007,
+            "range_km": 865.6060857749654,
+            "sse": 7.13860189273035e-06,
+            "r_max_raw_km": 288.5600764632715,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -28.62319,
+                "longitude": 20.34751,
+                "ghi_wm2": 150.15,
+                "dni_wm2": 102.19,
+                "wind_speed_ms": 3.42,
+                "wind_direction_deg": 212.34
+            },
+            {
+                "cum_dist_km": 121.24,
+                "eta_hours": 3.12,
+                "latitude": -29.03028,
+                "longitude": 19.63407,
+                "ghi_wm2": 775.12,
+                "dni_wm2": 672.03,
+                "wind_speed_ms": 4.08,
+                "wind_direction_deg": 171.61
+            },
+            {
+                "cum_dist_km": 244.62,
+                "eta_hours": 6.3,
+                "latitude": -29.45164,
+                "longitude": 18.49954,
+                "ghi_wm2": 862.0,
+                "dni_wm2": 754.24,
+                "wind_speed_ms": 3.19,
+                "wind_direction_deg": 226.51
+            }
+        ]
+    },
+    "Day 6": {
+        "date": "2024-09-18",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 330.33,
+        "time_taken_hours": 6.73,
+        "r_max_km": 27.24,
+        "r_max_source": "semivariogram",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "solved",
+            "model": "spherical",
+            "n_grid_points": 50,
+            "n_lag_bins": 11,
+            "nugget": 6.563744972204455e-18,
+            "partial_sill": 0.18852526571011277,
+            "range_km": 770.0898669853597,
+            "sse": 1.139875931975374,
+            "r_max_raw_km": 27.243431142057723,
+            "r_max_clamped_km": 27.243431142057723
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -29.66121,
+                "longitude": 17.89023,
+                "ghi_wm2": 110.13,
+                "dni_wm2": 72.48,
+                "wind_speed_ms": 1.68,
+                "wind_direction_deg": 252.07
+            },
+            {
+                "cum_dist_km": 56.24,
+                "eta_hours": 1.36,
+                "latitude": -30.10163,
+                "longitude": 17.90984,
+                "ghi_wm2": 323.85,
+                "dni_wm2": 190.86,
+                "wind_speed_ms": 1.85,
+                "wind_direction_deg": 230.24
+            },
+            {
+                "cum_dist_km": 110.78,
+                "eta_hours": 2.68,
+                "latitude": -30.54412,
+                "longitude": 17.95554,
+                "ghi_wm2": 546.72,
+                "dni_wm2": 373.72,
+                "wind_speed_ms": 1.76,
+                "wind_direction_deg": 246.24
+            },
+            {
+                "cum_dist_km": 166.61,
+                "eta_hours": 4.03,
+                "latitude": -30.94769,
+                "longitude": 18.22039,
+                "ghi_wm2": 703.74,
+                "dni_wm2": 507.33,
+                "wind_speed_ms": 3.68,
+                "wind_direction_deg": 274.28
+            },
+            {
+                "cum_dist_km": 222.43,
+                "eta_hours": 5.39,
+                "latitude": -31.30589,
+                "longitude": 18.57744,
+                "ghi_wm2": 760.87,
+                "dni_wm2": 536.52,
+                "wind_speed_ms": 3.76,
+                "wind_direction_deg": 255.21
+            },
+            {
+                "cum_dist_km": 277.9,
+                "eta_hours": 6.73,
+                "latitude": -31.65717,
+                "longitude": 18.56123,
+                "ghi_wm2": 528.23,
+                "dni_wm2": 272.89,
+                "wind_speed_ms": 4.87,
+                "wind_direction_deg": 263.29
+            }
+        ]
+    },
+    "Day 8": {
+        "date": "2024-09-19",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 245.88,
+        "time_taken_hours": 7.82,
+        "r_max_km": 60.0,
+        "r_max_source": "semivariogram",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "solved",
+            "model": "spherical",
+            "n_grid_points": 20,
+            "n_lag_bins": 10,
+            "nugget": 4.1181882709412473e-13,
+            "partial_sill": 0.03235945399664578,
+            "range_km": 358.2512692317395,
+            "sse": 0.00476829463965311,
+            "r_max_raw_km": 74.89783273817626,
+            "r_max_clamped_km": 60.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -33.38126,
+                "longitude": 18.90039,
+                "ghi_wm2": 120.0,
+                "dni_wm2": 68.36,
+                "wind_speed_ms": 2.43,
+                "wind_direction_deg": 157.81
+            },
+            {
+                "cum_dist_km": 120.05,
+                "eta_hours": 3.91,
+                "latitude": -33.83218,
+                "longitude": 19.39582,
+                "ghi_wm2": 549.95,
+                "dni_wm2": 347.12,
+                "wind_speed_ms": 2.76,
+                "wind_direction_deg": 144.16
+            },
+            {
+                "cum_dist_km": 240.39,
+                "eta_hours": 7.82,
+                "latitude": -33.88496,
+                "longitude": 18.53206,
+                "ghi_wm2": 585.28,
+                "dni_wm2": 480.76,
+                "wind_speed_ms": 9.98,
+                "wind_direction_deg": 152.5
+            }
+        ]
+    },
+    "Route to V&A Waterfront Silo District": {
+        "date": "2024-09-20",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 12.62,
+        "time_taken_hours": 0.0,
+        "r_max_km": 10.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "too_few_grid_points_fallback",
+            "model": null,
+            "n_grid_points": 4,
+            "n_lag_bins": 0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -33.89329,
+                "longitude": 18.5151,
+                "ghi_wm2": 125.56,
+                "dni_wm2": 82.92,
+                "wind_speed_ms": 7.52,
+                "wind_direction_deg": 130.52
+            }
+        ]
+    }
+}
