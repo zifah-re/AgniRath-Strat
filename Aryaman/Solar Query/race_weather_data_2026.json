@@ -1,0 +1,450 @@
+{
+    "Day 1": {
+        "day_number": 1,
+        "date": "2025-09-10",
+        "start_time_sast": "09:00:00",
+        "distance_covered_km": 238.33,
+        "time_taken_hours": 5.38,
+        "r_max_km": 40.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 49,
+            "n_lag_bins": 11,
+            "nugget": 4.4264371666718865e-16,
+            "partial_sill": 0.01203539172481174,
+            "range_km": 644.1210971341347,
+            "sse": 0.0009621946300563456,
+            "r_max_raw_km": 214.70703237804662,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -26.83544,
+                "longitude": 27.84605,
+                "ghi_wm2": 434.83,
+                "dni_wm2": 328.41,
+                "wind_speed_ms": 5.51,
+                "wind_direction_deg": 25.46
+            },
+            {
+                "cum_dist_km": 80.21,
+                "eta_hours": 2.69,
+                "latitude": -26.21324,
+                "longitude": 27.69207,
+                "ghi_wm2": 848.19,
+                "dni_wm2": 727.61,
+                "wind_speed_ms": 5.34,
+                "wind_direction_deg": 2.92
+            },
+            {
+                "cum_dist_km": 160.22,
+                "eta_hours": 5.38,
+                "latitude": -25.77819,
+                "longitude": 27.26311,
+                "ghi_wm2": 679.63,
+                "dni_wm2": 513.84,
+                "wind_speed_ms": 4.09,
+                "wind_direction_deg": 28.52
+            }
+        ]
+    },
+    "Day 2 Half Blind": {
+        "day_number": 2,
+        "date": "2025-09-11",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 302.5,
+        "time_taken_hours": 6.39,
+        "r_max_km": 40.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 70,
+            "n_lag_bins": 11,
+            "nugget": 7.24123439187345e-27,
+            "partial_sill": 0.0069097067730676896,
+            "range_km": 721.0544806537333,
+            "sse": 0.00026620499512263715,
+            "r_max_raw_km": 267.9276715808631,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -25.66054,
+                "longitude": 26.689,
+                "ghi_wm2": 214.81,
+                "dni_wm2": 149.35,
+                "wind_speed_ms": 2.51,
+                "wind_direction_deg": 5.76
+            },
+            {
+                "cum_dist_km": 80.32,
+                "eta_hours": 2.12,
+                "latitude": -25.60285,
+                "longitude": 26.03715,
+                "ghi_wm2": 652.7,
+                "dni_wm2": 543.1,
+                "wind_speed_ms": 5.39,
+                "wind_direction_deg": 23.54
+            },
+            {
+                "cum_dist_km": 161.71,
+                "eta_hours": 4.28,
+                "latitude": -25.96517,
+                "longitude": 25.4254,
+                "ghi_wm2": 839.28,
+                "dni_wm2": 671.45,
+                "wind_speed_ms": 5.1,
+                "wind_direction_deg": 3.11
+            },
+            {
+                "cum_dist_km": 241.74,
+                "eta_hours": 6.39,
+                "latitude": -26.51315,
+                "longitude": 24.91193,
+                "ghi_wm2": 784.7,
+                "dni_wm2": 671.29,
+                "wind_speed_ms": 5.34,
+                "wind_direction_deg": 337.38
+            }
+        ]
+    },
+    "Day 4": {
+        "day_number": 4,
+        "date": "2025-09-13",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 259.92,
+        "time_taken_hours": 7.64,
+        "r_max_km": 40.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 45,
+            "n_lag_bins": 11,
+            "nugget": 4.132890384449432e-17,
+            "partial_sill": 0.006355620093369057,
+            "range_km": 308.3872540624826,
+            "sse": 0.00048554956274868706,
+            "r_max_raw_km": 215.8673984617751,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -28.75309,
+                "longitude": 24.74678,
+                "ghi_wm2": 139.79,
+                "dni_wm2": 61.56,
+                "wind_speed_ms": 5.08,
+                "wind_direction_deg": 35.07
+            },
+            {
+                "cum_dist_km": 82.72,
+                "eta_hours": 2.55,
+                "latitude": -28.30352,
+                "longitude": 24.14896,
+                "ghi_wm2": 668.25,
+                "dni_wm2": 547.19,
+                "wind_speed_ms": 3.95,
+                "wind_direction_deg": 321.14
+            },
+            {
+                "cum_dist_km": 163.57,
+                "eta_hours": 5.03,
+                "latitude": -28.28174,
+                "longitude": 23.37945,
+                "ghi_wm2": 876.69,
+                "dni_wm2": 754.1,
+                "wind_speed_ms": 5.29,
+                "wind_direction_deg": 274.68
+            },
+            {
+                "cum_dist_km": 248.24,
+                "eta_hours": 7.64,
+                "latitude": -27.91223,
+                "longitude": 22.96293,
+                "ghi_wm2": 631.32,
+                "dni_wm2": 532.31,
+                "wind_speed_ms": 5.54,
+                "wind_direction_deg": 263.31
+            }
+        ]
+    },
+    "Day 5": {
+        "day_number": 5,
+        "date": "2025-09-14",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 292.52,
+        "time_taken_hours": 7.89,
+        "r_max_km": 40.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 60,
+            "n_lag_bins": 11,
+            "nugget": 2.7169264840291228e-11,
+            "partial_sill": 0.0008590166924893382,
+            "range_km": 837.7430435514624,
+            "sse": 5.411708348260953e-05,
+            "r_max_raw_km": 279.2596661475277,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -27.91248,
+                "longitude": 22.86076,
+                "ghi_wm2": 182.56,
+                "dni_wm2": 129.46,
+                "wind_speed_ms": 1.89,
+                "wind_direction_deg": 145.94
+            },
+            {
+                "cum_dist_km": 125.39,
+                "eta_hours": 3.43,
+                "latitude": -28.37482,
+                "longitude": 21.73844,
+                "ghi_wm2": 842.79,
+                "dni_wm2": 732.64,
+                "wind_speed_ms": 1.94,
+                "wind_direction_deg": 190.7
+            },
+            {
+                "cum_dist_km": 207.52,
+                "eta_hours": 5.68,
+                "latitude": -28.64374,
+                "longitude": 21.04816,
+                "ghi_wm2": 912.73,
+                "dni_wm2": 800.88,
+                "wind_speed_ms": 2.23,
+                "wind_direction_deg": 234.73
+            },
+            {
+                "cum_dist_km": 288.47,
+                "eta_hours": 7.89,
+                "latitude": -28.64987,
+                "longitude": 20.36285,
+                "ghi_wm2": 656.96,
+                "dni_wm2": 557.17,
+                "wind_speed_ms": 1.21,
+                "wind_direction_deg": 268.81
+            }
+        ]
+    },
+    "Day 6": {
+        "day_number": 6,
+        "date": "2025-09-15",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 310.09,
+        "time_taken_hours": 6.44,
+        "r_max_km": 40.0,
+        "r_max_source": "fallback",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "sill_below_tolerance_over_observed_range",
+            "model": "spherical",
+            "n_grid_points": 72,
+            "n_lag_bins": 12,
+            "nugget": 1.6021188813360028e-10,
+            "partial_sill": 0.0023868700873386855,
+            "range_km": 865.6802178429261,
+            "sse": 0.0004615903029876359,
+            "r_max_raw_km": 288.5600764632715,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -28.6232,
+                "longitude": 20.34758,
+                "ghi_wm2": 145.76,
+                "dni_wm2": 97.19,
+                "wind_speed_ms": 1.71,
+                "wind_direction_deg": 11.91
+            },
+            {
+                "cum_dist_km": 80.26,
+                "eta_hours": 2.07,
+                "latitude": -28.86949,
+                "longitude": 19.99443,
+                "ghi_wm2": 608.5,
+                "dni_wm2": 511.52,
+                "wind_speed_ms": 2.84,
+                "wind_direction_deg": 341.2
+            },
+            {
+                "cum_dist_km": 167.96,
+                "eta_hours": 4.33,
+                "latitude": -29.12619,
+                "longitude": 19.18288,
+                "ghi_wm2": 898.0,
+                "dni_wm2": 774.4,
+                "wind_speed_ms": 5.92,
+                "wind_direction_deg": 289.46
+            },
+            {
+                "cum_dist_km": 249.73,
+                "eta_hours": 6.44,
+                "latitude": -29.4682,
+                "longitude": 18.44427,
+                "ghi_wm2": 863.93,
+                "dni_wm2": 717.44,
+                "wind_speed_ms": 8.05,
+                "wind_direction_deg": 272.12
+            }
+        ]
+    },
+    "Day 7": {
+        "day_number": 7,
+        "date": "2025-09-16",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 342.55,
+        "time_taken_hours": 7.5,
+        "r_max_km": 39.59,
+        "r_max_source": "semivariogram",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "solved",
+            "model": "spherical",
+            "n_grid_points": 72,
+            "n_lag_bins": 12,
+            "nugget": 1.5372480151476419e-22,
+            "partial_sill": 0.05019540697826994,
+            "range_km": 296.30976265003363,
+            "sse": 0.6360040303949283,
+            "r_max_raw_km": 39.58974488735819,
+            "r_max_clamped_km": 39.58974488735819
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -29.66129,
+                "longitude": 17.88898,
+                "ghi_wm2": 35.32,
+                "dni_wm2": 3.32,
+                "wind_speed_ms": 4.02,
+                "wind_direction_deg": 266.17
+            },
+            {
+                "cum_dist_km": 79.89,
+                "eta_hours": 1.87,
+                "latitude": -30.28717,
+                "longitude": 17.89647,
+                "ghi_wm2": 184.7,
+                "dni_wm2": 55.47,
+                "wind_speed_ms": 4.68,
+                "wind_direction_deg": 271.77
+            },
+            {
+                "cum_dist_km": 159.29,
+                "eta_hours": 3.72,
+                "latitude": -30.89138,
+                "longitude": 18.18063,
+                "ghi_wm2": 539.2,
+                "dni_wm2": 337.46,
+                "wind_speed_ms": 5.9,
+                "wind_direction_deg": 269.83
+            },
+            {
+                "cum_dist_km": 241.73,
+                "eta_hours": 5.65,
+                "latitude": -31.44181,
+                "longitude": 18.69923,
+                "ghi_wm2": 483.55,
+                "dni_wm2": 285.21,
+                "wind_speed_ms": 6.3,
+                "wind_direction_deg": 258.03
+            },
+            {
+                "cum_dist_km": 321.35,
+                "eta_hours": 7.5,
+                "latitude": -32.03461,
+                "longitude": 18.79205,
+                "ghi_wm2": 356.88,
+                "dni_wm2": 156.25,
+                "wind_speed_ms": 4.68,
+                "wind_direction_deg": 231.42
+            }
+        ]
+    },
+    "Day 8": {
+        "day_number": 8,
+        "date": "2025-09-17",
+        "start_time_sast": "08:00:00",
+        "distance_covered_km": 278.67,
+        "time_taken_hours": 6.92,
+        "r_max_km": 40.0,
+        "r_max_source": "semivariogram",
+        "semivariogram_diagnostics": {
+            "epsilon": 0.1,
+            "status": "solved",
+            "model": "spherical",
+            "n_grid_points": 32,
+            "n_lag_bins": 11,
+            "nugget": 1.7009275168573725e-16,
+            "partial_sill": 0.030189781022473165,
+            "range_km": 594.5799363811346,
+            "sse": 0.037856881937542955,
+            "r_max_raw_km": 133.5438653394957,
+            "r_max_clamped_km": 40.0
+        },
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -32.17286,
+                "longitude": 18.89958,
+                "ghi_wm2": 131.52,
+                "dni_wm2": 93.64,
+                "wind_speed_ms": 1.11,
+                "wind_direction_deg": 136.76
+            },
+            {
+                "cum_dist_km": 80.45,
+                "eta_hours": 2.31,
+                "latitude": -32.7753,
+                "longitude": 18.92455,
+                "ghi_wm2": 605.79,
+                "dni_wm2": 520.34,
+                "wind_speed_ms": 0.9,
+                "wind_direction_deg": 210.68
+            },
+            {
+                "cum_dist_km": 160.82,
+                "eta_hours": 4.62,
+                "latitude": -33.37134,
+                "longitude": 19.17653,
+                "ghi_wm2": 861.17,
+                "dni_wm2": 762.13,
+                "wind_speed_ms": 2.0,
+                "wind_direction_deg": 238.52
+            },
+            {
+                "cum_dist_km": 240.89,
+                "eta_hours": 6.92,
+                "latitude": -33.49545,
+                "longitude": 18.96354,
+                "ghi_wm2": 646.43,
+                "dni_wm2": 466.06,
+                "wind_speed_ms": 1.98,
+                "wind_direction_deg": 216.31
+            }
+        ]
+    }
+}

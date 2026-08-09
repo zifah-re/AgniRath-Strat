@@ -6,13 +6,38 @@ GHI / DNI / 10 m wind for each stage, discretizes each stage into waypoints,
 looks up local weather at each waypoint's arrival time, and exports
 race_weather_data.json.
 
-v1.1 CHANGE (this revision): the fixed waypoint-spacing radius
-(R_MAX_KM = 10.0) is replaced by a *per-stage, data-derived* radius computed
-from a spatial semivariogram of the clear-sky index (Kc = GHI / GHI_clearsky)
-over that stage's ERA5 grid points. See section 3.5. The fixed constant is
-kept as FALLBACK_R_MAX_KM and used only if a stage's variogram cannot be
-fit (too few grid points, degenerate fit, etc.) so the script never hard
--fails because of this feature.
+v1.2 CHANGE (this revision): KML parsing/day-grouping rewritten.
+
+  Root cause of the "only Day 1 and Day 2 came out right" bug: the KML's
+  route LineString placemarks are named things like
+  "10 Sept Stage 1: Boiketlong to Rustenburg" and
+  "11 Sept Stage 1: Swart Ruggens to Zeerust" - i.e. every day's route
+  segments are labelled "Stage 1" / "Stage 2", never "Day N". The old
+  _DAY_PATTERN regex `(?:day|stage)\s*0*(\d+)` matched the word "Stage" and
+  captured the STAGE number (1 or 2), not the day number. That collapsed
+  every day's "Stage 1" segment into one "Day 1" bucket and every day's
+  "Stage 2" segment into one "Day 2" bucket, and no other keys were ever
+  produced (there is no "Stage 3" anywhere in the file) - hence only
+  "Day 1" / "Day 2" ever appeared in the output, each one a scrambled
+  merge of unrelated days' segments stitched together.
+
+  Fix: parse per KML *Folder* instead of scanning all Placemarks flat and
+  grouping by a regex on the placemark name. The KML's real day boundaries
+  are the Folder structure (Document > Folder "My Places" > Folder "Day N
+  ..."), so `parse_kml_main_routes()` now walks those folders directly and
+  keys results by the folder's actual day label. Loop placemarks are still
+  excluded, and Day 3 ("Full Blind") is naturally dropped from the output
+  since it has no LineString placemarks at all - by design, that stage has
+  no prescribed route.
+
+  A second, related bug this fix also addresses: `main()` previously
+  assigned each stage a date via `RACE_START_DATE + timedelta(days=i)`
+  where `i` was the *index* into the (regex-broken) stage dict. Once Day 3
+  is correctly dropped for having no route, that index-based date math
+  would silently shift every day from Day 4 onward back by one calendar
+  day. Dates are now derived from the day number parsed out of each
+  folder's actual label (e.g. "Day 4" -> 4 -> RACE_START_DATE + 3 days),
+  so gaps like the missing Day 3 no longer cause drift.
 
 Key assumptions / decisions (see chat response for full rationale):
   - Weather source stays cdsapi/ERA5 only, per explicit instruction in this
@@ -66,9 +91,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # DEFAULTS - edit these instead of being prompted at runtime.
 # ---------------------------------------------------------------------------
-KML_FILENAME_HINT = "2024 Sasol Solar Challenge Route (Publish).kml"
+KML_FILENAME_HINT = "2026 Sasol Solar Challenge Route (Publish).kml"
 
-RACE_START_DATE = date(2024, 9, 13)
+RACE_START_DATE = date(2025, 9, 10)
 
 STAGE_START_TIME_DAY1 = time(9, 0, 0)    # Day 1 start, SAST
 STAGE_START_TIME_OTHER = time(8, 0, 0)   # Days 2+ start, SAST
@@ -79,7 +104,7 @@ ERA5_AREA = [-22, 16, -35, 33]           # [north, west, south, east]
 FALLBACK_R_MAX_KM = 10.0         # used only if a stage's variogram can't be fit
 SEMIVARIOGRAM_EPSILON = 0.1      # tolerance on sqrt(gamma(h)); see module docstring
 MIN_R_MAX_KM = 5.0               # sanity floor (avoid pathologically small spacing)
-MAX_R_MAX_KM = 60.0              # sanity ceiling (avoid pathologically sparse waypoints)
+MAX_R_MAX_KM = 40.0              # sanity ceiling (avoid pathologically sparse waypoints)
 BBOX_BUFFER_KM = 20.0            # buffer added around each stage's coord bbox when
                                   # pulling ERA5 grid points into the variogram
 N_LAG_BINS = 12                  # distance bins for the empirical variogram
@@ -89,32 +114,83 @@ MIN_CLEARSKY_GHI_WM2 = 50.0      # drop low-sun-angle samples (unstable Kc ratio
 SAVE_VARIOGRAM_PLOTS = True      # diagnostic PNG per stage, for QA / debugging
 VARIOGRAM_PLOT_DIR = "variogram_diagnostics"
 
-_DAY_PATTERN = re.compile(r"(?:day|stage)\s*0*(\d+)", re.IGNORECASE)
+# Matches the day number out of a KML Folder label like "Day 4", "Day 2 Half
+# Blind", "Day 3 Full Blind", "Day 1 " (trailing space), etc. Deliberately
+# does NOT match "Stage N" - that word only ever appears on the individual
+# route-segment Placemarks inside a day folder, not on the folder itself,
+# but staying folder-scoped (rather than falling back to a looser regex)
+# avoids resurrecting the original Stage/Day collision bug.
+_DAY_FOLDER_PATTERN = re.compile(r"day\s*0*(\d+)", re.IGNORECASE)
 
 
-# --- 1. KML PARSING WITH LOOP FILTERING ---
-def parse_kml_main_routes(kml_path):
+# --- 1. KML PARSING, PER DAY FOLDER ---
+def parse_kml_day_folders(kml_path):
+    """Returns an ordered dict {day_label: [segment_coords, ...]} where
+    day_label is the KML Folder's own name (e.g. 'Day 4', 'Day 2 Half
+    Blind') and each segment_coords is a list of (lat, lon) tuples for one
+    non-loop LineString placemark inside that folder, in document order.
+
+    Walking Folders directly (rather than scanning every Placemark in the
+    document and grouping by a regex on its name) is the fix for the
+    Stage-N/Day-N collision described in the module docstring: the route
+    LineStrings are only ever named "Stage 1"/"Stage 2", so grouping by
+    name-regex silently merged every day's Stage 1 into one bucket and
+    every day's Stage 2 into another. Grouping by the folder they actually
+    live in has no such ambiguity.
+
+    A day folder with no LineString placemarks (Day 3, "Full Blind" - only
+    start/finish Points, no prescribed route) is simply omitted from the
+    result. That's expected, not an error: Full Blind stages have no fixed
+    route to discretize or fetch weather along.
+    """
     tree = ET.parse(kml_path)
     root = tree.getroot()
-    namespace = {"kml": "http://www.opengis.net/kml/2.2"}
+    ns = {"kml": "http://www.opengis.net/kml/2.2"}
 
-    main_routes = {}
-    for placemark in root.findall(".//kml:Placemark", namespace):
-        name_elem = placemark.find("kml:name", namespace)
-        name = name_elem.text.strip() if name_elem is not None else "Unknown"
+    day_routes = {}
+    # Day folders are nested: Document > Folder "My Places" > Folder "Day N ..."
+    for day_folder in root.findall(".//kml:Folder/kml:Folder", ns):
+        name_elem = day_folder.find("kml:name", ns)
+        day_label = name_elem.text.strip() if name_elem is not None else "Unknown"
 
-        if "loop" in name.lower():
-            continue
+        segments = []
+        for placemark in day_folder.findall("kml:Placemark", ns):
+            pname_elem = placemark.find("kml:name", ns)
+            pname = pname_elem.text.strip() if pname_elem is not None else ""
+            if "loop" in pname.lower():
+                continue
 
-        linestring = placemark.find(".//kml:LineString/kml:coordinates", namespace)
-        if linestring is not None:
-            coords_text = linestring.text.strip().split()
+            linestring = placemark.find("kml:LineString/kml:coordinates", ns)
+            if linestring is None or not linestring.text:
+                continue
+
             coords = []
-            for pt in coords_text:
+            for pt in linestring.text.strip().split():
                 lon, lat, *_ = map(float, pt.split(","))
                 coords.append((lat, lon))
-            main_routes[name] = coords
-    return main_routes
+            segments.append(coords)
+
+        if segments:
+            day_routes[day_label] = segments
+        else:
+            print(f"  [i] {day_label}: no LineString route segments found "
+                  f"(expected for a Full Blind stage) - skipping.")
+
+    return day_routes
+
+
+def parse_day_number(day_label):
+    """Extracts the integer day number from a folder label like 'Day 4' or
+    'Day 2 Half Blind'. Raises ValueError if the label doesn't contain a
+    recognizable 'Day N' - fails loudly rather than silently mis-dating a
+    stage, since date alignment depends entirely on this."""
+    m = _DAY_FOLDER_PATTERN.search(day_label)
+    if not m:
+        raise ValueError(
+            f"Could not parse a day number out of folder label {day_label!r}; "
+            f"expected something matching 'Day <N>'."
+        )
+    return int(m.group(1))
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -125,21 +201,15 @@ def haversine(lat1, lon1, lat2, lon2):
     return 2 * R * math.asin(math.sqrt(a))
 
 
-# --- 2. STAGE GROUPING / STITCHING ---
-def group_stages_by_day(route_placemarks):
-    groups = {}
-    order = []
-    for name, coords in route_placemarks.items():
-        match = _DAY_PATTERN.search(name)
-        key = f"Day {int(match.group(1))}" if match else name
-        if key not in groups:
-            groups[key] = []
-            order.append(key)
-        groups[key].append(coords)
-
+# --- 2. STAGE STITCHING ---
+def stitch_day_segments(day_routes):
+    """Takes {day_label: [segment_coords, ...]} (already correctly grouped
+    by parse_kml_day_folders) and concatenates each day's segments into one
+    continuous coordinate list, splicing out a duplicated junction point
+    when consecutive segments meet at (near) the same spot. Returned dict
+    preserves day order and is keyed the same way as the input."""
     stitched = {}
-    for key in order:
-        segments = groups[key]
+    for day_label, segments in day_routes.items():
         combined = list(segments[0])
         for seg in segments[1:]:
             if not seg:
@@ -148,13 +218,12 @@ def group_stages_by_day(route_placemarks):
                 combined.extend(seg[1:])
             else:
                 combined.extend(seg)
-        stitched[key] = combined
+        stitched[day_label] = combined
 
-    def sort_key(k):
-        m = re.match(r"Day (\d+)$", k)
-        return (0, int(m.group(1))) if m else (1, order.index(k))
-
-    return {k: stitched[k] for k in sorted(stitched, key=sort_key)}
+    # Sort by the actual parsed day number so downstream processing (and
+    # the ERA5 date list) proceeds in true chronological stage order, even
+    # though the KML folders already happen to be in this order.
+    return dict(sorted(stitched.items(), key=lambda kv: parse_day_number(kv[0])))
 
 
 # --- 3. GRIDDED DATA INGESTION ---
@@ -648,23 +717,40 @@ def main():
         print(f"KML file not found: {kml_file}")
         return
 
-    route_placemarks = parse_kml_main_routes(kml_file)
-    if not route_placemarks:
+    day_route_segments = parse_kml_day_folders(kml_file)
+    if not day_route_segments:
         print("No main routes found in KML.")
         return
 
-    stage_groups = group_stages_by_day(route_placemarks)
-    stage_dates = [RACE_START_DATE + timedelta(days=i) for i in range(len(stage_groups))]
+    # Keyed by real day label, in true chronological day-number order.
+    # Day 3 (Full Blind) is simply absent - no route to stitch/discretize.
+    stage_groups = stitch_day_segments(day_route_segments)
 
-    print(f"Found {len(stage_groups)} stage(s). Downloading weather data...\n")
-    weather_grid_ds = download_era5_weather_grid(stage_dates)
+    # Dates are derived from each folder's own parsed day number, NOT from
+    # a sequential enumerate() index - that's what silently shifted every
+    # date from Day 4 onward when Day 3 (no route) was dropped in the old
+    # code path. See module docstring, v1.2 CHANGE.
+    day_numbers = {day_label: parse_day_number(day_label) for day_label in stage_groups}
+    stage_dates = {
+        day_label: RACE_START_DATE + timedelta(days=day_numbers[day_label] - 1)
+        for day_label in stage_groups
+    }
+
+    print(f"Found {len(stage_groups)} stage(s) with a defined route "
+          f"(of {len(day_route_segments)} day folder(s) parsed): "
+          f"{list(stage_groups.keys())}\n")
+
+    weather_grid_ds = download_era5_weather_grid(list(stage_dates.values()))
     sast_tz = ZoneInfo("Africa/Johannesburg")
 
     json_output_data = {}
 
-    for day_index, ((day_label, coords), stage_date) in enumerate(zip(stage_groups.items(), stage_dates)):
+    for day_label, coords in stage_groups.items():
         if len(coords) < 2:
             continue
+
+        day_number = day_numbers[day_label]
+        stage_date = stage_dates[day_label]
 
         print(f"Processing stitched stage: {day_label} ({stage_date.isoformat()})...")
 
@@ -679,8 +765,9 @@ def main():
         )
         waypoints = discretize_route(coords, r_max_km, velocity)
 
-        # Apply conditional logic for Day 1 (9 AM) vs Day 2+ (8 AM)
-        stage_start_time = STAGE_START_TIME_DAY1 if day_index == 0 else STAGE_START_TIME_OTHER
+        # Apply conditional logic for Day 1 (9 AM) vs Day 2+ (8 AM), keyed
+        # off the actual parsed day number rather than loop position.
+        stage_start_time = STAGE_START_TIME_DAY1 if day_number == 1 else STAGE_START_TIME_OTHER
         stage_start_sast = datetime.combine(stage_date, stage_start_time, tzinfo=sast_tz)
 
         stage_waypoints_data = []
@@ -706,6 +793,7 @@ def main():
         time_taken = waypoints[-1]["eta_hours"] if waypoints else 0.0
 
         json_output_data[day_label] = {
+            "day_number": day_number,
             "date": stage_date.isoformat(),
             "start_time_sast": stage_start_time.strftime("%H:%M:%S"),
             "distance_covered_km": round(total_dist, 2),
@@ -718,7 +806,7 @@ def main():
         }
 
     # Output to JSON
-    json_filename = "race_weather_data.json"
+    json_filename = "race_weather_data_2026.json"
     with open(json_filename, "w") as json_file:
         json.dump(json_output_data, json_file, indent=4)
 
