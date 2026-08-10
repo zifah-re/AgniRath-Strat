@@ -1,55 +1,2163 @@
 {
-    "Day 1": {
+    "My Places": {
         "day_number": 1,
         "date": "2025-09-10",
         "start_time_sast": "09:00:00",
-        "distance_covered_km": 238.33,
-        "time_taken_hours": 5.38,
-        "r_max_km": 40.0,
-        "r_max_source": "fallback",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "sill_below_tolerance_over_observed_range",
-            "model": "spherical",
-            "n_grid_points": 49,
-            "n_lag_bins": 11,
-            "nugget": 4.4264371666718865e-16,
-            "partial_sill": 0.01203539172481174,
-            "range_km": 644.1210971341347,
-            "sse": 0.0009621946300563456,
-            "r_max_raw_km": 214.70703237804662,
-            "r_max_clamped_km": 40.0
-        },
+        "distance_covered_km": 2381.94,
+        "time_taken_hours": 7.99,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -26.83544,
                 "longitude": 27.84605,
-                "ghi_wm2": 434.83,
-                "dni_wm2": 328.41,
-                "wind_speed_ms": 5.51,
-                "wind_direction_deg": 25.46
+                "ghi_wm2": 438.0,
+                "dni_wm2": 739.6,
+                "wind_speed_ms": 17.1,
+                "wind_direction_deg": 33.0
             },
             {
-                "cum_dist_km": 80.21,
+                "cum_dist_km": 10.82,
+                "eta_hours": 0.04,
+                "latitude": -26.76747,
+                "longitude": 27.82514,
+                "ghi_wm2": 445.12,
+                "dni_wm2": 743.1,
+                "wind_speed_ms": 16.94,
+                "wind_direction_deg": 33.04
+            },
+            {
+                "cum_dist_km": 20.89,
+                "eta_hours": 0.07,
+                "latitude": -26.68293,
+                "longitude": 27.79766,
+                "ghi_wm2": 451.75,
+                "dni_wm2": 746.36,
+                "wind_speed_ms": 16.78,
+                "wind_direction_deg": 33.07
+            },
+            {
+                "cum_dist_km": 31.27,
+                "eta_hours": 0.11,
+                "latitude": -26.60196,
+                "longitude": 27.7851,
+                "ghi_wm2": 458.59,
+                "dni_wm2": 749.71,
+                "wind_speed_ms": 16.63,
+                "wind_direction_deg": 33.11
+            },
+            {
+                "cum_dist_km": 41.52,
+                "eta_hours": 0.14,
+                "latitude": -26.51729,
+                "longitude": 27.79514,
+                "ghi_wm2": 465.33,
+                "dni_wm2": 753.03,
+                "wind_speed_ms": 16.47,
+                "wind_direction_deg": 33.14
+            },
+            {
+                "cum_dist_km": 51.99,
+                "eta_hours": 0.17,
+                "latitude": -26.4407,
+                "longitude": 27.73833,
+                "ghi_wm2": 458.89,
+                "dni_wm2": 660.61,
+                "wind_speed_ms": 16.99,
+                "wind_direction_deg": 29.9
+            },
+            {
+                "cum_dist_km": 62.2,
+                "eta_hours": 0.21,
+                "latitude": -26.37075,
+                "longitude": 27.67272,
+                "ghi_wm2": 464.17,
+                "dni_wm2": 660.46,
+                "wind_speed_ms": 17.11,
+                "wind_direction_deg": 29.49
+            },
+            {
+                "cum_dist_km": 73.35,
+                "eta_hours": 0.25,
+                "latitude": -26.2737,
+                "longitude": 27.68058,
+                "ghi_wm2": 469.94,
+                "dni_wm2": 660.29,
+                "wind_speed_ms": 17.24,
+                "wind_direction_deg": 29.04
+            },
+            {
+                "cum_dist_km": 83.36,
+                "eta_hours": 0.28,
+                "latitude": -26.18687,
+                "longitude": 27.70309,
+                "ghi_wm2": 475.11,
+                "dni_wm2": 660.14,
+                "wind_speed_ms": 17.35,
+                "wind_direction_deg": 28.64
+            },
+            {
+                "cum_dist_km": 93.42,
+                "eta_hours": 0.31,
+                "latitude": -26.12319,
+                "longitude": 27.67146,
+                "ghi_wm2": 480.32,
+                "dni_wm2": 659.99,
+                "wind_speed_ms": 17.47,
+                "wind_direction_deg": 28.24
+            },
+            {
+                "cum_dist_km": 103.55,
+                "eta_hours": 0.35,
+                "latitude": -26.04569,
+                "longitude": 27.63173,
+                "ghi_wm2": 485.56,
+                "dni_wm2": 659.83,
+                "wind_speed_ms": 17.58,
+                "wind_direction_deg": 27.83
+            },
+            {
+                "cum_dist_km": 113.7,
+                "eta_hours": 0.38,
+                "latitude": -26.00382,
+                "longitude": 27.55098,
+                "ghi_wm2": 490.81,
+                "dni_wm2": 659.68,
+                "wind_speed_ms": 17.7,
+                "wind_direction_deg": 27.42
+            },
+            {
+                "cum_dist_km": 123.72,
+                "eta_hours": 0.42,
+                "latitude": -25.94115,
+                "longitude": 27.49535,
+                "ghi_wm2": 495.99,
+                "dni_wm2": 659.53,
+                "wind_speed_ms": 17.81,
+                "wind_direction_deg": 27.01
+            },
+            {
+                "cum_dist_km": 133.73,
+                "eta_hours": 0.45,
+                "latitude": -25.90383,
+                "longitude": 27.41145,
+                "ghi_wm2": 483.37,
+                "dni_wm2": 624.99,
+                "wind_speed_ms": 12.93,
+                "wind_direction_deg": 46.08
+            },
+            {
+                "cum_dist_km": 143.77,
+                "eta_hours": 0.48,
+                "latitude": -25.86201,
+                "longitude": 27.32469,
+                "ghi_wm2": 490.75,
+                "dni_wm2": 631.36,
+                "wind_speed_ms": 12.84,
+                "wind_direction_deg": 46.69
+            },
+            {
+                "cum_dist_km": 153.77,
+                "eta_hours": 0.52,
+                "latitude": -25.81057,
+                "longitude": 27.25611,
+                "ghi_wm2": 498.1,
+                "dni_wm2": 637.71,
+                "wind_speed_ms": 12.76,
+                "wind_direction_deg": 47.3
+            },
+            {
+                "cum_dist_km": 163.82,
+                "eta_hours": 0.55,
+                "latitude": -25.74904,
+                "longitude": 27.27019,
+                "ghi_wm2": 505.49,
+                "dni_wm2": 644.09,
+                "wind_speed_ms": 12.67,
+                "wind_direction_deg": 47.9
+            },
+            {
+                "cum_dist_km": 173.84,
+                "eta_hours": 0.58,
+                "latitude": -25.68126,
+                "longitude": 27.25085,
+                "ghi_wm2": 514.44,
+                "dni_wm2": 656.26,
+                "wind_speed_ms": 11.53,
+                "wind_direction_deg": 54.01
+            },
+            {
+                "cum_dist_km": 183.86,
+                "eta_hours": 0.62,
+                "latitude": -25.76774,
+                "longitude": 27.27204,
+                "ghi_wm2": 520.23,
+                "dni_wm2": 656.81,
+                "wind_speed_ms": 12.49,
+                "wind_direction_deg": 49.12
+            },
+            {
+                "cum_dist_km": 193.91,
+                "eta_hours": 0.65,
+                "latitude": -25.68513,
+                "longitude": 27.25148,
+                "ghi_wm2": 528.46,
+                "dni_wm2": 666.79,
+                "wind_speed_ms": 11.32,
+                "wind_direction_deg": 54.82
+            },
+            {
+                "cum_dist_km": 203.96,
+                "eta_hours": 0.69,
+                "latitude": -25.68802,
+                "longitude": 27.21129,
+                "ghi_wm2": 535.48,
+                "dni_wm2": 672.07,
+                "wind_speed_ms": 11.21,
+                "wind_direction_deg": 55.22
+            },
+            {
+                "cum_dist_km": 213.99,
+                "eta_hours": 0.72,
+                "latitude": -25.63468,
+                "longitude": 27.13799,
+                "ghi_wm2": 542.49,
+                "dni_wm2": 677.33,
+                "wind_speed_ms": 11.1,
+                "wind_direction_deg": 55.62
+            },
+            {
+                "cum_dist_km": 224.08,
+                "eta_hours": 0.75,
+                "latitude": -25.63791,
+                "longitude": 27.03822,
+                "ghi_wm2": 571.57,
+                "dni_wm2": 776.64,
+                "wind_speed_ms": 15.33,
+                "wind_direction_deg": 47.17
+            },
+            {
+                "cum_dist_km": 234.1,
+                "eta_hours": 0.79,
+                "latitude": -25.62609,
+                "longitude": 26.94143,
+                "ghi_wm2": 578.98,
+                "dni_wm2": 782.66,
+                "wind_speed_ms": 15.39,
+                "wind_direction_deg": 46.2
+            },
+            {
+                "cum_dist_km": 244.25,
+                "eta_hours": 0.82,
+                "latitude": -25.64198,
+                "longitude": 26.84295,
+                "ghi_wm2": 586.48,
+                "dni_wm2": 788.76,
+                "wind_speed_ms": 15.46,
+                "wind_direction_deg": 45.21
+            },
+            {
+                "cum_dist_km": 254.4,
+                "eta_hours": 0.85,
+                "latitude": -25.65091,
+                "longitude": 26.74389,
+                "ghi_wm2": 593.98,
+                "dni_wm2": 794.86,
+                "wind_speed_ms": 15.52,
+                "wind_direction_deg": 44.22
+            },
+            {
+                "cum_dist_km": 264.5,
+                "eta_hours": 0.89,
+                "latitude": -25.65804,
+                "longitude": 26.66723,
+                "ghi_wm2": 601.44,
+                "dni_wm2": 800.93,
+                "wind_speed_ms": 15.59,
+                "wind_direction_deg": 43.24
+            },
+            {
+                "cum_dist_km": 274.56,
+                "eta_hours": 0.92,
+                "latitude": -25.66223,
+                "longitude": 26.57115,
+                "ghi_wm2": 608.87,
+                "dni_wm2": 806.97,
+                "wind_speed_ms": 15.65,
+                "wind_direction_deg": 42.26
+            },
+            {
+                "cum_dist_km": 284.6,
+                "eta_hours": 0.96,
+                "latitude": -25.62795,
+                "longitude": 26.48403,
+                "ghi_wm2": 598.22,
+                "dni_wm2": 782.56,
+                "wind_speed_ms": 19.55,
+                "wind_direction_deg": 35.18
+            },
+            {
+                "cum_dist_km": 294.76,
+                "eta_hours": 0.99,
+                "latitude": -25.59231,
+                "longitude": 26.39636,
+                "ghi_wm2": 605.0,
+                "dni_wm2": 786.45,
+                "wind_speed_ms": 19.67,
+                "wind_direction_deg": 35.04
+            },
+            {
+                "cum_dist_km": 304.89,
+                "eta_hours": 1.02,
+                "latitude": -25.59002,
+                "longitude": 26.30048,
+                "ghi_wm2": 610.36,
+                "dni_wm2": 788.36,
+                "wind_speed_ms": 19.7,
+                "wind_direction_deg": 34.86
+            },
+            {
+                "cum_dist_km": 314.95,
+                "eta_hours": 1.06,
+                "latitude": -25.55397,
+                "longitude": 26.2121,
+                "ghi_wm2": 615.09,
+                "dni_wm2": 789.42,
+                "wind_speed_ms": 19.71,
+                "wind_direction_deg": 34.65
+            },
+            {
+                "cum_dist_km": 325.04,
+                "eta_hours": 1.09,
+                "latitude": -25.5338,
+                "longitude": 26.13428,
+                "ghi_wm2": 619.83,
+                "dni_wm2": 790.49,
+                "wind_speed_ms": 19.72,
+                "wind_direction_deg": 34.45
+            },
+            {
+                "cum_dist_km": 335.8,
+                "eta_hours": 1.13,
+                "latitude": -25.56049,
+                "longitude": 26.06251,
+                "ghi_wm2": 624.9,
+                "dni_wm2": 791.63,
+                "wind_speed_ms": 19.73,
+                "wind_direction_deg": 34.23
+            },
+            {
+                "cum_dist_km": 346.16,
+                "eta_hours": 1.16,
+                "latitude": -25.6422,
+                "longitude": 26.04614,
+                "ghi_wm2": 629.76,
+                "dni_wm2": 792.72,
+                "wind_speed_ms": 19.73,
+                "wind_direction_deg": 34.02
+            },
+            {
+                "cum_dist_km": 356.68,
+                "eta_hours": 1.2,
+                "latitude": -25.72739,
+                "longitude": 26.01678,
+                "ghi_wm2": 634.71,
+                "dni_wm2": 793.84,
+                "wind_speed_ms": 19.74,
+                "wind_direction_deg": 33.81
+            },
+            {
+                "cum_dist_km": 366.82,
+                "eta_hours": 1.23,
+                "latitude": -25.76474,
+                "longitude": 25.92678,
+                "ghi_wm2": 639.48,
+                "dni_wm2": 794.91,
+                "wind_speed_ms": 19.75,
+                "wind_direction_deg": 33.61
+            },
+            {
+                "cum_dist_km": 379.13,
+                "eta_hours": 1.27,
+                "latitude": -25.81638,
+                "longitude": 25.81863,
+                "ghi_wm2": 645.27,
+                "dni_wm2": 796.21,
+                "wind_speed_ms": 19.75,
+                "wind_direction_deg": 33.36
+            },
+            {
+                "cum_dist_km": 392.1,
+                "eta_hours": 1.32,
+                "latitude": -25.84755,
+                "longitude": 25.69693,
+                "ghi_wm2": 651.37,
+                "dni_wm2": 797.58,
+                "wind_speed_ms": 19.76,
+                "wind_direction_deg": 33.1
+            },
+            {
+                "cum_dist_km": 402.31,
+                "eta_hours": 1.35,
+                "latitude": -25.88186,
+                "longitude": 25.6066,
+                "ghi_wm2": 656.17,
+                "dni_wm2": 798.66,
+                "wind_speed_ms": 19.77,
+                "wind_direction_deg": 32.89
+            },
+            {
+                "cum_dist_km": 413.57,
+                "eta_hours": 1.39,
+                "latitude": -25.92796,
+                "longitude": 25.50639,
+                "ghi_wm2": 661.46,
+                "dni_wm2": 799.85,
+                "wind_speed_ms": 19.78,
+                "wind_direction_deg": 32.67
+            },
+            {
+                "cum_dist_km": 423.65,
+                "eta_hours": 1.42,
+                "latitude": -25.9693,
+                "longitude": 25.41659,
+                "ghi_wm2": 666.21,
+                "dni_wm2": 800.92,
+                "wind_speed_ms": 19.78,
+                "wind_direction_deg": 32.46
+            },
+            {
+                "cum_dist_km": 436.86,
+                "eta_hours": 1.47,
+                "latitude": -26.05999,
+                "longitude": 25.33183,
+                "ghi_wm2": 672.42,
+                "dni_wm2": 802.32,
+                "wind_speed_ms": 19.79,
+                "wind_direction_deg": 32.2
+            },
+            {
+                "cum_dist_km": 447.48,
+                "eta_hours": 1.5,
+                "latitude": -26.13615,
+                "longitude": 25.26785,
+                "ghi_wm2": 677.41,
+                "dni_wm2": 803.44,
+                "wind_speed_ms": 19.8,
+                "wind_direction_deg": 31.98
+            },
+            {
+                "cum_dist_km": 458.82,
+                "eta_hours": 1.54,
+                "latitude": -26.21263,
+                "longitude": 25.19531,
+                "ghi_wm2": 682.74,
+                "dni_wm2": 804.64,
+                "wind_speed_ms": 19.81,
+                "wind_direction_deg": 31.75
+            },
+            {
+                "cum_dist_km": 469.18,
+                "eta_hours": 1.58,
+                "latitude": -26.27554,
+                "longitude": 25.11862,
+                "ghi_wm2": 687.61,
+                "dni_wm2": 805.74,
+                "wind_speed_ms": 19.82,
+                "wind_direction_deg": 31.55
+            },
+            {
+                "cum_dist_km": 479.55,
+                "eta_hours": 1.61,
+                "latitude": -26.34818,
+                "longitude": 25.0536,
+                "ghi_wm2": 692.49,
+                "dni_wm2": 806.83,
+                "wind_speed_ms": 19.82,
+                "wind_direction_deg": 31.34
+            },
+            {
+                "cum_dist_km": 489.91,
+                "eta_hours": 1.65,
+                "latitude": -26.42205,
+                "longitude": 24.99017,
+                "ghi_wm2": 697.36,
+                "dni_wm2": 807.93,
+                "wind_speed_ms": 19.83,
+                "wind_direction_deg": 31.13
+            },
+            {
+                "cum_dist_km": 502.69,
+                "eta_hours": 1.69,
+                "latitude": -26.51315,
+                "longitude": 24.91193,
+                "ghi_wm2": 703.37,
+                "dni_wm2": 809.28,
+                "wind_speed_ms": 19.84,
+                "wind_direction_deg": 30.87
+            },
+            {
+                "cum_dist_km": 514.57,
+                "eta_hours": 1.73,
+                "latitude": -26.60351,
+                "longitude": 24.85146,
+                "ghi_wm2": 708.96,
+                "dni_wm2": 810.54,
+                "wind_speed_ms": 19.85,
+                "wind_direction_deg": 30.63
+            },
+            {
+                "cum_dist_km": 524.65,
+                "eta_hours": 1.76,
+                "latitude": -26.68997,
+                "longitude": 24.82106,
+                "ghi_wm2": 713.69,
+                "dni_wm2": 811.61,
+                "wind_speed_ms": 19.85,
+                "wind_direction_deg": 30.43
+            },
+            {
+                "cum_dist_km": 535.18,
+                "eta_hours": 1.8,
+                "latitude": -26.78062,
+                "longitude": 24.79042,
+                "ghi_wm2": 718.65,
+                "dni_wm2": 812.72,
+                "wind_speed_ms": 19.86,
+                "wind_direction_deg": 30.22
+            },
+            {
+                "cum_dist_km": 548.69,
+                "eta_hours": 1.84,
+                "latitude": -26.89689,
+                "longitude": 24.75086,
+                "ghi_wm2": 725.0,
+                "dni_wm2": 814.15,
+                "wind_speed_ms": 19.87,
+                "wind_direction_deg": 29.94
+            },
+            {
+                "cum_dist_km": 559.75,
+                "eta_hours": 1.88,
+                "latitude": -26.9744,
+                "longitude": 24.7021,
+                "ghi_wm2": 730.2,
+                "dni_wm2": 815.32,
+                "wind_speed_ms": 19.88,
+                "wind_direction_deg": 29.72
+            },
+            {
+                "cum_dist_km": 760.12,
+                "eta_hours": 2.55,
+                "latitude": -28.75309,
+                "longitude": 24.74678,
+                "ghi_wm2": 791.74,
+                "dni_wm2": 902.06,
+                "wind_speed_ms": 45.42,
+                "wind_direction_deg": 356.68
+            },
+            {
+                "cum_dist_km": 770.49,
+                "eta_hours": 2.59,
+                "latitude": -28.70351,
+                "longitude": 24.67252,
+                "ghi_wm2": 795.19,
+                "dni_wm2": 902.99,
+                "wind_speed_ms": 45.44,
+                "wind_direction_deg": 356.47
+            },
+            {
+                "cum_dist_km": 781.07,
+                "eta_hours": 2.62,
+                "latitude": -28.64364,
+                "longitude": 24.59867,
+                "ghi_wm2": 798.71,
+                "dni_wm2": 903.94,
+                "wind_speed_ms": 45.45,
+                "wind_direction_deg": 356.26
+            },
+            {
+                "cum_dist_km": 791.1,
+                "eta_hours": 2.66,
+                "latitude": -28.57014,
+                "longitude": 24.55036,
+                "ghi_wm2": 802.04,
+                "dni_wm2": 904.84,
+                "wind_speed_ms": 45.46,
+                "wind_direction_deg": 356.06
+            },
+            {
+                "cum_dist_km": 801.12,
                 "eta_hours": 2.69,
-                "latitude": -26.21324,
-                "longitude": 27.69207,
-                "ghi_wm2": 848.19,
-                "dni_wm2": 727.61,
-                "wind_speed_ms": 5.34,
-                "wind_direction_deg": 2.92
+                "latitude": -28.52107,
+                "longitude": 24.47872,
+                "ghi_wm2": 805.37,
+                "dni_wm2": 905.74,
+                "wind_speed_ms": 45.48,
+                "wind_direction_deg": 355.86
             },
             {
-                "cum_dist_km": 160.22,
-                "eta_hours": 5.38,
-                "latitude": -25.77819,
-                "longitude": 27.26311,
-                "ghi_wm2": 679.63,
-                "dni_wm2": 513.84,
-                "wind_speed_ms": 4.09,
-                "wind_direction_deg": 28.52
+                "cum_dist_km": 812.46,
+                "eta_hours": 2.73,
+                "latitude": -28.45465,
+                "longitude": 24.39109,
+                "ghi_wm2": 809.14,
+                "dni_wm2": 906.76,
+                "wind_speed_ms": 45.49,
+                "wind_direction_deg": 355.63
+            },
+            {
+                "cum_dist_km": 826.38,
+                "eta_hours": 2.78,
+                "latitude": -28.36639,
+                "longitude": 24.29087,
+                "ghi_wm2": 813.77,
+                "dni_wm2": 908.01,
+                "wind_speed_ms": 45.51,
+                "wind_direction_deg": 355.35
+            },
+            {
+                "cum_dist_km": 836.86,
+                "eta_hours": 2.81,
+                "latitude": -28.3065,
+                "longitude": 24.20999,
+                "ghi_wm2": 817.26,
+                "dni_wm2": 908.95,
+                "wind_speed_ms": 45.52,
+                "wind_direction_deg": 355.14
+            },
+            {
+                "cum_dist_km": 849.06,
+                "eta_hours": 2.85,
+                "latitude": -28.28076,
+                "longitude": 24.09123,
+                "ghi_wm2": 821.32,
+                "dni_wm2": 910.04,
+                "wind_speed_ms": 45.54,
+                "wind_direction_deg": 354.89
+            },
+            {
+                "cum_dist_km": 860.21,
+                "eta_hours": 2.89,
+                "latitude": -28.21968,
+                "longitude": 24.00459,
+                "ghi_wm2": 825.02,
+                "dni_wm2": 911.04,
+                "wind_speed_ms": 45.56,
+                "wind_direction_deg": 354.67
+            },
+            {
+                "cum_dist_km": 905.92,
+                "eta_hours": 3.04,
+                "latitude": -28.26345,
+                "longitude": 23.55097,
+                "ghi_wm2": 837.19,
+                "dni_wm2": 914.17,
+                "wind_speed_ms": 45.54,
+                "wind_direction_deg": 353.83
+            },
+            {
+                "cum_dist_km": 918.3,
+                "eta_hours": 3.08,
+                "latitude": -28.26768,
+                "longitude": 23.42928,
+                "ghi_wm2": 838.36,
+                "dni_wm2": 914.34,
+                "wind_speed_ms": 45.48,
+                "wind_direction_deg": 353.66
+            },
+            {
+                "cum_dist_km": 931.47,
+                "eta_hours": 3.13,
+                "latitude": -28.29974,
+                "longitude": 23.30277,
+                "ghi_wm2": 839.6,
+                "dni_wm2": 914.51,
+                "wind_speed_ms": 45.42,
+                "wind_direction_deg": 353.49
+            },
+            {
+                "cum_dist_km": 941.98,
+                "eta_hours": 3.16,
+                "latitude": -28.33443,
+                "longitude": 23.20342,
+                "ghi_wm2": 840.58,
+                "dni_wm2": 914.65,
+                "wind_speed_ms": 45.37,
+                "wind_direction_deg": 353.35
+            },
+            {
+                "cum_dist_km": 952.27,
+                "eta_hours": 3.2,
+                "latitude": -28.33039,
+                "longitude": 23.09834,
+                "ghi_wm2": 841.55,
+                "dni_wm2": 914.79,
+                "wind_speed_ms": 45.32,
+                "wind_direction_deg": 353.21
+            },
+            {
+                "cum_dist_km": 963.01,
+                "eta_hours": 3.23,
+                "latitude": -28.28372,
+                "longitude": 23.07428,
+                "ghi_wm2": 842.56,
+                "dni_wm2": 914.94,
+                "wind_speed_ms": 45.27,
+                "wind_direction_deg": 353.06
+            },
+            {
+                "cum_dist_km": 974.6,
+                "eta_hours": 3.27,
+                "latitude": -28.31453,
+                "longitude": 23.0683,
+                "ghi_wm2": 843.65,
+                "dni_wm2": 915.09,
+                "wind_speed_ms": 45.22,
+                "wind_direction_deg": 352.91
+            },
+            {
+                "cum_dist_km": 984.65,
+                "eta_hours": 3.31,
+                "latitude": -28.27783,
+                "longitude": 23.07558,
+                "ghi_wm2": 844.6,
+                "dni_wm2": 915.23,
+                "wind_speed_ms": 45.17,
+                "wind_direction_deg": 352.77
+            },
+            {
+                "cum_dist_km": 998.14,
+                "eta_hours": 3.35,
+                "latitude": -28.15694,
+                "longitude": 23.08162,
+                "ghi_wm2": 845.87,
+                "dni_wm2": 915.41,
+                "wind_speed_ms": 45.11,
+                "wind_direction_deg": 352.59
+            },
+            {
+                "cum_dist_km": 1011.81,
+                "eta_hours": 3.4,
+                "latitude": -28.03555,
+                "longitude": 23.06022,
+                "ghi_wm2": 847.15,
+                "dni_wm2": 915.59,
+                "wind_speed_ms": 45.04,
+                "wind_direction_deg": 352.41
+            },
+            {
+                "cum_dist_km": 1029.34,
+                "eta_hours": 3.46,
+                "latitude": -27.91223,
+                "longitude": 22.96293,
+                "ghi_wm2": 848.8,
+                "dni_wm2": 915.83,
+                "wind_speed_ms": 44.96,
+                "wind_direction_deg": 352.17
+            },
+            {
+                "cum_dist_km": 1039.53,
+                "eta_hours": 3.49,
+                "latitude": -27.91036,
+                "longitude": 22.87571,
+                "ghi_wm2": 849.76,
+                "dni_wm2": 915.97,
+                "wind_speed_ms": 44.91,
+                "wind_direction_deg": 352.03
+            },
+            {
+                "cum_dist_km": 1049.93,
+                "eta_hours": 3.53,
+                "latitude": -27.92492,
+                "longitude": 22.77114,
+                "ghi_wm2": 850.74,
+                "dni_wm2": 916.11,
+                "wind_speed_ms": 44.86,
+                "wind_direction_deg": 351.89
+            },
+            {
+                "cum_dist_km": 1060.16,
+                "eta_hours": 3.56,
+                "latitude": -27.99186,
+                "longitude": 22.71968,
+                "ghi_wm2": 851.7,
+                "dni_wm2": 916.24,
+                "wind_speed_ms": 44.82,
+                "wind_direction_deg": 351.76
+            },
+            {
+                "cum_dist_km": 1080.48,
+                "eta_hours": 3.63,
+                "latitude": -28.10081,
+                "longitude": 22.55678,
+                "ghi_wm2": 853.61,
+                "dni_wm2": 916.52,
+                "wind_speed_ms": 44.72,
+                "wind_direction_deg": 351.48
+            },
+            {
+                "cum_dist_km": 1092.73,
+                "eta_hours": 3.67,
+                "latitude": -28.14197,
+                "longitude": 22.44148,
+                "ghi_wm2": 854.76,
+                "dni_wm2": 916.68,
+                "wind_speed_ms": 44.66,
+                "wind_direction_deg": 351.32
+            },
+            {
+                "cum_dist_km": 1107.75,
+                "eta_hours": 3.72,
+                "latitude": -28.19202,
+                "longitude": 22.30017,
+                "ghi_wm2": 856.17,
+                "dni_wm2": 916.88,
+                "wind_speed_ms": 44.59,
+                "wind_direction_deg": 351.12
+            },
+            {
+                "cum_dist_km": 1166.41,
+                "eta_hours": 3.92,
+                "latitude": -28.37482,
+                "longitude": 21.73844,
+                "ghi_wm2": 861.69,
+                "dni_wm2": 917.67,
+                "wind_speed_ms": 44.32,
+                "wind_direction_deg": 350.33
+            },
+            {
+                "cum_dist_km": 1177.4,
+                "eta_hours": 3.95,
+                "latitude": -28.36276,
+                "longitude": 21.62689,
+                "ghi_wm2": 862.72,
+                "dni_wm2": 917.82,
+                "wind_speed_ms": 44.26,
+                "wind_direction_deg": 350.18
+            },
+            {
+                "cum_dist_km": 1187.6,
+                "eta_hours": 3.99,
+                "latitude": -28.37731,
+                "longitude": 21.52652,
+                "ghi_wm2": 863.68,
+                "dni_wm2": 917.95,
+                "wind_speed_ms": 44.22,
+                "wind_direction_deg": 350.05
+            },
+            {
+                "cum_dist_km": 1199.12,
+                "eta_hours": 4.03,
+                "latitude": -28.37533,
+                "longitude": 21.40907,
+                "ghi_wm2": 862.82,
+                "dni_wm2": 917.69,
+                "wind_speed_ms": 44.14,
+                "wind_direction_deg": 349.89
+            },
+            {
+                "cum_dist_km": 1211.6,
+                "eta_hours": 4.07,
+                "latitude": -28.43328,
+                "longitude": 21.30694,
+                "ghi_wm2": 861.02,
+                "dni_wm2": 917.22,
+                "wind_speed_ms": 44.05,
+                "wind_direction_deg": 349.72
+            },
+            {
+                "cum_dist_km": 1222.01,
+                "eta_hours": 4.1,
+                "latitude": -28.47312,
+                "longitude": 21.25634,
+                "ghi_wm2": 859.52,
+                "dni_wm2": 916.83,
+                "wind_speed_ms": 43.98,
+                "wind_direction_deg": 349.58
+            },
+            {
+                "cum_dist_km": 1232.43,
+                "eta_hours": 4.14,
+                "latitude": -28.43475,
+                "longitude": 21.34184,
+                "ghi_wm2": 858.01,
+                "dni_wm2": 916.44,
+                "wind_speed_ms": 43.91,
+                "wind_direction_deg": 349.44
+            },
+            {
+                "cum_dist_km": 1242.77,
+                "eta_hours": 4.17,
+                "latitude": -28.44125,
+                "longitude": 21.42761,
+                "ghi_wm2": 856.52,
+                "dni_wm2": 916.05,
+                "wind_speed_ms": 43.83,
+                "wind_direction_deg": 349.3
+            },
+            {
+                "cum_dist_km": 1253.58,
+                "eta_hours": 4.21,
+                "latitude": -28.42598,
+                "longitude": 21.44664,
+                "ghi_wm2": 854.96,
+                "dni_wm2": 915.64,
+                "wind_speed_ms": 43.76,
+                "wind_direction_deg": 349.16
+            },
+            {
+                "cum_dist_km": 1263.74,
+                "eta_hours": 4.24,
+                "latitude": -28.44139,
+                "longitude": 21.36616,
+                "ghi_wm2": 853.49,
+                "dni_wm2": 915.26,
+                "wind_speed_ms": 43.69,
+                "wind_direction_deg": 349.02
+            },
+            {
+                "cum_dist_km": 1274.08,
+                "eta_hours": 4.28,
+                "latitude": -28.46991,
+                "longitude": 21.27921,
+                "ghi_wm2": 852.0,
+                "dni_wm2": 914.87,
+                "wind_speed_ms": 43.61,
+                "wind_direction_deg": 348.88
+            },
+            {
+                "cum_dist_km": 1284.37,
+                "eta_hours": 4.31,
+                "latitude": -28.47543,
+                "longitude": 21.20454,
+                "ghi_wm2": 850.51,
+                "dni_wm2": 914.49,
+                "wind_speed_ms": 43.54,
+                "wind_direction_deg": 348.75
+            },
+            {
+                "cum_dist_km": 1295.15,
+                "eta_hours": 4.35,
+                "latitude": -28.55302,
+                "longitude": 21.14898,
+                "ghi_wm2": 848.95,
+                "dni_wm2": 914.08,
+                "wind_speed_ms": 43.47,
+                "wind_direction_deg": 348.6
+            },
+            {
+                "cum_dist_km": 1306.43,
+                "eta_hours": 4.39,
+                "latitude": -28.62848,
+                "longitude": 21.07263,
+                "ghi_wm2": 847.32,
+                "dni_wm2": 913.66,
+                "wind_speed_ms": 43.39,
+                "wind_direction_deg": 348.45
+            },
+            {
+                "cum_dist_km": 1317.51,
+                "eta_hours": 4.43,
+                "latitude": -28.69158,
+                "longitude": 20.98549,
+                "ghi_wm2": 845.72,
+                "dni_wm2": 913.24,
+                "wind_speed_ms": 43.31,
+                "wind_direction_deg": 348.3
+            },
+            {
+                "cum_dist_km": 1328.49,
+                "eta_hours": 4.46,
+                "latitude": -28.70511,
+                "longitude": 20.89492,
+                "ghi_wm2": 844.14,
+                "dni_wm2": 912.83,
+                "wind_speed_ms": 43.23,
+                "wind_direction_deg": 348.15
+            },
+            {
+                "cum_dist_km": 1341.18,
+                "eta_hours": 4.5,
+                "latitude": -28.75633,
+                "longitude": 20.78275,
+                "ghi_wm2": 842.31,
+                "dni_wm2": 912.35,
+                "wind_speed_ms": 43.14,
+                "wind_direction_deg": 347.98
+            },
+            {
+                "cum_dist_km": 1351.59,
+                "eta_hours": 4.54,
+                "latitude": -28.73895,
+                "longitude": 20.68427,
+                "ghi_wm2": 840.8,
+                "dni_wm2": 911.96,
+                "wind_speed_ms": 43.07,
+                "wind_direction_deg": 347.84
+            },
+            {
+                "cum_dist_km": 1362.29,
+                "eta_hours": 4.58,
+                "latitude": -28.76755,
+                "longitude": 20.6028,
+                "ghi_wm2": 839.26,
+                "dni_wm2": 911.56,
+                "wind_speed_ms": 42.99,
+                "wind_direction_deg": 347.7
+            },
+            {
+                "cum_dist_km": 1373.62,
+                "eta_hours": 4.61,
+                "latitude": -28.72879,
+                "longitude": 20.50516,
+                "ghi_wm2": 837.62,
+                "dni_wm2": 911.13,
+                "wind_speed_ms": 42.91,
+                "wind_direction_deg": 347.55
+            },
+            {
+                "cum_dist_km": 1387.16,
+                "eta_hours": 4.66,
+                "latitude": -28.66134,
+                "longitude": 20.39232,
+                "ghi_wm2": 835.67,
+                "dni_wm2": 910.62,
+                "wind_speed_ms": 42.82,
+                "wind_direction_deg": 347.36
+            },
+            {
+                "cum_dist_km": 1397.17,
+                "eta_hours": 4.69,
+                "latitude": -28.64326,
+                "longitude": 20.35269,
+                "ghi_wm2": 834.22,
+                "dni_wm2": 910.24,
+                "wind_speed_ms": 42.75,
+                "wind_direction_deg": 347.23
+            },
+            {
+                "cum_dist_km": 1408.72,
+                "eta_hours": 4.73,
+                "latitude": -28.69229,
+                "longitude": 20.45657,
+                "ghi_wm2": 832.55,
+                "dni_wm2": 909.81,
+                "wind_speed_ms": 42.66,
+                "wind_direction_deg": 347.07
+            },
+            {
+                "cum_dist_km": 1419.56,
+                "eta_hours": 4.77,
+                "latitude": -28.75932,
+                "longitude": 20.53465,
+                "ghi_wm2": 830.99,
+                "dni_wm2": 909.4,
+                "wind_speed_ms": 42.59,
+                "wind_direction_deg": 346.93
+            },
+            {
+                "cum_dist_km": 1430.81,
+                "eta_hours": 4.81,
+                "latitude": -28.81302,
+                "longitude": 20.43739,
+                "ghi_wm2": 829.36,
+                "dni_wm2": 908.98,
+                "wind_speed_ms": 42.51,
+                "wind_direction_deg": 346.78
+            },
+            {
+                "cum_dist_km": 1442.83,
+                "eta_hours": 4.85,
+                "latitude": -28.84091,
+                "longitude": 20.31823,
+                "ghi_wm2": 827.63,
+                "dni_wm2": 908.53,
+                "wind_speed_ms": 42.42,
+                "wind_direction_deg": 346.62
+            },
+            {
+                "cum_dist_km": 1469.67,
+                "eta_hours": 4.94,
+                "latitude": -28.86201,
+                "longitude": 20.04453,
+                "ghi_wm2": 800.38,
+                "dni_wm2": 828.54,
+                "wind_speed_ms": 14.99,
+                "wind_direction_deg": 247.32
+            },
+            {
+                "cum_dist_km": 1483.72,
+                "eta_hours": 4.98,
+                "latitude": -28.87972,
+                "longitude": 19.9017,
+                "ghi_wm2": 800.1,
+                "dni_wm2": 830.21,
+                "wind_speed_ms": 15.0,
+                "wind_direction_deg": 247.08
+            },
+            {
+                "cum_dist_km": 1494.46,
+                "eta_hours": 5.02,
+                "latitude": -28.90887,
+                "longitude": 19.79665,
+                "ghi_wm2": 798.88,
+                "dni_wm2": 832.01,
+                "wind_speed_ms": 15.0,
+                "wind_direction_deg": 247.06
+            },
+            {
+                "cum_dist_km": 1504.8,
+                "eta_hours": 5.05,
+                "latitude": -28.97374,
+                "longitude": 19.72241,
+                "ghi_wm2": 796.87,
+                "dni_wm2": 834.18,
+                "wind_speed_ms": 15.01,
+                "wind_direction_deg": 247.16
+            },
+            {
+                "cum_dist_km": 1523.55,
+                "eta_hours": 5.12,
+                "latitude": -29.06182,
+                "longitude": 19.56093,
+                "ghi_wm2": 793.21,
+                "dni_wm2": 838.11,
+                "wind_speed_ms": 15.01,
+                "wind_direction_deg": 247.35
+            },
+            {
+                "cum_dist_km": 1533.66,
+                "eta_hours": 5.15,
+                "latitude": -29.10746,
+                "longitude": 19.47213,
+                "ghi_wm2": 791.24,
+                "dni_wm2": 840.24,
+                "wind_speed_ms": 15.02,
+                "wind_direction_deg": 247.45
+            },
+            {
+                "cum_dist_km": 1545.99,
+                "eta_hours": 5.19,
+                "latitude": -29.13288,
+                "longitude": 19.35081,
+                "ghi_wm2": 788.84,
+                "dni_wm2": 842.82,
+                "wind_speed_ms": 15.02,
+                "wind_direction_deg": 247.58
+            },
+            {
+                "cum_dist_km": 1562.32,
+                "eta_hours": 5.25,
+                "latitude": -29.12619,
+                "longitude": 19.18288,
+                "ghi_wm2": 785.66,
+                "dni_wm2": 846.25,
+                "wind_speed_ms": 15.02,
+                "wind_direction_deg": 247.74
+            },
+            {
+                "cum_dist_km": 1573.36,
+                "eta_hours": 5.28,
+                "latitude": -29.16187,
+                "longitude": 19.077,
+                "ghi_wm2": 783.51,
+                "dni_wm2": 848.57,
+                "wind_speed_ms": 15.03,
+                "wind_direction_deg": 247.85
+            },
+            {
+                "cum_dist_km": 1584.35,
+                "eta_hours": 5.32,
+                "latitude": -29.20232,
+                "longitude": 18.97407,
+                "ghi_wm2": 781.37,
+                "dni_wm2": 850.88,
+                "wind_speed_ms": 15.03,
+                "wind_direction_deg": 247.96
+            },
+            {
+                "cum_dist_km": 1596.78,
+                "eta_hours": 5.36,
+                "latitude": -29.2662,
+                "longitude": 18.87297,
+                "ghi_wm2": 778.95,
+                "dni_wm2": 853.48,
+                "wind_speed_ms": 15.04,
+                "wind_direction_deg": 248.09
+            },
+            {
+                "cum_dist_km": 1608.38,
+                "eta_hours": 5.4,
+                "latitude": -29.32014,
+                "longitude": 18.7707,
+                "ghi_wm2": 776.69,
+                "dni_wm2": 855.92,
+                "wind_speed_ms": 15.04,
+                "wind_direction_deg": 248.21
+            },
+            {
+                "cum_dist_km": 1628.32,
+                "eta_hours": 5.47,
+                "latitude": -29.40741,
+                "longitude": 18.59094,
+                "ghi_wm2": 772.8,
+                "dni_wm2": 860.11,
+                "wind_speed_ms": 15.05,
+                "wind_direction_deg": 248.41
+            },
+            {
+                "cum_dist_km": 1638.88,
+                "eta_hours": 5.5,
+                "latitude": -29.4529,
+                "longitude": 18.4952,
+                "ghi_wm2": 770.75,
+                "dni_wm2": 862.32,
+                "wind_speed_ms": 15.05,
+                "wind_direction_deg": 248.51
+            },
+            {
+                "cum_dist_km": 1650.67,
+                "eta_hours": 5.54,
+                "latitude": -29.48754,
+                "longitude": 18.38007,
+                "ghi_wm2": 768.45,
+                "dni_wm2": 864.8,
+                "wind_speed_ms": 15.05,
+                "wind_direction_deg": 248.63
+            },
+            {
+                "cum_dist_km": 1660.95,
+                "eta_hours": 5.58,
+                "latitude": -29.51457,
+                "longitude": 18.27938,
+                "ghi_wm2": 766.45,
+                "dni_wm2": 866.95,
+                "wind_speed_ms": 15.06,
+                "wind_direction_deg": 248.74
+            },
+            {
+                "cum_dist_km": 1671.35,
+                "eta_hours": 5.61,
+                "latitude": -29.55106,
+                "longitude": 18.18397,
+                "ghi_wm2": 764.42,
+                "dni_wm2": 869.14,
+                "wind_speed_ms": 15.06,
+                "wind_direction_deg": 248.84
+            },
+            {
+                "cum_dist_km": 1683.09,
+                "eta_hours": 5.65,
+                "latitude": -29.56419,
+                "longitude": 18.06388,
+                "ghi_wm2": 762.14,
+                "dni_wm2": 871.6,
+                "wind_speed_ms": 15.07,
+                "wind_direction_deg": 248.96
+            },
+            {
+                "cum_dist_km": 1693.83,
+                "eta_hours": 5.69,
+                "latitude": -29.60218,
+                "longitude": 17.96275,
+                "ghi_wm2": 760.04,
+                "dni_wm2": 873.86,
+                "wind_speed_ms": 15.07,
+                "wind_direction_deg": 249.07
+            },
+            {
+                "cum_dist_km": 1703.89,
+                "eta_hours": 5.72,
+                "latitude": -29.66132,
+                "longitude": 17.89339,
+                "ghi_wm2": 758.08,
+                "dni_wm2": 875.97,
+                "wind_speed_ms": 15.07,
+                "wind_direction_deg": 249.17
+            },
+            {
+                "cum_dist_km": 1714.19,
+                "eta_hours": 5.76,
+                "latitude": -29.68583,
+                "longitude": 17.82422,
+                "ghi_wm2": 756.08,
+                "dni_wm2": 878.13,
+                "wind_speed_ms": 15.08,
+                "wind_direction_deg": 249.27
+            },
+            {
+                "cum_dist_km": 1724.22,
+                "eta_hours": 5.79,
+                "latitude": -29.66575,
+                "longitude": 17.89642,
+                "ghi_wm2": 754.12,
+                "dni_wm2": 880.24,
+                "wind_speed_ms": 15.08,
+                "wind_direction_deg": 249.37
+            },
+            {
+                "cum_dist_km": 1735.91,
+                "eta_hours": 5.83,
+                "latitude": -29.75253,
+                "longitude": 17.84524,
+                "ghi_wm2": 751.85,
+                "dni_wm2": 882.69,
+                "wind_speed_ms": 15.08,
+                "wind_direction_deg": 249.49
+            },
+            {
+                "cum_dist_km": 1746.01,
+                "eta_hours": 5.86,
+                "latitude": -29.83765,
+                "longitude": 17.85108,
+                "ghi_wm2": 749.88,
+                "dni_wm2": 884.81,
+                "wind_speed_ms": 15.09,
+                "wind_direction_deg": 249.59
+            },
+            {
+                "cum_dist_km": 1757.37,
+                "eta_hours": 5.9,
+                "latitude": -29.92737,
+                "longitude": 17.88741,
+                "ghi_wm2": 747.66,
+                "dni_wm2": 887.2,
+                "wind_speed_ms": 15.09,
+                "wind_direction_deg": 249.71
+            },
+            {
+                "cum_dist_km": 1768.45,
+                "eta_hours": 5.94,
+                "latitude": -30.01178,
+                "longitude": 17.87997,
+                "ghi_wm2": 745.51,
+                "dni_wm2": 889.52,
+                "wind_speed_ms": 15.09,
+                "wind_direction_deg": 249.82
+            },
+            {
+                "cum_dist_km": 1780.1,
+                "eta_hours": 5.98,
+                "latitude": -30.11084,
+                "longitude": 17.91334,
+                "ghi_wm2": 743.24,
+                "dni_wm2": 891.97,
+                "wind_speed_ms": 15.1,
+                "wind_direction_deg": 249.94
+            },
+            {
+                "cum_dist_km": 1790.95,
+                "eta_hours": 6.02,
+                "latitude": -30.20135,
+                "longitude": 17.93123,
+                "ghi_wm2": 739.74,
+                "dni_wm2": 892.47,
+                "wind_speed_ms": 15.11,
+                "wind_direction_deg": 249.92
+            },
+            {
+                "cum_dist_km": 1802.46,
+                "eta_hours": 6.05,
+                "latitude": -30.28717,
+                "longitude": 17.89647,
+                "ghi_wm2": 733.94,
+                "dni_wm2": 890.36,
+                "wind_speed_ms": 15.13,
+                "wind_direction_deg": 249.73
+            },
+            {
+                "cum_dist_km": 1812.59,
+                "eta_hours": 6.09,
+                "latitude": -30.37533,
+                "longitude": 17.9013,
+                "ghi_wm2": 728.83,
+                "dni_wm2": 888.5,
+                "wind_speed_ms": 15.15,
+                "wind_direction_deg": 249.56
+            },
+            {
+                "cum_dist_km": 1823.72,
+                "eta_hours": 6.13,
+                "latitude": -30.46111,
+                "longitude": 17.94777,
+                "ghi_wm2": 723.23,
+                "dni_wm2": 886.45,
+                "wind_speed_ms": 15.18,
+                "wind_direction_deg": 249.37
+            },
+            {
+                "cum_dist_km": 1833.82,
+                "eta_hours": 6.16,
+                "latitude": -30.54467,
+                "longitude": 17.95849,
+                "ghi_wm2": 718.14,
+                "dni_wm2": 884.6,
+                "wind_speed_ms": 15.2,
+                "wind_direction_deg": 249.2
+            },
+            {
+                "cum_dist_km": 1844.03,
+                "eta_hours": 6.19,
+                "latitude": -30.60482,
+                "longitude": 18.01675,
+                "ghi_wm2": 712.99,
+                "dni_wm2": 882.72,
+                "wind_speed_ms": 15.22,
+                "wind_direction_deg": 249.03
+            },
+            {
+                "cum_dist_km": 1854.75,
+                "eta_hours": 6.23,
+                "latitude": -30.68771,
+                "longitude": 18.06086,
+                "ghi_wm2": 707.59,
+                "dni_wm2": 880.75,
+                "wind_speed_ms": 15.24,
+                "wind_direction_deg": 248.85
+            },
+            {
+                "cum_dist_km": 1864.94,
+                "eta_hours": 6.26,
+                "latitude": -30.77431,
+                "longitude": 18.09227,
+                "ghi_wm2": 702.46,
+                "dni_wm2": 878.88,
+                "wind_speed_ms": 15.26,
+                "wind_direction_deg": 248.68
+            },
+            {
+                "cum_dist_km": 1875.99,
+                "eta_hours": 6.3,
+                "latitude": -30.85199,
+                "longitude": 18.1416,
+                "ghi_wm2": 696.89,
+                "dni_wm2": 876.85,
+                "wind_speed_ms": 15.28,
+                "wind_direction_deg": 248.5
+            },
+            {
+                "cum_dist_km": 1887.98,
+                "eta_hours": 6.34,
+                "latitude": -30.93753,
+                "longitude": 18.21538,
+                "ghi_wm2": 690.85,
+                "dni_wm2": 874.65,
+                "wind_speed_ms": 15.3,
+                "wind_direction_deg": 248.3
+            },
+            {
+                "cum_dist_km": 1899.57,
+                "eta_hours": 6.38,
+                "latitude": -31.02881,
+                "longitude": 18.2672,
+                "ghi_wm2": 685.01,
+                "dni_wm2": 872.52,
+                "wind_speed_ms": 15.33,
+                "wind_direction_deg": 248.1
+            },
+            {
+                "cum_dist_km": 1911.93,
+                "eta_hours": 6.42,
+                "latitude": -31.10551,
+                "longitude": 18.34748,
+                "ghi_wm2": 678.79,
+                "dni_wm2": 870.25,
+                "wind_speed_ms": 15.35,
+                "wind_direction_deg": 247.89
+            },
+            {
+                "cum_dist_km": 1925.35,
+                "eta_hours": 6.47,
+                "latitude": -31.18823,
+                "longitude": 18.43709,
+                "ghi_wm2": 672.03,
+                "dni_wm2": 867.78,
+                "wind_speed_ms": 15.38,
+                "wind_direction_deg": 247.67
+            },
+            {
+                "cum_dist_km": 1951.31,
+                "eta_hours": 6.55,
+                "latitude": -31.35418,
+                "longitude": 18.61106,
+                "ghi_wm2": 658.95,
+                "dni_wm2": 863.01,
+                "wind_speed_ms": 15.43,
+                "wind_direction_deg": 247.23
+            },
+            {
+                "cum_dist_km": 1964.3,
+                "eta_hours": 6.6,
+                "latitude": -31.44181,
+                "longitude": 18.69923,
+                "ghi_wm2": 652.4,
+                "dni_wm2": 860.63,
+                "wind_speed_ms": 15.46,
+                "wind_direction_deg": 247.01
+            },
+            {
+                "cum_dist_km": 1981.29,
+                "eta_hours": 6.65,
+                "latitude": -31.59112,
+                "longitude": 18.72916,
+                "ghi_wm2": 643.84,
+                "dni_wm2": 857.51,
+                "wind_speed_ms": 15.49,
+                "wind_direction_deg": 246.73
+            },
+            {
+                "cum_dist_km": 1992.39,
+                "eta_hours": 6.69,
+                "latitude": -31.56777,
+                "longitude": 18.80663,
+                "ghi_wm2": 638.25,
+                "dni_wm2": 855.47,
+                "wind_speed_ms": 15.51,
+                "wind_direction_deg": 246.54
+            },
+            {
+                "cum_dist_km": 2002.7,
+                "eta_hours": 6.73,
+                "latitude": -31.6136,
+                "longitude": 18.72858,
+                "ghi_wm2": 633.06,
+                "dni_wm2": 853.57,
+                "wind_speed_ms": 15.54,
+                "wind_direction_deg": 246.37
+            },
+            {
+                "cum_dist_km": 2014.86,
+                "eta_hours": 6.77,
+                "latitude": -31.71165,
+                "longitude": 18.67791,
+                "ghi_wm2": 626.93,
+                "dni_wm2": 851.34,
+                "wind_speed_ms": 15.56,
+                "wind_direction_deg": 246.16
+            },
+            {
+                "cum_dist_km": 2025.09,
+                "eta_hours": 6.8,
+                "latitude": -31.79347,
+                "longitude": 18.6285,
+                "ghi_wm2": 446.28,
+                "dni_wm2": 454.16,
+                "wind_speed_ms": 5.44,
+                "wind_direction_deg": 300.23
+            },
+            {
+                "cum_dist_km": 2035.37,
+                "eta_hours": 6.84,
+                "latitude": -31.87327,
+                "longitude": 18.62183,
+                "ghi_wm2": 443.63,
+                "dni_wm2": 456.5,
+                "wind_speed_ms": 5.43,
+                "wind_direction_deg": 300.88
+            },
+            {
+                "cum_dist_km": 2047.53,
+                "eta_hours": 6.88,
+                "latitude": -31.95219,
+                "longitude": 18.70842,
+                "ghi_wm2": 440.48,
+                "dni_wm2": 459.26,
+                "wind_speed_ms": 5.42,
+                "wind_direction_deg": 301.66
+            },
+            {
+                "cum_dist_km": 2058.07,
+                "eta_hours": 6.91,
+                "latitude": -32.01662,
+                "longitude": 18.78052,
+                "ghi_wm2": 437.75,
+                "dni_wm2": 461.66,
+                "wind_speed_ms": 5.42,
+                "wind_direction_deg": 302.33
+            },
+            {
+                "cum_dist_km": 2068.34,
+                "eta_hours": 6.95,
+                "latitude": -32.098,
+                "longitude": 18.82739,
+                "ghi_wm2": 435.1,
+                "dni_wm2": 464.0,
+                "wind_speed_ms": 5.41,
+                "wind_direction_deg": 302.99
+            },
+            {
+                "cum_dist_km": 2078.36,
+                "eta_hours": 6.98,
+                "latitude": -32.17215,
+                "longitude": 18.87221,
+                "ghi_wm2": 432.51,
+                "dni_wm2": 466.27,
+                "wind_speed_ms": 5.4,
+                "wind_direction_deg": 303.63
+            },
+            {
+                "cum_dist_km": 2088.42,
+                "eta_hours": 7.01,
+                "latitude": -32.20082,
+                "longitude": 18.87189,
+                "ghi_wm2": 428.89,
+                "dni_wm2": 466.53,
+                "wind_speed_ms": 5.39,
+                "wind_direction_deg": 303.87
+            },
+            {
+                "cum_dist_km": 2098.92,
+                "eta_hours": 7.05,
+                "latitude": -32.27504,
+                "longitude": 18.88483,
+                "ghi_wm2": 423.63,
+                "dni_wm2": 463.86,
+                "wind_speed_ms": 5.37,
+                "wind_direction_deg": 303.55
+            },
+            {
+                "cum_dist_km": 2109.16,
+                "eta_hours": 7.08,
+                "latitude": -32.35467,
+                "longitude": 18.93473,
+                "ghi_wm2": 418.51,
+                "dni_wm2": 461.25,
+                "wind_speed_ms": 5.35,
+                "wind_direction_deg": 303.25
+            },
+            {
+                "cum_dist_km": 2119.23,
+                "eta_hours": 7.12,
+                "latitude": -32.43997,
+                "longitude": 18.95761,
+                "ghi_wm2": 413.47,
+                "dni_wm2": 458.69,
+                "wind_speed_ms": 5.33,
+                "wind_direction_deg": 302.94
+            },
+            {
+                "cum_dist_km": 2129.43,
+                "eta_hours": 7.15,
+                "latitude": -32.53019,
+                "longitude": 18.97384,
+                "ghi_wm2": 408.36,
+                "dni_wm2": 456.1,
+                "wind_speed_ms": 5.31,
+                "wind_direction_deg": 302.63
+            },
+            {
+                "cum_dist_km": 2139.5,
+                "eta_hours": 7.19,
+                "latitude": -32.60662,
+                "longitude": 18.97644,
+                "ghi_wm2": 403.32,
+                "dni_wm2": 453.54,
+                "wind_speed_ms": 5.29,
+                "wind_direction_deg": 302.33
+            },
+            {
+                "cum_dist_km": 2149.79,
+                "eta_hours": 7.22,
+                "latitude": -32.67736,
+                "longitude": 18.94964,
+                "ghi_wm2": 398.17,
+                "dni_wm2": 450.92,
+                "wind_speed_ms": 5.27,
+                "wind_direction_deg": 302.02
+            },
+            {
+                "cum_dist_km": 2160.25,
+                "eta_hours": 7.26,
+                "latitude": -32.75972,
+                "longitude": 18.92064,
+                "ghi_wm2": 392.94,
+                "dni_wm2": 448.26,
+                "wind_speed_ms": 5.25,
+                "wind_direction_deg": 301.7
+            },
+            {
+                "cum_dist_km": 2170.57,
+                "eta_hours": 7.29,
+                "latitude": -32.85216,
+                "longitude": 18.92592,
+                "ghi_wm2": 387.77,
+                "dni_wm2": 445.64,
+                "wind_speed_ms": 5.23,
+                "wind_direction_deg": 301.39
+            },
+            {
+                "cum_dist_km": 2180.58,
+                "eta_hours": 7.32,
+                "latitude": -32.93214,
+                "longitude": 18.97054,
+                "ghi_wm2": 382.76,
+                "dni_wm2": 443.09,
+                "wind_speed_ms": 5.21,
+                "wind_direction_deg": 301.09
+            },
+            {
+                "cum_dist_km": 2191.09,
+                "eta_hours": 7.36,
+                "latitude": -33.02156,
+                "longitude": 18.99338,
+                "ghi_wm2": 377.5,
+                "dni_wm2": 440.42,
+                "wind_speed_ms": 5.18,
+                "wind_direction_deg": 300.77
+            },
+            {
+                "cum_dist_km": 2206.63,
+                "eta_hours": 7.41,
+                "latitude": -33.16008,
+                "longitude": 18.97777,
+                "ghi_wm2": 369.73,
+                "dni_wm2": 436.47,
+                "wind_speed_ms": 5.15,
+                "wind_direction_deg": 300.3
+            },
+            {
+                "cum_dist_km": 2216.64,
+                "eta_hours": 7.44,
+                "latitude": -33.24453,
+                "longitude": 18.99175,
+                "ghi_wm2": 364.72,
+                "dni_wm2": 433.93,
+                "wind_speed_ms": 5.13,
+                "wind_direction_deg": 300.0
+            },
+            {
+                "cum_dist_km": 2226.7,
+                "eta_hours": 7.48,
+                "latitude": -33.30216,
+                "longitude": 19.06389,
+                "ghi_wm2": 359.69,
+                "dni_wm2": 431.37,
+                "wind_speed_ms": 5.11,
+                "wind_direction_deg": 299.69
+            },
+            {
+                "cum_dist_km": 2236.77,
+                "eta_hours": 7.51,
+                "latitude": -33.32629,
+                "longitude": 19.15166,
+                "ghi_wm2": 354.64,
+                "dni_wm2": 428.81,
+                "wind_speed_ms": 5.09,
+                "wind_direction_deg": 299.39
+            },
+            {
+                "cum_dist_km": 2246.87,
+                "eta_hours": 7.55,
+                "latitude": -33.40105,
+                "longitude": 19.20709,
+                "ghi_wm2": 349.59,
+                "dni_wm2": 426.24,
+                "wind_speed_ms": 5.07,
+                "wind_direction_deg": 299.08
+            },
+            {
+                "cum_dist_km": 2256.91,
+                "eta_hours": 7.58,
+                "latitude": -33.40394,
+                "longitude": 19.28613,
+                "ghi_wm2": 344.57,
+                "dni_wm2": 423.69,
+                "wind_speed_ms": 5.05,
+                "wind_direction_deg": 298.78
+            },
+            {
+                "cum_dist_km": 2267.1,
+                "eta_hours": 7.61,
+                "latitude": -33.35158,
+                "longitude": 19.34933,
+                "ghi_wm2": 339.47,
+                "dni_wm2": 421.1,
+                "wind_speed_ms": 5.03,
+                "wind_direction_deg": 298.47
+            },
+            {
+                "cum_dist_km": 2277.68,
+                "eta_hours": 7.65,
+                "latitude": -33.34996,
+                "longitude": 19.35656,
+                "ghi_wm2": 334.17,
+                "dni_wm2": 418.41,
+                "wind_speed_ms": 5.01,
+                "wind_direction_deg": 298.15
+            },
+            {
+                "cum_dist_km": 2287.69,
+                "eta_hours": 7.68,
+                "latitude": -33.38974,
+                "longitude": 19.2872,
+                "ghi_wm2": 329.16,
+                "dni_wm2": 415.86,
+                "wind_speed_ms": 4.99,
+                "wind_direction_deg": 297.85
+            },
+            {
+                "cum_dist_km": 2297.75,
+                "eta_hours": 7.72,
+                "latitude": -33.40955,
+                "longitude": 19.2215,
+                "ghi_wm2": 324.13,
+                "dni_wm2": 413.3,
+                "wind_speed_ms": 4.97,
+                "wind_direction_deg": 297.54
+            },
+            {
+                "cum_dist_km": 2307.75,
+                "eta_hours": 7.75,
+                "latitude": -33.33927,
+                "longitude": 19.16037,
+                "ghi_wm2": 319.12,
+                "dni_wm2": 410.76,
+                "wind_speed_ms": 4.95,
+                "wind_direction_deg": 297.24
+            },
+            {
+                "cum_dist_km": 2317.84,
+                "eta_hours": 7.78,
+                "latitude": -33.31328,
+                "longitude": 19.07458,
+                "ghi_wm2": 314.08,
+                "dni_wm2": 408.2,
+                "wind_speed_ms": 4.93,
+                "wind_direction_deg": 296.94
+            },
+            {
+                "cum_dist_km": 2327.92,
+                "eta_hours": 7.82,
+                "latitude": -33.3609,
+                "longitude": 19.0186,
+                "ghi_wm2": 309.03,
+                "dni_wm2": 405.63,
+                "wind_speed_ms": 4.91,
+                "wind_direction_deg": 296.63
+            },
+            {
+                "cum_dist_km": 2338.17,
+                "eta_hours": 7.85,
+                "latitude": -33.44345,
+                "longitude": 18.97062,
+                "ghi_wm2": 303.9,
+                "dni_wm2": 403.03,
+                "wind_speed_ms": 4.89,
+                "wind_direction_deg": 296.32
+            },
+            {
+                "cum_dist_km": 2348.77,
+                "eta_hours": 7.89,
+                "latitude": -33.53685,
+                "longitude": 18.96595,
+                "ghi_wm2": 208.03,
+                "dni_wm2": 151.18,
+                "wind_speed_ms": 4.72,
+                "wind_direction_deg": 269.55
+            },
+            {
+                "cum_dist_km": 2358.77,
+                "eta_hours": 7.92,
+                "latitude": -33.62405,
+                "longitude": 18.988,
+                "ghi_wm2": 205.0,
+                "dni_wm2": 152.09,
+                "wind_speed_ms": 4.72,
+                "wind_direction_deg": 269.69
+            },
+            {
+                "cum_dist_km": 2368.97,
+                "eta_hours": 7.96,
+                "latitude": -33.67064,
+                "longitude": 18.91265,
+                "ghi_wm2": 201.92,
+                "dni_wm2": 153.02,
+                "wind_speed_ms": 4.71,
+                "wind_direction_deg": 269.83
+            },
+            {
+                "cum_dist_km": 2379.06,
+                "eta_hours": 7.99,
+                "latitude": -33.75296,
+                "longitude": 18.8972,
+                "ghi_wm2": 198.87,
+                "dni_wm2": 153.94,
+                "wind_speed_ms": 4.7,
+                "wind_direction_deg": 269.96
+            }
+        ]
+    },
+    "Day 1": {
+        "day_number": 1,
+        "date": "2025-09-10",
+        "start_time_sast": "09:00:00",
+        "distance_covered_km": 260.95,
+        "time_taken_hours": 7.8,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
+        "waypoints": [
+            {
+                "cum_dist_km": 0.0,
+                "eta_hours": 0.0,
+                "latitude": -26.83544,
+                "longitude": 27.84605,
+                "ghi_wm2": 438.0,
+                "dni_wm2": 739.6,
+                "wind_speed_ms": 17.1,
+                "wind_direction_deg": 33.0
+            },
+            {
+                "cum_dist_km": 10.82,
+                "eta_hours": 0.33,
+                "latitude": -26.76747,
+                "longitude": 27.82514,
+                "ghi_wm2": 503.0,
+                "dni_wm2": 771.53,
+                "wind_speed_ms": 15.61,
+                "wind_direction_deg": 33.33
+            },
+            {
+                "cum_dist_km": 20.89,
+                "eta_hours": 0.64,
+                "latitude": -26.68293,
+                "longitude": 27.79766,
+                "ghi_wm2": 564.34,
+                "dni_wm2": 797.23,
+                "wind_speed_ms": 17.12,
+                "wind_direction_deg": 27.24
+            },
+            {
+                "cum_dist_km": 31.27,
+                "eta_hours": 0.96,
+                "latitude": -26.60196,
+                "longitude": 27.7851,
+                "ghi_wm2": 628.67,
+                "dni_wm2": 835.09,
+                "wind_speed_ms": 16.84,
+                "wind_direction_deg": 24.37
+            },
+            {
+                "cum_dist_km": 41.52,
+                "eta_hours": 1.27,
+                "latitude": -26.51729,
+                "longitude": 27.79514,
+                "ghi_wm2": 676.83,
+                "dni_wm2": 853.8,
+                "wind_speed_ms": 15.57,
+                "wind_direction_deg": 23.45
+            },
+            {
+                "cum_dist_km": 51.99,
+                "eta_hours": 1.59,
+                "latitude": -26.4407,
+                "longitude": 27.73833,
+                "ghi_wm2": 723.71,
+                "dni_wm2": 870.05,
+                "wind_speed_ms": 14.13,
+                "wind_direction_deg": 22.81
+            },
+            {
+                "cum_dist_km": 62.2,
+                "eta_hours": 1.91,
+                "latitude": -26.37075,
+                "longitude": 27.67272,
+                "ghi_wm2": 761.96,
+                "dni_wm2": 846.73,
+                "wind_speed_ms": 22.25,
+                "wind_direction_deg": 20.0
+            },
+            {
+                "cum_dist_km": 73.35,
+                "eta_hours": 2.25,
+                "latitude": -26.2737,
+                "longitude": 27.68058,
+                "ghi_wm2": 802.88,
+                "dni_wm2": 878.99,
+                "wind_speed_ms": 21.73,
+                "wind_direction_deg": 17.51
+            },
+            {
+                "cum_dist_km": 83.36,
+                "eta_hours": 2.56,
+                "latitude": -26.18687,
+                "longitude": 27.70309,
+                "ghi_wm2": 831.1,
+                "dni_wm2": 894.75,
+                "wind_speed_ms": 20.78,
+                "wind_direction_deg": 14.45
+            },
+            {
+                "cum_dist_km": 93.42,
+                "eta_hours": 2.86,
+                "latitude": -26.12319,
+                "longitude": 27.67146,
+                "ghi_wm2": 859.47,
+                "dni_wm2": 910.6,
+                "wind_speed_ms": 19.82,
+                "wind_direction_deg": 11.36
+            },
+            {
+                "cum_dist_km": 103.55,
+                "eta_hours": 3.17,
+                "latitude": -26.04569,
+                "longitude": 27.63173,
+                "ghi_wm2": 869.57,
+                "dni_wm2": 913.92,
+                "wind_speed_ms": 19.31,
+                "wind_direction_deg": 8.6
+            },
+            {
+                "cum_dist_km": 113.7,
+                "eta_hours": 3.49,
+                "latitude": -26.00382,
+                "longitude": 27.55098,
+                "ghi_wm2": 872.37,
+                "dni_wm2": 915.19,
+                "wind_speed_ms": 18.97,
+                "wind_direction_deg": 6.12
+            },
+            {
+                "cum_dist_km": 123.72,
+                "eta_hours": 3.79,
+                "latitude": -25.94115,
+                "longitude": 27.49535,
+                "ghi_wm2": 875.14,
+                "dni_wm2": 916.45,
+                "wind_speed_ms": 18.63,
+                "wind_direction_deg": 3.66
+            },
+            {
+                "cum_dist_km": 133.73,
+                "eta_hours": 4.1,
+                "latitude": -25.90383,
+                "longitude": 27.41145,
+                "ghi_wm2": 863.51,
+                "dni_wm2": 900.38,
+                "wind_speed_ms": 15.93,
+                "wind_direction_deg": 354.6
+            },
+            {
+                "cum_dist_km": 143.77,
+                "eta_hours": 4.41,
+                "latitude": -25.86201,
+                "longitude": 27.32469,
+                "ghi_wm2": 843.52,
+                "dni_wm2": 892.63,
+                "wind_speed_ms": 15.41,
+                "wind_direction_deg": 353.37
+            },
+            {
+                "cum_dist_km": 153.77,
+                "eta_hours": 4.71,
+                "latitude": -25.81057,
+                "longitude": 27.25611,
+                "ghi_wm2": 814.01,
+                "dni_wm2": 861.37,
+                "wind_speed_ms": 11.56,
+                "wind_direction_deg": 250.93
+            },
+            {
+                "cum_dist_km": 163.82,
+                "eta_hours": 5.02,
+                "latitude": -25.74904,
+                "longitude": 27.27019,
+                "ghi_wm2": 789.16,
+                "dni_wm2": 844.32,
+                "wind_speed_ms": 11.51,
+                "wind_direction_deg": 343.77
+            },
+            {
+                "cum_dist_km": 173.84,
+                "eta_hours": 5.33,
+                "latitude": -25.68126,
+                "longitude": 27.25085,
+                "ghi_wm2": 752.16,
+                "dni_wm2": 840.54,
+                "wind_speed_ms": 9.56,
+                "wind_direction_deg": 240.29
+            },
+            {
+                "cum_dist_km": 183.86,
+                "eta_hours": 5.64,
+                "latitude": -25.76774,
+                "longitude": 27.27204,
+                "ghi_wm2": 710.53,
+                "dni_wm2": 822.76,
+                "wind_speed_ms": 11.69,
+                "wind_direction_deg": 143.5
+            },
+            {
+                "cum_dist_km": 193.91,
+                "eta_hours": 5.94,
+                "latitude": -25.68513,
+                "longitude": 27.25148,
+                "ghi_wm2": 677.69,
+                "dni_wm2": 828.85,
+                "wind_speed_ms": 10.42,
+                "wind_direction_deg": 44.59
+            },
+            {
+                "cum_dist_km": 203.96,
+                "eta_hours": 6.25,
+                "latitude": -25.68802,
+                "longitude": 27.21129,
+                "ghi_wm2": 626.75,
+                "dni_wm2": 816.47,
+                "wind_speed_ms": 10.09,
+                "wind_direction_deg": 23.47
+            },
+            {
+                "cum_dist_km": 213.99,
+                "eta_hours": 6.56,
+                "latitude": -25.63468,
+                "longitude": 27.13799,
+                "ghi_wm2": 569.25,
+                "dni_wm2": 789.78,
+                "wind_speed_ms": 9.48,
+                "wind_direction_deg": 20.4
+            },
+            {
+                "cum_dist_km": 224.08,
+                "eta_hours": 6.87,
+                "latitude": -25.63791,
+                "longitude": 27.03822,
+                "ghi_wm2": 459.36,
+                "dni_wm2": 525.14,
+                "wind_speed_ms": 13.01,
+                "wind_direction_deg": 314.18
+            },
+            {
+                "cum_dist_km": 234.1,
+                "eta_hours": 7.18,
+                "latitude": -25.62609,
+                "longitude": 26.94143,
+                "ghi_wm2": 389.23,
+                "dni_wm2": 450.07,
+                "wind_speed_ms": 12.73,
+                "wind_direction_deg": 357.59
+            },
+            {
+                "cum_dist_km": 244.25,
+                "eta_hours": 7.49,
+                "latitude": -25.64198,
+                "longitude": 26.84295,
+                "ghi_wm2": 324.48,
+                "dni_wm2": 401.94,
+                "wind_speed_ms": 12.6,
+                "wind_direction_deg": 355.1
+            },
+            {
+                "cum_dist_km": 254.4,
+                "eta_hours": 7.8,
+                "latitude": -25.65091,
+                "longitude": 26.74389,
+                "ghi_wm2": 236.5,
+                "dni_wm2": 277.38,
+                "wind_speed_ms": 13.66,
+                "wind_direction_deg": 6.4
             }
         ]
     },
@@ -58,62 +2166,289 @@
         "date": "2025-09-11",
         "start_time_sast": "08:00:00",
         "distance_covered_km": 302.5,
-        "time_taken_hours": 6.39,
-        "r_max_km": 40.0,
-        "r_max_source": "fallback",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "sill_below_tolerance_over_observed_range",
-            "model": "spherical",
-            "n_grid_points": 70,
-            "n_lag_bins": 11,
-            "nugget": 7.24123439187345e-27,
-            "partial_sill": 0.0069097067730676896,
-            "range_km": 721.0544806537333,
-            "sse": 0.00026620499512263715,
-            "r_max_raw_km": 267.9276715808631,
-            "r_max_clamped_km": 40.0
-        },
+        "time_taken_hours": 7.9,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -25.66054,
                 "longitude": 26.689,
-                "ghi_wm2": 214.81,
-                "dni_wm2": 149.35,
-                "wind_speed_ms": 2.51,
-                "wind_direction_deg": 5.76
+                "ghi_wm2": 209.0,
+                "dni_wm2": 559.1,
+                "wind_speed_ms": 8.8,
+                "wind_direction_deg": 359.0
             },
             {
-                "cum_dist_km": 80.32,
-                "eta_hours": 2.12,
-                "latitude": -25.60285,
-                "longitude": 26.03715,
-                "ghi_wm2": 652.7,
-                "dni_wm2": 543.1,
-                "wind_speed_ms": 5.39,
-                "wind_direction_deg": 23.54
+                "cum_dist_km": 10.3,
+                "eta_hours": 0.27,
+                "latitude": -25.66118,
+                "longitude": 26.60232,
+                "ghi_wm2": 269.72,
+                "dni_wm2": 607.14,
+                "wind_speed_ms": 8.02,
+                "wind_direction_deg": 11.37
             },
             {
-                "cum_dist_km": 161.71,
-                "eta_hours": 4.28,
-                "latitude": -25.96517,
-                "longitude": 25.4254,
-                "ghi_wm2": 839.28,
-                "dni_wm2": 671.45,
-                "wind_speed_ms": 5.1,
-                "wind_direction_deg": 3.11
+                "cum_dist_km": 20.4,
+                "eta_hours": 0.54,
+                "latitude": -25.64466,
+                "longitude": 26.50799,
+                "ghi_wm2": 327.34,
+                "dni_wm2": 654.62,
+                "wind_speed_ms": 7.95,
+                "wind_direction_deg": 13.37
             },
             {
-                "cum_dist_km": 241.74,
-                "eta_hours": 6.39,
-                "latitude": -26.51315,
-                "longitude": 24.91193,
-                "ghi_wm2": 784.7,
-                "dni_wm2": 671.29,
-                "wind_speed_ms": 5.34,
-                "wind_direction_deg": 337.38
+                "cum_dist_km": 30.52,
+                "eta_hours": 0.81,
+                "latitude": -25.59663,
+                "longitude": 26.42561,
+                "ghi_wm2": 381.16,
+                "dni_wm2": 687.67,
+                "wind_speed_ms": 7.09,
+                "wind_direction_deg": 34.61
+            },
+            {
+                "cum_dist_km": 40.58,
+                "eta_hours": 1.07,
+                "latitude": -25.60158,
+                "longitude": 26.33018,
+                "ghi_wm2": 436.52,
+                "dni_wm2": 728.91,
+                "wind_speed_ms": 8.81,
+                "wind_direction_deg": 39.83
+            },
+            {
+                "cum_dist_km": 50.64,
+                "eta_hours": 1.34,
+                "latitude": -25.57089,
+                "longitude": 26.23959,
+                "ghi_wm2": 490.18,
+                "dni_wm2": 757.41,
+                "wind_speed_ms": 11.78,
+                "wind_direction_deg": 39.93
+            },
+            {
+                "cum_dist_km": 60.64,
+                "eta_hours": 1.6,
+                "latitude": -25.51816,
+                "longitude": 26.16355,
+                "ghi_wm2": 540.54,
+                "dni_wm2": 776.17,
+                "wind_speed_ms": 13.83,
+                "wind_direction_deg": 31.76
+            },
+            {
+                "cum_dist_km": 70.64,
+                "eta_hours": 1.87,
+                "latitude": -25.53947,
+                "longitude": 26.07731,
+                "ghi_wm2": 596.78,
+                "dni_wm2": 810.27,
+                "wind_speed_ms": 16.19,
+                "wind_direction_deg": 30.19
+            },
+            {
+                "cum_dist_km": 81.39,
+                "eta_hours": 2.15,
+                "latitude": -25.61172,
+                "longitude": 26.03297,
+                "ghi_wm2": 645.72,
+                "dni_wm2": 829.63,
+                "wind_speed_ms": 16.87,
+                "wind_direction_deg": 27.93
+            },
+            {
+                "cum_dist_km": 91.46,
+                "eta_hours": 2.42,
+                "latitude": -25.69704,
+                "longitude": 26.04171,
+                "ghi_wm2": 688.8,
+                "dni_wm2": 854.96,
+                "wind_speed_ms": 25.46,
+                "wind_direction_deg": 23.49
+            },
+            {
+                "cum_dist_km": 101.75,
+                "eta_hours": 2.69,
+                "latitude": -25.7543,
+                "longitude": 25.96556,
+                "ghi_wm2": 729.63,
+                "dni_wm2": 867.15,
+                "wind_speed_ms": 24.92,
+                "wind_direction_deg": 21.85
+            },
+            {
+                "cum_dist_km": 114.78,
+                "eta_hours": 3.04,
+                "latitude": -25.79966,
+                "longitude": 25.8471,
+                "ghi_wm2": 778.94,
+                "dni_wm2": 881.27,
+                "wind_speed_ms": 24.16,
+                "wind_direction_deg": 19.65
+            },
+            {
+                "cum_dist_km": 125.87,
+                "eta_hours": 3.33,
+                "latitude": -25.83784,
+                "longitude": 25.74858,
+                "ghi_wm2": 803.29,
+                "dni_wm2": 883.47,
+                "wind_speed_ms": 23.02,
+                "wind_direction_deg": 16.71
+            },
+            {
+                "cum_dist_km": 136.55,
+                "eta_hours": 3.61,
+                "latitude": -25.86423,
+                "longitude": 25.6468,
+                "ghi_wm2": 826.73,
+                "dni_wm2": 885.58,
+                "wind_speed_ms": 21.92,
+                "wind_direction_deg": 13.89
+            },
+            {
+                "cum_dist_km": 147.86,
+                "eta_hours": 3.91,
+                "latitude": -25.90854,
+                "longitude": 25.54873,
+                "ghi_wm2": 851.56,
+                "dni_wm2": 887.83,
+                "wind_speed_ms": 20.75,
+                "wind_direction_deg": 10.9
+            },
+            {
+                "cum_dist_km": 158.16,
+                "eta_hours": 4.18,
+                "latitude": -25.95066,
+                "longitude": 25.45705,
+                "ghi_wm2": 853.84,
+                "dni_wm2": 883.34,
+                "wind_speed_ms": 20.59,
+                "wind_direction_deg": 348.9
+            },
+            {
+                "cum_dist_km": 171.06,
+                "eta_hours": 4.52,
+                "latitude": -26.02596,
+                "longitude": 25.36215,
+                "ghi_wm2": 861.0,
+                "dni_wm2": 887.33,
+                "wind_speed_ms": 20.76,
+                "wind_direction_deg": 346.86
+            },
+            {
+                "cum_dist_km": 181.37,
+                "eta_hours": 4.8,
+                "latitude": -26.09816,
+                "longitude": 25.29742,
+                "ghi_wm2": 866.73,
+                "dni_wm2": 890.52,
+                "wind_speed_ms": 20.9,
+                "wind_direction_deg": 345.22
+            },
+            {
+                "cum_dist_km": 191.42,
+                "eta_hours": 5.06,
+                "latitude": -26.17103,
+                "longitude": 25.23891,
+                "ghi_wm2": 867.7,
+                "dni_wm2": 892.21,
+                "wind_speed_ms": 21.01,
+                "wind_direction_deg": 343.44
+            },
+            {
+                "cum_dist_km": 204.94,
+                "eta_hours": 5.42,
+                "latitude": -26.25558,
+                "longitude": 25.14289,
+                "ghi_wm2": 848.74,
+                "dni_wm2": 888.24,
+                "wind_speed_ms": 21.04,
+                "wind_direction_deg": 340.22
+            },
+            {
+                "cum_dist_km": 215.44,
+                "eta_hours": 5.7,
+                "latitude": -26.32575,
+                "longitude": 25.073,
+                "ghi_wm2": 834.02,
+                "dni_wm2": 885.16,
+                "wind_speed_ms": 21.07,
+                "wind_direction_deg": 337.72
+            },
+            {
+                "cum_dist_km": 225.91,
+                "eta_hours": 5.97,
+                "latitude": -26.40034,
+                "longitude": 25.00884,
+                "ghi_wm2": 819.35,
+                "dni_wm2": 882.08,
+                "wind_speed_ms": 21.1,
+                "wind_direction_deg": 335.23
+            },
+            {
+                "cum_dist_km": 237.2,
+                "eta_hours": 6.27,
+                "latitude": -26.48086,
+                "longitude": 24.93979,
+                "ghi_wm2": 785.23,
+                "dni_wm2": 872.68,
+                "wind_speed_ms": 20.23,
+                "wind_direction_deg": 333.63
+            },
+            {
+                "cum_dist_km": 248.11,
+                "eta_hours": 6.56,
+                "latitude": -26.55804,
+                "longitude": 24.87207,
+                "ghi_wm2": 750.72,
+                "dni_wm2": 868.87,
+                "wind_speed_ms": 28.44,
+                "wind_direction_deg": 332.07
+            },
+            {
+                "cum_dist_km": 260.34,
+                "eta_hours": 6.88,
+                "latitude": -26.66105,
+                "longitude": 24.83093,
+                "ghi_wm2": 712.58,
+                "dni_wm2": 857.68,
+                "wind_speed_ms": 27.6,
+                "wind_direction_deg": 329.81
+            },
+            {
+                "cum_dist_km": 274.23,
+                "eta_hours": 7.25,
+                "latitude": -26.78062,
+                "longitude": 24.79042,
+                "ghi_wm2": 655.09,
+                "dni_wm2": 837.55,
+                "wind_speed_ms": 26.8,
+                "wind_direction_deg": 327.74
+            },
+            {
+                "cum_dist_km": 287.74,
+                "eta_hours": 7.61,
+                "latitude": -26.89689,
+                "longitude": 24.75086,
+                "ghi_wm2": 592.92,
+                "dni_wm2": 814.68,
+                "wind_speed_ms": 26.08,
+                "wind_direction_deg": 325.95
+            },
+            {
+                "cum_dist_km": 298.8,
+                "eta_hours": 7.9,
+                "latitude": -26.9744,
+                "longitude": 24.7021,
+                "ghi_wm2": 542.04,
+                "dni_wm2": 795.97,
+                "wind_speed_ms": 25.5,
+                "wind_direction_deg": 324.49
             }
         ]
     },
@@ -121,63 +2456,230 @@
         "day_number": 4,
         "date": "2025-09-13",
         "start_time_sast": "08:00:00",
-        "distance_covered_km": 259.92,
-        "time_taken_hours": 7.64,
-        "r_max_km": 40.0,
-        "r_max_source": "fallback",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "sill_below_tolerance_over_observed_range",
-            "model": "spherical",
-            "n_grid_points": 45,
-            "n_lag_bins": 11,
-            "nugget": 4.132890384449432e-17,
-            "partial_sill": 0.006355620093369057,
-            "range_km": 308.3872540624826,
-            "sse": 0.00048554956274868706,
-            "r_max_raw_km": 215.8673984617751,
-            "r_max_clamped_km": 40.0
-        },
+        "distance_covered_km": 280.89,
+        "time_taken_hours": 7.96,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -28.75309,
                 "longitude": 24.74678,
-                "ghi_wm2": 139.79,
-                "dni_wm2": 61.56,
-                "wind_speed_ms": 5.08,
-                "wind_direction_deg": 35.07
+                "ghi_wm2": 126.0,
+                "dni_wm2": 168.8,
+                "wind_speed_ms": 7.3,
+                "wind_direction_deg": 344.0
             },
             {
-                "cum_dist_km": 82.72,
-                "eta_hours": 2.55,
-                "latitude": -28.30352,
-                "longitude": 24.14896,
-                "ghi_wm2": 668.25,
-                "dni_wm2": 547.19,
-                "wind_speed_ms": 3.95,
-                "wind_direction_deg": 321.14
+                "cum_dist_km": 10.37,
+                "eta_hours": 0.3,
+                "latitude": -28.70351,
+                "longitude": 24.67252,
+                "ghi_wm2": 182.73,
+                "dni_wm2": 230.32,
+                "wind_speed_ms": 9.9,
+                "wind_direction_deg": 250.69
             },
             {
-                "cum_dist_km": 163.57,
-                "eta_hours": 5.03,
-                "latitude": -28.28174,
-                "longitude": 23.37945,
-                "ghi_wm2": 876.69,
-                "dni_wm2": 754.1,
-                "wind_speed_ms": 5.29,
-                "wind_direction_deg": 274.68
+                "cum_dist_km": 20.95,
+                "eta_hours": 0.6,
+                "latitude": -28.64364,
+                "longitude": 24.59867,
+                "ghi_wm2": 221.75,
+                "dni_wm2": 258.52,
+                "wind_speed_ms": 12.12,
+                "wind_direction_deg": 154.93
             },
             {
-                "cum_dist_km": 248.24,
-                "eta_hours": 7.64,
+                "cum_dist_km": 30.98,
+                "eta_hours": 0.88,
+                "latitude": -28.57014,
+                "longitude": 24.55036,
+                "ghi_wm2": 241.22,
+                "dni_wm2": 270.17,
+                "wind_speed_ms": 13.05,
+                "wind_direction_deg": 53.44
+            },
+            {
+                "cum_dist_km": 40.99,
+                "eta_hours": 1.17,
+                "latitude": -28.52107,
+                "longitude": 24.47872,
+                "ghi_wm2": 255.33,
+                "dni_wm2": 228.4,
+                "wind_speed_ms": 11.15,
+                "wind_direction_deg": 67.77
+            },
+            {
+                "cum_dist_km": 52.33,
+                "eta_hours": 1.49,
+                "latitude": -28.45465,
+                "longitude": 24.39109,
+                "ghi_wm2": 311.01,
+                "dni_wm2": 275.28,
+                "wind_speed_ms": 10.18,
+                "wind_direction_deg": 53.28
+            },
+            {
+                "cum_dist_km": 66.25,
+                "eta_hours": 1.89,
+                "latitude": -28.36639,
+                "longitude": 24.29087,
+                "ghi_wm2": 373.25,
+                "dni_wm2": 317.71,
+                "wind_speed_ms": 9.03,
+                "wind_direction_deg": 41.39
+            },
+            {
+                "cum_dist_km": 76.74,
+                "eta_hours": 2.19,
+                "latitude": -28.3065,
+                "longitude": 24.20999,
+                "ghi_wm2": 440.19,
+                "dni_wm2": 376.69,
+                "wind_speed_ms": 8.33,
+                "wind_direction_deg": 97.4
+            },
+            {
+                "cum_dist_km": 88.94,
+                "eta_hours": 2.53,
+                "latitude": -28.28076,
+                "longitude": 24.09123,
+                "ghi_wm2": 540.14,
+                "dni_wm2": 446.2,
+                "wind_speed_ms": 17.03,
+                "wind_direction_deg": 290.0
+            },
+            {
+                "cum_dist_km": 100.09,
+                "eta_hours": 2.85,
+                "latitude": -28.21968,
+                "longitude": 24.00459,
+                "ghi_wm2": 618.25,
+                "dni_wm2": 550.8,
+                "wind_speed_ms": 15.85,
+                "wind_direction_deg": 290.0
+            },
+            {
+                "cum_dist_km": 145.8,
+                "eta_hours": 4.15,
+                "latitude": -28.26345,
+                "longitude": 23.55097,
+                "ghi_wm2": 842.88,
+                "dni_wm2": 875.1,
+                "wind_speed_ms": 16.75,
+                "wind_direction_deg": 286.09
+            },
+            {
+                "cum_dist_km": 158.18,
+                "eta_hours": 4.51,
+                "latitude": -28.26768,
+                "longitude": 23.42928,
+                "ghi_wm2": 868.16,
+                "dni_wm2": 922.26,
+                "wind_speed_ms": 19.71,
+                "wind_direction_deg": 265.98
+            },
+            {
+                "cum_dist_km": 171.34,
+                "eta_hours": 4.88,
+                "latitude": -28.29974,
+                "longitude": 23.30277,
+                "ghi_wm2": 880.16,
+                "dni_wm2": 926.38,
+                "wind_speed_ms": 20.69,
+                "wind_direction_deg": 264.48
+            },
+            {
+                "cum_dist_km": 181.85,
+                "eta_hours": 5.18,
+                "latitude": -28.33443,
+                "longitude": 23.20342,
+                "ghi_wm2": 876.47,
+                "dni_wm2": 926.25,
+                "wind_speed_ms": 21.43,
+                "wind_direction_deg": 263.82
+            },
+            {
+                "cum_dist_km": 192.15,
+                "eta_hours": 5.47,
+                "latitude": -28.33039,
+                "longitude": 23.09834,
+                "ghi_wm2": 864.15,
+                "dni_wm2": 923.87,
+                "wind_speed_ms": 22.13,
+                "wind_direction_deg": 263.53
+            },
+            {
+                "cum_dist_km": 202.89,
+                "eta_hours": 5.78,
+                "latitude": -28.28372,
+                "longitude": 23.07428,
+                "ghi_wm2": 851.31,
+                "dni_wm2": 921.39,
+                "wind_speed_ms": 22.87,
+                "wind_direction_deg": 263.22
+            },
+            {
+                "cum_dist_km": 214.48,
+                "eta_hours": 6.11,
+                "latitude": -28.31453,
+                "longitude": 23.0683,
+                "ghi_wm2": 829.97,
+                "dni_wm2": 916.69,
+                "wind_speed_ms": 23.63,
+                "wind_direction_deg": 263.11
+            },
+            {
+                "cum_dist_km": 224.53,
+                "eta_hours": 6.39,
+                "latitude": -28.27783,
+                "longitude": 23.07558,
+                "ghi_wm2": 798.19,
+                "dni_wm2": 909.02,
+                "wind_speed_ms": 24.23,
+                "wind_direction_deg": 263.39
+            },
+            {
+                "cum_dist_km": 238.01,
+                "eta_hours": 6.78,
+                "latitude": -28.15694,
+                "longitude": 23.08162,
+                "ghi_wm2": 755.56,
+                "dni_wm2": 898.73,
+                "wind_speed_ms": 25.04,
+                "wind_direction_deg": 263.78
+            },
+            {
+                "cum_dist_km": 251.68,
+                "eta_hours": 7.17,
+                "latitude": -28.03555,
+                "longitude": 23.06022,
+                "ghi_wm2": 702.6,
+                "dni_wm2": 874.89,
+                "wind_speed_ms": 23.48,
+                "wind_direction_deg": 256.33
+            },
+            {
+                "cum_dist_km": 269.21,
+                "eta_hours": 7.67,
                 "latitude": -27.91223,
                 "longitude": 22.96293,
-                "ghi_wm2": 631.32,
-                "dni_wm2": 532.31,
-                "wind_speed_ms": 5.54,
-                "wind_direction_deg": 263.31
+                "ghi_wm2": 618.21,
+                "dni_wm2": 847.83,
+                "wind_speed_ms": 23.13,
+                "wind_direction_deg": 254.33
+            },
+            {
+                "cum_dist_km": 279.4,
+                "eta_hours": 7.96,
+                "latitude": -27.91036,
+                "longitude": 22.87571,
+                "ghi_wm2": 569.17,
+                "dni_wm2": 832.1,
+                "wind_speed_ms": 22.93,
+                "wind_direction_deg": 253.17
             }
         ]
     },
@@ -185,63 +2687,280 @@
         "day_number": 5,
         "date": "2025-09-14",
         "start_time_sast": "08:00:00",
-        "distance_covered_km": 292.52,
-        "time_taken_hours": 7.89,
-        "r_max_km": 40.0,
-        "r_max_source": "fallback",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "sill_below_tolerance_over_observed_range",
-            "model": "spherical",
-            "n_grid_points": 60,
-            "n_lag_bins": 11,
-            "nugget": 2.7169264840291228e-11,
-            "partial_sill": 0.0008590166924893382,
-            "range_km": 837.7430435514624,
-            "sse": 5.411708348260953e-05,
-            "r_max_raw_km": 279.2596661475277,
-            "r_max_clamped_km": 40.0
-        },
+        "distance_covered_km": 353.34,
+        "time_taken_hours": 7.84,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -27.91248,
                 "longitude": 22.86076,
-                "ghi_wm2": 182.56,
-                "dni_wm2": 129.46,
-                "wind_speed_ms": 1.89,
-                "wind_direction_deg": 145.94
+                "ghi_wm2": 177.0,
+                "dni_wm2": 567.7,
+                "wind_speed_ms": 5.8,
+                "wind_direction_deg": 214.0
+            },
+            {
+                "cum_dist_km": 10.35,
+                "eta_hours": 0.23,
+                "latitude": -27.92791,
+                "longitude": 22.75697,
+                "ghi_wm2": 232.04,
+                "dni_wm2": 617.47,
+                "wind_speed_ms": 5.26,
+                "wind_direction_deg": 196.9
+            },
+            {
+                "cum_dist_km": 20.47,
+                "eta_hours": 0.46,
+                "latitude": -28.00086,
+                "longitude": 22.71068,
+                "ghi_wm2": 285.94,
+                "dni_wm2": 666.21,
+                "wind_speed_ms": 4.73,
+                "wind_direction_deg": 180.16
+            },
+            {
+                "cum_dist_km": 39.46,
+                "eta_hours": 0.89,
+                "latitude": -28.10081,
+                "longitude": 22.55678,
+                "ghi_wm2": 382.96,
+                "dni_wm2": 750.78,
+                "wind_speed_ms": 4.1,
+                "wind_direction_deg": 95.34
+            },
+            {
+                "cum_dist_km": 51.71,
+                "eta_hours": 1.17,
+                "latitude": -28.14197,
+                "longitude": 22.44148,
+                "ghi_wm2": 444.73,
+                "dni_wm2": 791.06,
+                "wind_speed_ms": 4.09,
+                "wind_direction_deg": 109.62
+            },
+            {
+                "cum_dist_km": 66.73,
+                "eta_hours": 1.51,
+                "latitude": -28.19202,
+                "longitude": 22.30017,
+                "ghi_wm2": 517.82,
+                "dni_wm2": 826.01,
+                "wind_speed_ms": 4.26,
+                "wind_direction_deg": 132.73
             },
             {
                 "cum_dist_km": 125.39,
-                "eta_hours": 3.43,
+                "eta_hours": 2.84,
                 "latitude": -28.37482,
                 "longitude": 21.73844,
-                "ghi_wm2": 842.79,
-                "dni_wm2": 732.64,
-                "wind_speed_ms": 1.94,
-                "wind_direction_deg": 190.7
+                "ghi_wm2": 735.45,
+                "dni_wm2": 880.7,
+                "wind_speed_ms": 2.95,
+                "wind_direction_deg": 37.54
             },
             {
-                "cum_dist_km": 207.52,
-                "eta_hours": 5.68,
-                "latitude": -28.64374,
-                "longitude": 21.04816,
-                "ghi_wm2": 912.73,
-                "dni_wm2": 800.88,
-                "wind_speed_ms": 2.23,
-                "wind_direction_deg": 234.73
+                "cum_dist_km": 136.38,
+                "eta_hours": 3.09,
+                "latitude": -28.36276,
+                "longitude": 21.62689,
+                "ghi_wm2": 772.57,
+                "dni_wm2": 893.51,
+                "wind_speed_ms": 2.63,
+                "wind_direction_deg": 55.7
             },
             {
-                "cum_dist_km": 288.47,
-                "eta_hours": 7.89,
-                "latitude": -28.64987,
-                "longitude": 20.36285,
-                "ghi_wm2": 656.96,
-                "dni_wm2": 557.17,
-                "wind_speed_ms": 1.21,
-                "wind_direction_deg": 268.81
+                "cum_dist_km": 146.58,
+                "eta_hours": 3.32,
+                "latitude": -28.37731,
+                "longitude": 21.52652,
+                "ghi_wm2": 797.74,
+                "dni_wm2": 900.62,
+                "wind_speed_ms": 2.7,
+                "wind_direction_deg": 112.72
+            },
+            {
+                "cum_dist_km": 158.1,
+                "eta_hours": 3.58,
+                "latitude": -28.37533,
+                "longitude": 21.40907,
+                "ghi_wm2": 826.17,
+                "dni_wm2": 908.65,
+                "wind_speed_ms": 2.77,
+                "wind_direction_deg": 177.14
+            },
+            {
+                "cum_dist_km": 170.58,
+                "eta_hours": 3.86,
+                "latitude": -28.43328,
+                "longitude": 21.30694,
+                "ghi_wm2": 853.82,
+                "dni_wm2": 915.75,
+                "wind_speed_ms": 2.71,
+                "wind_direction_deg": 225.78
+            },
+            {
+                "cum_dist_km": 180.99,
+                "eta_hours": 4.1,
+                "latitude": -28.47312,
+                "longitude": 21.25634,
+                "ghi_wm2": 872.72,
+                "dni_wm2": 921.03,
+                "wind_speed_ms": 3.46,
+                "wind_direction_deg": 255.31
+            },
+            {
+                "cum_dist_km": 191.41,
+                "eta_hours": 4.33,
+                "latitude": -28.43475,
+                "longitude": 21.34184,
+                "ghi_wm2": 881.68,
+                "dni_wm2": 923.27,
+                "wind_speed_ms": 4.57,
+                "wind_direction_deg": 253.66
+            },
+            {
+                "cum_dist_km": 201.76,
+                "eta_hours": 4.57,
+                "latitude": -28.44125,
+                "longitude": 21.42761,
+                "ghi_wm2": 893.01,
+                "dni_wm2": 926.82,
+                "wind_speed_ms": 5.74,
+                "wind_direction_deg": 265.67
+            },
+            {
+                "cum_dist_km": 212.56,
+                "eta_hours": 4.81,
+                "latitude": -28.42598,
+                "longitude": 21.44664,
+                "ghi_wm2": 902.07,
+                "dni_wm2": 929.08,
+                "wind_speed_ms": 6.96,
+                "wind_direction_deg": 259.06
+            },
+            {
+                "cum_dist_km": 222.72,
+                "eta_hours": 5.04,
+                "latitude": -28.44139,
+                "longitude": 21.36616,
+                "ghi_wm2": 905.47,
+                "dni_wm2": 929.25,
+                "wind_speed_ms": 7.8,
+                "wind_direction_deg": 248.91
+            },
+            {
+                "cum_dist_km": 233.06,
+                "eta_hours": 5.28,
+                "latitude": -28.46991,
+                "longitude": 21.27921,
+                "ghi_wm2": 897.04,
+                "dni_wm2": 927.3,
+                "wind_speed_ms": 8.34,
+                "wind_direction_deg": 248.45
+            },
+            {
+                "cum_dist_km": 243.36,
+                "eta_hours": 5.51,
+                "latitude": -28.47543,
+                "longitude": 21.20454,
+                "ghi_wm2": 888.65,
+                "dni_wm2": 925.37,
+                "wind_speed_ms": 8.87,
+                "wind_direction_deg": 247.98
+            },
+            {
+                "cum_dist_km": 254.13,
+                "eta_hours": 5.75,
+                "latitude": -28.55302,
+                "longitude": 21.14898,
+                "ghi_wm2": 877.62,
+                "dni_wm2": 919.54,
+                "wind_speed_ms": 8.74,
+                "wind_direction_deg": 243.51
+            },
+            {
+                "cum_dist_km": 265.41,
+                "eta_hours": 6.01,
+                "latitude": -28.62848,
+                "longitude": 21.07263,
+                "ghi_wm2": 868.06,
+                "dni_wm2": 917.27,
+                "wind_speed_ms": 9.62,
+                "wind_direction_deg": 243.99
+            },
+            {
+                "cum_dist_km": 276.49,
+                "eta_hours": 6.26,
+                "latitude": -28.69158,
+                "longitude": 20.98549,
+                "ghi_wm2": 842.22,
+                "dni_wm2": 911.08,
+                "wind_speed_ms": 10.3,
+                "wind_direction_deg": 243.74
+            },
+            {
+                "cum_dist_km": 287.47,
+                "eta_hours": 6.51,
+                "latitude": -28.70511,
+                "longitude": 20.89492,
+                "ghi_wm2": 816.12,
+                "dni_wm2": 907.1,
+                "wind_speed_ms": 12.06,
+                "wind_direction_deg": 256.47
+            },
+            {
+                "cum_dist_km": 300.16,
+                "eta_hours": 6.8,
+                "latitude": -28.75633,
+                "longitude": 20.78275,
+                "ghi_wm2": 786.81,
+                "dni_wm2": 900.55,
+                "wind_speed_ms": 12.43,
+                "wind_direction_deg": 255.61
+            },
+            {
+                "cum_dist_km": 310.57,
+                "eta_hours": 7.03,
+                "latitude": -28.73895,
+                "longitude": 20.68427,
+                "ghi_wm2": 764.76,
+                "dni_wm2": 892.24,
+                "wind_speed_ms": 7.87,
+                "wind_direction_deg": 280.87
+            },
+            {
+                "cum_dist_km": 321.27,
+                "eta_hours": 7.27,
+                "latitude": -28.76755,
+                "longitude": 20.6028,
+                "ghi_wm2": 724.55,
+                "dni_wm2": 878.75,
+                "wind_speed_ms": 7.63,
+                "wind_direction_deg": 279.9
+            },
+            {
+                "cum_dist_km": 332.6,
+                "eta_hours": 7.53,
+                "latitude": -28.72879,
+                "longitude": 20.50516,
+                "ghi_wm2": 681.95,
+                "dni_wm2": 864.46,
+                "wind_speed_ms": 7.37,
+                "wind_direction_deg": 278.88
+            },
+            {
+                "cum_dist_km": 346.15,
+                "eta_hours": 7.84,
+                "latitude": -28.66134,
+                "longitude": 20.39232,
+                "ghi_wm2": 635.89,
+                "dni_wm2": 853.55,
+                "wind_speed_ms": 7.17,
+                "wind_direction_deg": 291.98
             }
         ]
     },
@@ -249,63 +2968,270 @@
         "day_number": 6,
         "date": "2025-09-15",
         "start_time_sast": "08:00:00",
-        "distance_covered_km": 310.09,
-        "time_taken_hours": 6.44,
-        "r_max_km": 40.0,
-        "r_max_source": "fallback",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "sill_below_tolerance_over_observed_range",
-            "model": "spherical",
-            "n_grid_points": 72,
-            "n_lag_bins": 12,
-            "nugget": 1.6021188813360028e-10,
-            "partial_sill": 0.0023868700873386855,
-            "range_km": 865.6802178429261,
-            "sse": 0.0004615903029876359,
-            "r_max_raw_km": 288.5600764632715,
-            "r_max_clamped_km": 40.0
-        },
+        "distance_covered_km": 328.2,
+        "time_taken_hours": 7.8,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -28.6232,
                 "longitude": 20.34758,
-                "ghi_wm2": 145.76,
-                "dni_wm2": 97.19,
-                "wind_speed_ms": 1.71,
-                "wind_direction_deg": 11.91
+                "ghi_wm2": 134.0,
+                "dni_wm2": 448.2,
+                "wind_speed_ms": 5.6,
+                "wind_direction_deg": 90.0
             },
             {
-                "cum_dist_km": 80.26,
-                "eta_hours": 2.07,
-                "latitude": -28.86949,
-                "longitude": 19.99443,
-                "ghi_wm2": 608.5,
-                "dni_wm2": 511.52,
-                "wind_speed_ms": 2.84,
-                "wind_direction_deg": 341.2
+                "cum_dist_km": 10.57,
+                "eta_hours": 0.26,
+                "latitude": -28.67461,
+                "longitude": 20.42342,
+                "ghi_wm2": 191.98,
+                "dni_wm2": 510.58,
+                "wind_speed_ms": 4.49,
+                "wind_direction_deg": 87.94
+            },
+            {
+                "cum_dist_km": 22.49,
+                "eta_hours": 0.55,
+                "latitude": -28.74076,
+                "longitude": 20.51672,
+                "ghi_wm2": 260.35,
+                "dni_wm2": 574.96,
+                "wind_speed_ms": 6.61,
+                "wind_direction_deg": 299.31
+            },
+            {
+                "cum_dist_km": 34.26,
+                "eta_hours": 0.84,
+                "latitude": -28.80164,
+                "longitude": 20.45569,
+                "ghi_wm2": 324.91,
+                "dni_wm2": 645.23,
+                "wind_speed_ms": 7.24,
+                "wind_direction_deg": 321.98
+            },
+            {
+                "cum_dist_km": 48.46,
+                "eta_hours": 1.18,
+                "latitude": -28.84091,
+                "longitude": 20.31823,
+                "ghi_wm2": 400.98,
+                "dni_wm2": 708.41,
+                "wind_speed_ms": 8.27,
+                "wind_direction_deg": 333.01
+            },
+            {
+                "cum_dist_km": 75.31,
+                "eta_hours": 1.84,
+                "latitude": -28.86201,
+                "longitude": 20.04453,
+                "ghi_wm2": 539.51,
+                "dni_wm2": 795.26,
+                "wind_speed_ms": 3.05,
+                "wind_direction_deg": 275.04
+            },
+            {
+                "cum_dist_km": 89.36,
+                "eta_hours": 2.18,
+                "latitude": -28.87972,
+                "longitude": 19.9017,
+                "ghi_wm2": 605.01,
+                "dni_wm2": 850.94,
+                "wind_speed_ms": 10.97,
+                "wind_direction_deg": 323.86
+            },
+            {
+                "cum_dist_km": 100.1,
+                "eta_hours": 2.44,
+                "latitude": -28.90887,
+                "longitude": 19.79665,
+                "ghi_wm2": 650.55,
+                "dni_wm2": 865.55,
+                "wind_speed_ms": 12.09,
+                "wind_direction_deg": 320.72
+            },
+            {
+                "cum_dist_km": 110.44,
+                "eta_hours": 2.69,
+                "latitude": -28.97374,
+                "longitude": 19.72241,
+                "ghi_wm2": 694.4,
+                "dni_wm2": 879.61,
+                "wind_speed_ms": 13.18,
+                "wind_direction_deg": 317.7
+            },
+            {
+                "cum_dist_km": 129.18,
+                "eta_hours": 3.15,
+                "latitude": -29.06182,
+                "longitude": 19.56093,
+                "ghi_wm2": 765.42,
+                "dni_wm2": 902.16,
+                "wind_speed_ms": 14.83,
+                "wind_direction_deg": 310.57
+            },
+            {
+                "cum_dist_km": 139.3,
+                "eta_hours": 3.4,
+                "latitude": -29.10746,
+                "longitude": 19.47213,
+                "ghi_wm2": 794.27,
+                "dni_wm2": 911.04,
+                "wind_speed_ms": 15.37,
+                "wind_direction_deg": 304.9
+            },
+            {
+                "cum_dist_km": 151.63,
+                "eta_hours": 3.7,
+                "latitude": -29.13288,
+                "longitude": 19.35081,
+                "ghi_wm2": 829.44,
+                "dni_wm2": 921.86,
+                "wind_speed_ms": 16.03,
+                "wind_direction_deg": 297.99
             },
             {
                 "cum_dist_km": 167.96,
-                "eta_hours": 4.33,
+                "eta_hours": 4.09,
                 "latitude": -29.12619,
                 "longitude": 19.18288,
-                "ghi_wm2": 898.0,
-                "dni_wm2": 774.4,
-                "wind_speed_ms": 5.92,
-                "wind_direction_deg": 289.46
+                "ghi_wm2": 869.33,
+                "dni_wm2": 933.66,
+                "wind_speed_ms": 17.22,
+                "wind_direction_deg": 290.44
             },
             {
-                "cum_dist_km": 249.73,
-                "eta_hours": 6.44,
-                "latitude": -29.4682,
-                "longitude": 18.44427,
-                "ghi_wm2": 863.93,
-                "dni_wm2": 717.44,
-                "wind_speed_ms": 8.05,
-                "wind_direction_deg": 272.12
+                "cum_dist_km": 179.0,
+                "eta_hours": 4.36,
+                "latitude": -29.16187,
+                "longitude": 19.077,
+                "ghi_wm2": 878.15,
+                "dni_wm2": 937.99,
+                "wind_speed_ms": 22.55,
+                "wind_direction_deg": 298.91
+            },
+            {
+                "cum_dist_km": 189.99,
+                "eta_hours": 4.63,
+                "latitude": -29.20232,
+                "longitude": 18.97407,
+                "ghi_wm2": 891.55,
+                "dni_wm2": 940.56,
+                "wind_speed_ms": 23.92,
+                "wind_direction_deg": 298.11
+            },
+            {
+                "cum_dist_km": 202.41,
+                "eta_hours": 4.93,
+                "latitude": -29.2662,
+                "longitude": 18.87297,
+                "ghi_wm2": 906.7,
+                "dni_wm2": 943.47,
+                "wind_speed_ms": 25.46,
+                "wind_direction_deg": 297.2
+            },
+            {
+                "cum_dist_km": 214.01,
+                "eta_hours": 5.22,
+                "latitude": -29.32014,
+                "longitude": 18.7707,
+                "ghi_wm2": 903.93,
+                "dni_wm2": 934.5,
+                "wind_speed_ms": 26.49,
+                "wind_direction_deg": 296.13
+            },
+            {
+                "cum_dist_km": 233.95,
+                "eta_hours": 5.7,
+                "latitude": -29.40741,
+                "longitude": 18.59094,
+                "ghi_wm2": 890.32,
+                "dni_wm2": 912.97,
+                "wind_speed_ms": 28.05,
+                "wind_direction_deg": 294.19
+            },
+            {
+                "cum_dist_km": 244.52,
+                "eta_hours": 5.96,
+                "latitude": -29.4529,
+                "longitude": 18.4952,
+                "ghi_wm2": 883.11,
+                "dni_wm2": 901.56,
+                "wind_speed_ms": 28.87,
+                "wind_direction_deg": 293.16
+            },
+            {
+                "cum_dist_km": 256.31,
+                "eta_hours": 6.25,
+                "latitude": -29.48754,
+                "longitude": 18.38007,
+                "ghi_wm2": 874.23,
+                "dni_wm2": 915.33,
+                "wind_speed_ms": 25.45,
+                "wind_direction_deg": 265.51
+            },
+            {
+                "cum_dist_km": 266.58,
+                "eta_hours": 6.5,
+                "latitude": -29.51457,
+                "longitude": 18.27938,
+                "ghi_wm2": 850.18,
+                "dni_wm2": 909.49,
+                "wind_speed_ms": 25.7,
+                "wind_direction_deg": 264.01
+            },
+            {
+                "cum_dist_km": 276.99,
+                "eta_hours": 6.75,
+                "latitude": -29.55106,
+                "longitude": 18.18397,
+                "ghi_wm2": 825.84,
+                "dni_wm2": 903.59,
+                "wind_speed_ms": 25.95,
+                "wind_direction_deg": 262.49
+            },
+            {
+                "cum_dist_km": 288.73,
+                "eta_hours": 7.04,
+                "latitude": -29.56419,
+                "longitude": 18.06388,
+                "ghi_wm2": 795.88,
+                "dni_wm2": 895.2,
+                "wind_speed_ms": 26.24,
+                "wind_direction_deg": 260.96
+            },
+            {
+                "cum_dist_km": 299.47,
+                "eta_hours": 7.3,
+                "latitude": -29.60218,
+                "longitude": 17.96275,
+                "ghi_wm2": 753.46,
+                "dni_wm2": 877.19,
+                "wind_speed_ms": 26.5,
+                "wind_direction_deg": 260.7
+            },
+            {
+                "cum_dist_km": 309.53,
+                "eta_hours": 7.54,
+                "latitude": -29.66132,
+                "longitude": 17.89339,
+                "ghi_wm2": 712.44,
+                "dni_wm2": 889.05,
+                "wind_speed_ms": 22.12,
+                "wind_direction_deg": 271.82
+            },
+            {
+                "cum_dist_km": 319.83,
+                "eta_hours": 7.8,
+                "latitude": -29.68583,
+                "longitude": 17.82422,
+                "ghi_wm2": 673.03,
+                "dni_wm2": 877.6,
+                "wind_speed_ms": 21.94,
+                "wind_direction_deg": 270.82
             }
         ]
     },
@@ -313,73 +3239,330 @@
         "day_number": 7,
         "date": "2025-09-16",
         "start_time_sast": "08:00:00",
-        "distance_covered_km": 342.55,
-        "time_taken_hours": 7.5,
-        "r_max_km": 39.59,
-        "r_max_source": "semivariogram",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "solved",
-            "model": "spherical",
-            "n_grid_points": 72,
-            "n_lag_bins": 12,
-            "nugget": 1.5372480151476419e-22,
-            "partial_sill": 0.05019540697826994,
-            "range_km": 296.30976265003363,
-            "sse": 0.6360040303949283,
-            "r_max_raw_km": 39.58974488735819,
-            "r_max_clamped_km": 39.58974488735819
-        },
+        "distance_covered_km": 359.0,
+        "time_taken_hours": 7.93,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -29.66129,
                 "longitude": 17.88898,
-                "ghi_wm2": 35.32,
-                "dni_wm2": 3.32,
-                "wind_speed_ms": 4.02,
-                "wind_direction_deg": 266.17
+                "ghi_wm2": 25.0,
+                "dni_wm2": 0.0,
+                "wind_speed_ms": 11.5,
+                "wind_direction_deg": 305.0
             },
             {
-                "cum_dist_km": 79.89,
-                "eta_hours": 1.87,
-                "latitude": -30.28717,
-                "longitude": 17.89647,
-                "ghi_wm2": 184.7,
-                "dni_wm2": 55.47,
-                "wind_speed_ms": 4.68,
-                "wind_direction_deg": 271.77
+                "cum_dist_km": 10.05,
+                "eta_hours": 0.22,
+                "latitude": -29.72905,
+                "longitude": 17.86575,
+                "ghi_wm2": 35.53,
+                "dni_wm2": 1.84,
+                "wind_speed_ms": 11.86,
+                "wind_direction_deg": 301.86
+            },
+            {
+                "cum_dist_km": 20.53,
+                "eta_hours": 0.46,
+                "latitude": -29.81308,
+                "longitude": 17.84428,
+                "ghi_wm2": 43.5,
+                "dni_wm2": 0.0,
+                "wind_speed_ms": 14.53,
+                "wind_direction_deg": 308.17
+            },
+            {
+                "cum_dist_km": 30.71,
+                "eta_hours": 0.68,
+                "latitude": -29.89387,
+                "longitude": 17.87347,
+                "ghi_wm2": 54.16,
+                "dni_wm2": 0.0,
+                "wind_speed_ms": 14.39,
+                "wind_direction_deg": 307.26
+            },
+            {
+                "cum_dist_km": 43.03,
+                "eta_hours": 0.96,
+                "latitude": -29.98758,
+                "longitude": 17.87853,
+                "ghi_wm2": 56.23,
+                "dni_wm2": 2.59,
+                "wind_speed_ms": 18.78,
+                "wind_direction_deg": 285.62
+            },
+            {
+                "cum_dist_km": 53.86,
+                "eta_hours": 1.2,
+                "latitude": -30.07927,
+                "longitude": 17.90211,
+                "ghi_wm2": 70.41,
+                "dni_wm2": 6.52,
+                "wind_speed_ms": 18.72,
+                "wind_direction_deg": 281.6
+            },
+            {
+                "cum_dist_km": 64.66,
+                "eta_hours": 1.44,
+                "latitude": -30.16866,
+                "longitude": 17.92992,
+                "ghi_wm2": 85.34,
+                "dni_wm2": 11.12,
+                "wind_speed_ms": 18.38,
+                "wind_direction_deg": 277.5
+            },
+            {
+                "cum_dist_km": 75.34,
+                "eta_hours": 1.68,
+                "latitude": -30.24623,
+                "longitude": 17.89538,
+                "ghi_wm2": 100.09,
+                "dni_wm2": 15.66,
+                "wind_speed_ms": 18.05,
+                "wind_direction_deg": 273.46
+            },
+            {
+                "cum_dist_km": 85.98,
+                "eta_hours": 1.92,
+                "latitude": -30.34132,
+                "longitude": 17.88815,
+                "ghi_wm2": 92.97,
+                "dni_wm2": 0.0,
+                "wind_speed_ms": 17.52,
+                "wind_direction_deg": 286.76
+            },
+            {
+                "cum_dist_km": 96.0,
+                "eta_hours": 2.14,
+                "latitude": -30.41781,
+                "longitude": 17.93088,
+                "ghi_wm2": 111.34,
+                "dni_wm2": 6.99,
+                "wind_speed_ms": 17.42,
+                "wind_direction_deg": 286.0
+            },
+            {
+                "cum_dist_km": 106.02,
+                "eta_hours": 2.36,
+                "latitude": -30.50419,
+                "longitude": 17.94019,
+                "ghi_wm2": 178.08,
+                "dni_wm2": 53.13,
+                "wind_speed_ms": 20.78,
+                "wind_direction_deg": 292.1
+            },
+            {
+                "cum_dist_km": 116.71,
+                "eta_hours": 2.6,
+                "latitude": -30.56612,
+                "longitude": 17.99625,
+                "ghi_wm2": 224.77,
+                "dni_wm2": 88.02,
+                "wind_speed_ms": 20.64,
+                "wind_direction_deg": 290.19
+            },
+            {
+                "cum_dist_km": 127.19,
+                "eta_hours": 2.83,
+                "latitude": -30.64372,
+                "longitude": 18.05152,
+                "ghi_wm2": 270.52,
+                "dni_wm2": 122.22,
+                "wind_speed_ms": 20.5,
+                "wind_direction_deg": 288.33
+            },
+            {
+                "cum_dist_km": 137.84,
+                "eta_hours": 3.07,
+                "latitude": -30.73418,
+                "longitude": 18.08375,
+                "ghi_wm2": 381.8,
+                "dni_wm2": 182.83,
+                "wind_speed_ms": 24.59,
+                "wind_direction_deg": 280.5
+            },
+            {
+                "cum_dist_km": 148.15,
+                "eta_hours": 3.3,
+                "latitude": -30.81225,
+                "longitude": 18.1169,
+                "ghi_wm2": 422.93,
+                "dni_wm2": 243.3,
+                "wind_speed_ms": 24.57,
+                "wind_direction_deg": 278.89
             },
             {
                 "cum_dist_km": 159.29,
-                "eta_hours": 3.72,
+                "eta_hours": 3.55,
                 "latitude": -30.89138,
                 "longitude": 18.18063,
-                "ghi_wm2": 539.2,
-                "dni_wm2": 337.46,
-                "wind_speed_ms": 5.9,
-                "wind_direction_deg": 269.83
+                "ghi_wm2": 467.36,
+                "dni_wm2": 308.63,
+                "wind_speed_ms": 24.55,
+                "wind_direction_deg": 277.15
+            },
+            {
+                "cum_dist_km": 169.9,
+                "eta_hours": 3.79,
+                "latitude": -30.97186,
+                "longitude": 18.23741,
+                "ghi_wm2": 509.69,
+                "dni_wm2": 370.88,
+                "wind_speed_ms": 24.52,
+                "wind_direction_deg": 275.5
+            },
+            {
+                "cum_dist_km": 180.11,
+                "eta_hours": 4.01,
+                "latitude": -31.05528,
+                "longitude": 18.27749,
+                "ghi_wm2": 549.58,
+                "dni_wm2": 428.08,
+                "wind_speed_ms": 24.51,
+                "wind_direction_deg": 273.97
+            },
+            {
+                "cum_dist_km": 192.13,
+                "eta_hours": 4.28,
+                "latitude": -31.13018,
+                "longitude": 18.35161,
+                "ghi_wm2": 580.93,
+                "dni_wm2": 445.69,
+                "wind_speed_ms": 24.61,
+                "wind_direction_deg": 273.44
+            },
+            {
+                "cum_dist_km": 202.78,
+                "eta_hours": 4.52,
+                "latitude": -31.18823,
+                "longitude": 18.43709,
+                "ghi_wm2": 608.69,
+                "dni_wm2": 461.28,
+                "wind_speed_ms": 24.71,
+                "wind_direction_deg": 272.96
+            },
+            {
+                "cum_dist_km": 228.74,
+                "eta_hours": 5.1,
+                "latitude": -31.35418,
+                "longitude": 18.61106,
+                "ghi_wm2": 427.08,
+                "dni_wm2": 238.27,
+                "wind_speed_ms": 25.7,
+                "wind_direction_deg": 265.51
             },
             {
                 "cum_dist_km": 241.73,
-                "eta_hours": 5.65,
+                "eta_hours": 5.39,
                 "latitude": -31.44181,
                 "longitude": 18.69923,
-                "ghi_wm2": 483.55,
-                "dni_wm2": 285.21,
-                "wind_speed_ms": 6.3,
-                "wind_direction_deg": 258.03
+                "ghi_wm2": 397.56,
+                "dni_wm2": 204.84,
+                "wind_speed_ms": 25.41,
+                "wind_direction_deg": 264.07
             },
             {
-                "cum_dist_km": 321.35,
-                "eta_hours": 7.5,
-                "latitude": -32.03461,
-                "longitude": 18.79205,
-                "ghi_wm2": 356.88,
-                "dni_wm2": 156.25,
-                "wind_speed_ms": 4.68,
-                "wind_direction_deg": 231.42
+                "cum_dist_km": 258.72,
+                "eta_hours": 5.77,
+                "latitude": -31.59112,
+                "longitude": 18.72916,
+                "ghi_wm2": 358.94,
+                "dni_wm2": 161.11,
+                "wind_speed_ms": 25.03,
+                "wind_direction_deg": 262.17
+            },
+            {
+                "cum_dist_km": 269.82,
+                "eta_hours": 6.01,
+                "latitude": -31.56777,
+                "longitude": 18.80663,
+                "ghi_wm2": 336.35,
+                "dni_wm2": 135.8,
+                "wind_speed_ms": 24.79,
+                "wind_direction_deg": 260.86
+            },
+            {
+                "cum_dist_km": 280.13,
+                "eta_hours": 6.24,
+                "latitude": -31.6136,
+                "longitude": 18.72858,
+                "ghi_wm2": 360.94,
+                "dni_wm2": 168.57,
+                "wind_speed_ms": 24.58,
+                "wind_direction_deg": 258.33
+            },
+            {
+                "cum_dist_km": 292.29,
+                "eta_hours": 6.51,
+                "latitude": -31.71165,
+                "longitude": 18.67791,
+                "ghi_wm2": 389.92,
+                "dni_wm2": 207.2,
+                "wind_speed_ms": 24.34,
+                "wind_direction_deg": 255.35
+            },
+            {
+                "cum_dist_km": 302.52,
+                "eta_hours": 6.74,
+                "latitude": -31.79347,
+                "longitude": 18.6285,
+                "ghi_wm2": 386.28,
+                "dni_wm2": 262.13,
+                "wind_speed_ms": 17.12,
+                "wind_direction_deg": 229.21
+            },
+            {
+                "cum_dist_km": 312.8,
+                "eta_hours": 6.97,
+                "latitude": -31.87327,
+                "longitude": 18.62183,
+                "ghi_wm2": 345.29,
+                "dni_wm2": 227.91,
+                "wind_speed_ms": 16.48,
+                "wind_direction_deg": 223.71
+            },
+            {
+                "cum_dist_km": 324.96,
+                "eta_hours": 7.24,
+                "latitude": -31.95219,
+                "longitude": 18.70842,
+                "ghi_wm2": 338.07,
+                "dni_wm2": 229.99,
+                "wind_speed_ms": 16.74,
+                "wind_direction_deg": 221.79
+            },
+            {
+                "cum_dist_km": 335.5,
+                "eta_hours": 7.48,
+                "latitude": -32.01662,
+                "longitude": 18.78052,
+                "ghi_wm2": 335.84,
+                "dni_wm2": 203.07,
+                "wind_speed_ms": 18.11,
+                "wind_direction_deg": 227.52
+            },
+            {
+                "cum_dist_km": 345.77,
+                "eta_hours": 7.71,
+                "latitude": -32.098,
+                "longitude": 18.82739,
+                "ghi_wm2": 371.31,
+                "dni_wm2": 266.85,
+                "wind_speed_ms": 18.5,
+                "wind_direction_deg": 227.29
+            },
+            {
+                "cum_dist_km": 355.8,
+                "eta_hours": 7.93,
+                "latitude": -32.17215,
+                "longitude": 18.87221,
+                "ghi_wm2": 429.07,
+                "dni_wm2": 366.58,
+                "wind_speed_ms": 16.99,
+                "wind_direction_deg": 224.07
             }
         ]
     },
@@ -387,63 +3570,300 @@
         "day_number": 8,
         "date": "2025-09-17",
         "start_time_sast": "08:00:00",
-        "distance_covered_km": 278.67,
-        "time_taken_hours": 6.92,
-        "r_max_km": 40.0,
-        "r_max_source": "semivariogram",
-        "semivariogram_diagnostics": {
-            "epsilon": 0.1,
-            "status": "solved",
-            "model": "spherical",
-            "n_grid_points": 32,
-            "n_lag_bins": 11,
-            "nugget": 1.7009275168573725e-16,
-            "partial_sill": 0.030189781022473165,
-            "range_km": 594.5799363811346,
-            "sse": 0.037856881937542955,
-            "r_max_raw_km": 133.5438653394957,
-            "r_max_clamped_km": 40.0
-        },
+        "distance_covered_km": 300.36,
+        "time_taken_hours": 7.92,
+        "r_max_km": 5.0,
+        "r_max_source": "constant",
         "waypoints": [
             {
                 "cum_dist_km": 0.0,
                 "eta_hours": 0.0,
                 "latitude": -32.17286,
                 "longitude": 18.89958,
-                "ghi_wm2": 131.52,
-                "dni_wm2": 93.64,
-                "wind_speed_ms": 1.11,
-                "wind_direction_deg": 136.76
+                "ghi_wm2": 122.0,
+                "dni_wm2": 494.5,
+                "wind_speed_ms": 4.8,
+                "wind_direction_deg": 200.0
             },
             {
-                "cum_dist_km": 80.45,
-                "eta_hours": 2.31,
-                "latitude": -32.7753,
-                "longitude": 18.92455,
-                "ghi_wm2": 605.79,
-                "dni_wm2": 520.34,
-                "wind_speed_ms": 0.9,
-                "wind_direction_deg": 210.68
+                "cum_dist_km": 10.3,
+                "eta_hours": 0.27,
+                "latitude": -32.22359,
+                "longitude": 18.85132,
+                "ghi_wm2": 181.54,
+                "dni_wm2": 558.35,
+                "wind_speed_ms": 4.72,
+                "wind_direction_deg": 194.51
             },
             {
-                "cum_dist_km": 160.82,
-                "eta_hours": 4.62,
-                "latitude": -33.37134,
-                "longitude": 19.17653,
-                "ghi_wm2": 861.17,
-                "dni_wm2": 762.13,
-                "wind_speed_ms": 2.0,
-                "wind_direction_deg": 238.52
+                "cum_dist_km": 20.89,
+                "eta_hours": 0.56,
+                "latitude": -32.30217,
+                "longitude": 18.90442,
+                "ghi_wm2": 242.75,
+                "dni_wm2": 623.99,
+                "wind_speed_ms": 4.63,
+                "wind_direction_deg": 188.87
             },
             {
-                "cum_dist_km": 240.89,
-                "eta_hours": 6.92,
-                "latitude": -33.49545,
-                "longitude": 18.96354,
-                "ghi_wm2": 646.43,
-                "dni_wm2": 466.06,
-                "wind_speed_ms": 1.98,
-                "wind_direction_deg": 216.31
+                "cum_dist_km": 31.43,
+                "eta_hours": 0.84,
+                "latitude": -32.38724,
+                "longitude": 18.94796,
+                "ghi_wm2": 307.65,
+                "dni_wm2": 692.22,
+                "wind_speed_ms": 4.47,
+                "wind_direction_deg": 182.29
+            },
+            {
+                "cum_dist_km": 42.93,
+                "eta_hours": 1.14,
+                "latitude": -32.48703,
+                "longitude": 18.96475,
+                "ghi_wm2": 373.86,
+                "dni_wm2": 748.47,
+                "wind_speed_ms": 5.17,
+                "wind_direction_deg": 196.0
+            },
+            {
+                "cum_dist_km": 53.81,
+                "eta_hours": 1.43,
+                "latitude": -32.58221,
+                "longitude": 18.98811,
+                "ghi_wm2": 436.17,
+                "dni_wm2": 790.4,
+                "wind_speed_ms": 5.93,
+                "wind_direction_deg": 198.03
+            },
+            {
+                "cum_dist_km": 63.84,
+                "eta_hours": 1.7,
+                "latitude": -32.64306,
+                "longitude": 18.94756,
+                "ghi_wm2": 493.56,
+                "dni_wm2": 829.03,
+                "wind_speed_ms": 6.62,
+                "wind_direction_deg": 199.9
+            },
+            {
+                "cum_dist_km": 75.29,
+                "eta_hours": 2.01,
+                "latitude": -32.73095,
+                "longitude": 18.90888,
+                "ghi_wm2": 558.89,
+                "dni_wm2": 872.71,
+                "wind_speed_ms": 7.4,
+                "wind_direction_deg": 201.99
+            },
+            {
+                "cum_dist_km": 87.41,
+                "eta_hours": 2.33,
+                "latitude": -32.83787,
+                "longitude": 18.92579,
+                "ghi_wm2": 613.11,
+                "dni_wm2": 891.75,
+                "wind_speed_ms": 7.7,
+                "wind_direction_deg": 201.34
+            },
+            {
+                "cum_dist_km": 97.43,
+                "eta_hours": 2.59,
+                "latitude": -32.92069,
+                "longitude": 18.96056,
+                "ghi_wm2": 657.96,
+                "dni_wm2": 907.5,
+                "wind_speed_ms": 7.94,
+                "wind_direction_deg": 200.81
+            },
+            {
+                "cum_dist_km": 108.0,
+                "eta_hours": 2.88,
+                "latitude": -33.00791,
+                "longitude": 18.99345,
+                "ghi_wm2": 675.78,
+                "dni_wm2": 869.69,
+                "wind_speed_ms": 5.14,
+                "wind_direction_deg": 172.2
+            },
+            {
+                "cum_dist_km": 125.05,
+                "eta_hours": 3.33,
+                "latitude": -33.16008,
+                "longitude": 18.97777,
+                "ghi_wm2": 731.08,
+                "dni_wm2": 886.59,
+                "wind_speed_ms": 5.37,
+                "wind_direction_deg": 175.35
+            },
+            {
+                "cum_dist_km": 135.06,
+                "eta_hours": 3.6,
+                "latitude": -33.24453,
+                "longitude": 18.99175,
+                "ghi_wm2": 757.73,
+                "dni_wm2": 887.47,
+                "wind_speed_ms": 5.34,
+                "wind_direction_deg": 173.22
+            },
+            {
+                "cum_dist_km": 145.12,
+                "eta_hours": 3.87,
+                "latitude": -33.30216,
+                "longitude": 19.06389,
+                "ghi_wm2": 777.33,
+                "dni_wm2": 870.81,
+                "wind_speed_ms": 5.03,
+                "wind_direction_deg": 184.94
+            },
+            {
+                "cum_dist_km": 155.2,
+                "eta_hours": 4.13,
+                "latitude": -33.32629,
+                "longitude": 19.15166,
+                "ghi_wm2": 807.48,
+                "dni_wm2": 897.97,
+                "wind_speed_ms": 5.03,
+                "wind_direction_deg": 228.6
+            },
+            {
+                "cum_dist_km": 165.29,
+                "eta_hours": 4.4,
+                "latitude": -33.40105,
+                "longitude": 19.20709,
+                "ghi_wm2": 829.71,
+                "dni_wm2": 926.41,
+                "wind_speed_ms": 5.78,
+                "wind_direction_deg": 260.81
+            },
+            {
+                "cum_dist_km": 175.34,
+                "eta_hours": 4.67,
+                "latitude": -33.40394,
+                "longitude": 19.28613,
+                "ghi_wm2": 844.14,
+                "dni_wm2": 934.87,
+                "wind_speed_ms": 6.24,
+                "wind_direction_deg": 252.68
+            },
+            {
+                "cum_dist_km": 185.53,
+                "eta_hours": 4.94,
+                "latitude": -33.35158,
+                "longitude": 19.34933,
+                "ghi_wm2": 855.54,
+                "dni_wm2": 937.53,
+                "wind_speed_ms": 6.37,
+                "wind_direction_deg": 253.77
+            },
+            {
+                "cum_dist_km": 196.1,
+                "eta_hours": 5.22,
+                "latitude": -33.34996,
+                "longitude": 19.35656,
+                "ghi_wm2": 853.98,
+                "dni_wm2": 940.89,
+                "wind_speed_ms": 6.56,
+                "wind_direction_deg": 254.0
+            },
+            {
+                "cum_dist_km": 206.12,
+                "eta_hours": 5.49,
+                "latitude": -33.38974,
+                "longitude": 19.2872,
+                "ghi_wm2": 849.18,
+                "dni_wm2": 944.22,
+                "wind_speed_ms": 6.74,
+                "wind_direction_deg": 254.0
+            },
+            {
+                "cum_dist_km": 216.17,
+                "eta_hours": 5.76,
+                "latitude": -33.40955,
+                "longitude": 19.2215,
+                "ghi_wm2": 842.36,
+                "dni_wm2": 944.38,
+                "wind_speed_ms": 7.11,
+                "wind_direction_deg": 261.24
+            },
+            {
+                "cum_dist_km": 226.18,
+                "eta_hours": 6.02,
+                "latitude": -33.33927,
+                "longitude": 19.16037,
+                "ghi_wm2": 830.6,
+                "dni_wm2": 931.55,
+                "wind_speed_ms": 6.36,
+                "wind_direction_deg": 232.41
+            },
+            {
+                "cum_dist_km": 236.26,
+                "eta_hours": 6.29,
+                "latitude": -33.31328,
+                "longitude": 19.07458,
+                "ghi_wm2": 793.82,
+                "dni_wm2": 899.74,
+                "wind_speed_ms": 5.2,
+                "wind_direction_deg": 195.88
+            },
+            {
+                "cum_dist_km": 246.35,
+                "eta_hours": 6.56,
+                "latitude": -33.3609,
+                "longitude": 19.0186,
+                "ghi_wm2": 770.72,
+                "dni_wm2": 897.94,
+                "wind_speed_ms": 5.01,
+                "wind_direction_deg": 196.68
+            },
+            {
+                "cum_dist_km": 256.6,
+                "eta_hours": 6.83,
+                "latitude": -33.44345,
+                "longitude": 18.97062,
+                "ghi_wm2": 717.43,
+                "dni_wm2": 787.4,
+                "wind_speed_ms": 9.28,
+                "wind_direction_deg": 207.83
+            },
+            {
+                "cum_dist_km": 267.19,
+                "eta_hours": 7.12,
+                "latitude": -33.53685,
+                "longitude": 18.96595,
+                "ghi_wm2": 690.73,
+                "dni_wm2": 791.19,
+                "wind_speed_ms": 9.47,
+                "wind_direction_deg": 206.53
+            },
+            {
+                "cum_dist_km": 277.2,
+                "eta_hours": 7.38,
+                "latitude": -33.62405,
+                "longitude": 18.988,
+                "ghi_wm2": 557.81,
+                "dni_wm2": 564.32,
+                "wind_speed_ms": 7.94,
+                "wind_direction_deg": 206.53
+            },
+            {
+                "cum_dist_km": 287.4,
+                "eta_hours": 7.65,
+                "latitude": -33.67064,
+                "longitude": 18.91265,
+                "ghi_wm2": 551.28,
+                "dni_wm2": 624.7,
+                "wind_speed_ms": 8.19,
+                "wind_direction_deg": 207.62
+            },
+            {
+                "cum_dist_km": 297.49,
+                "eta_hours": 7.92,
+                "latitude": -33.75296,
+                "longitude": 18.8972,
+                "ghi_wm2": 535.16,
+                "dni_wm2": 661.4,
+                "wind_speed_ms": 8.45,
+                "wind_direction_deg": 222.46
             }
         ]
     }
