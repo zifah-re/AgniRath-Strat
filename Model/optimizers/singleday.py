@@ -42,6 +42,7 @@ from configs import race_config
 from core import physics
 from core.battery import Battery
 from core.route import Route
+import random
 
 # from simulator import forward_sim  # TODO: see module docstring (iii) —
 # _simulate below is a real, working integrator, not a stub, but it duplicates
@@ -124,6 +125,16 @@ def _is_mandatory_stop_zone(route: Route, x_m: float) -> bool:
     row = route.df.iloc[idx]
     return bool(row["control_stop"]) or str(row["seg_type"]).startswith("loop_")
 
+def simulate_breakdown(p_net):
+    inputs={"p_net":p_net}
+    scenarios=[{"name":"Battery Failure","type":"Electrical","input":"p_net","duration":10*60,"prob": lambda s: 0 if s <= 2000 else (1.0 if s >= 4100 else 0.05 + 0.95 * ((s - 2000) / 2100) ** 3)}]
+    seed=random.random()
+    stop_time=0
+    for scenario in scenarios:
+        if seed < scenario["prob"](inputs[scenario["input"]]):
+            stop_time+=scenario["duration"]
+            break
+    return stop_time
 
 # ===========================================================================
 # 2. Sharp-turn speed caps (iv)
@@ -246,8 +257,10 @@ class DayEvaluator:
                 x_m += substep_len_km * 1000.0
 
                 stop_here = _is_mandatory_stop_zone(self.route, x_m)
+                breakdown_time=simulate_breakdown(p_net)
                 t_s += swap_scheduler.advance(
                     float(dt_s), t_s, x_m, coincides_with_stop=stop_here)
+                t_s+=breakdown_time
 
         return DayEvalResult(
             final_soc_pct=battery.soc_pct,
@@ -492,7 +505,6 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         (race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index))
         - race_config.CONTROL_STOP_DURATION_S
         - n_loops * race_config.LOOP_STOP_DURATION_S
-        - race_config.UNPLANNED_STOP_BUDGET_S
     )  # approximation — driver-swap time isn't subtracted here since it's
        # already inside evaluator(...).total_time_s dynamically; not double-counted
 
