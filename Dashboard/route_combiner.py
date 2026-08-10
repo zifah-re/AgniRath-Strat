@@ -62,7 +62,7 @@ def main(kml_bytes):
         print(f"{x+1}. {i["name"]}")
     ch1=input("Enter order of combination (eg. 1,3,2,4): ").strip().split(',')
     order=[(int(i)-1,1) if '*' not in i else (int(i.strip("*"))-1,-1) for i in ch1]
-    coords=" ".join([" ".join(structural_opts[ch-1]["placemarks"][i]["coords"].strip().split()[:-1][::j] if i!=order[-1][0] else structural_opts[ch-1]["placemarks"][i]["coords"].strip().split()[::j]) for i,j in order])
+    coords=" ".join([" ".join(structural_opts[ch-1]["placemarks"][i]["coords"].strip().split()[:-1][::j] if x!=len(order)-1 else structural_opts[ch-1]["placemarks"][i]["coords"].strip().split()[::j]) for x,(i,j) in enumerate(order)])
     return coords
 
 if __name__ == "__main__":
