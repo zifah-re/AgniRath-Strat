@@ -1,24 +1,5 @@
 """
-optimizers/singleday.py — L2 single-day velocity optimizer — REVIEW DRAFT v2
-(block 5, owner: TBD). Mirrors the frozen `solve()` signature from the
-existing stub.
-
-Changes from v1 per Hafiz's review:
-  i)   global search is swappable between differential_evolution and a
-       custom GA (strategy pattern, GLOBAL_SEARCH_REGISTRY) instead of a
-       hardcoded DE-only pipeline.
-  ii)  control-segment resolution is 500 m (CONTROL_SEGMENT_M below),
-       overriding solver_config.CONTROL_SEGMENT_M (5_000) — propose
-       updating that shared constant in the merge PR instead of overriding
-       it locally long-term.
-  iii) mandatory driver/passenger swaps (SR 2.24.4, every 2 h) are modeled
-       during integration: piggyback on a CS/loop stop when one coincides,
-       otherwise cost a standalone stop.
-  iv)  segments containing a rapid route-bearing change get an artificial
-       20 km/h speed cap (sharp-turn realism) applied to their v_max before
-       the solve, not learned by the optimizer.
-  v)   final output is projected to integer km/h (cruise-control targets),
-       with a light local search to recover SOC lost to rounding.
+optimizers/singleday.py — L2 single-day velocity optimizer
 
 Mode-specific loss functions (charging/cruising/traffic) are intentionally
 NOT included in this pass, per instruction — objective is plain end-of-day
@@ -30,95 +11,44 @@ objects to work directly with method="SLSQP" in `minimize`.
 
 from __future__ import annotations
 
-import dataclasses
 import typing as _t
-
 import numpy as np
 from scipy.optimize import Bounds, NonlinearConstraint, differential_evolution, minimize
 
 from configs.car_config import CarState
 from configs import solver_config as SCFG
 from configs import race_config
-from core import physics
-from core.battery import Battery
 from core.route import Route
-import random
 
-# ===========================================================================
-# 0. Local config overrides — candidates for solver_config.py promotion
-# ===========================================================================
-
-CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M //5                #Uses a kilometer resolution
-
-SHARP_TURN_HEADING_DELTA_DEG = 30.0      # (iv) placeholder threshold, TODO-VERIFY
-                                         # against real KMZ bearing noise/smoothing
-SHARP_TURN_SPEED_LIMIT_KMH = 20.0        # as discussed
-
-DE_POPSIZE = 8                            # (i) kept conservative — see perf note
-DE_MAXITER = 60                           # in chat: DE popsize multiplies by
-                                          # dimensionality, and 500 m resolution
-                                          # means ~600 dims on a long day.
-                                          # TODO-VERIFY / benchmark before race use.
-
-_DRIVER_SWAP_STANDALONE_DURATION_S = race_config.LOOP_STOP_DURATION_S
+# Import the centralized forward integrator
+from simulator import forward_sim
 
 
 # ===========================================================================
-# 1. Driver-swap scheduler (iii)
+# 0. Local config overrides
 # ===========================================================================
 
-class DriverSwapScheduler:
-    """Tracks on-seat elapsed time and decides when SR 2.24.4 swaps land."""
+CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M // 5
 
-    def __init__(self, swap_interval_s: float = race_config.DRIVER_SWAP_INTERVAL_S,
-                 standalone_duration_s: float = _DRIVER_SWAP_STANDALONE_DURATION_S):
-        self.swap_interval_s = swap_interval_s
-        self.standalone_duration_s = standalone_duration_s
-        self._elapsed_since_last_swap_s = 0.0
-        self.swap_log: list[dict] = []
+SHARP_TURN_HEADING_DELTA_DEG = 30.0      
+SHARP_TURN_SPEED_LIMIT_KMH = 20.0        
 
-    def advance(self, dt_s: float, t_now_s: float, x_m: float,
-                coincides_with_stop: bool) -> float:
-        self._elapsed_since_last_swap_s += dt_s
-        if self._elapsed_since_last_swap_s < self.swap_interval_s:
-            return 0.0
-        self._elapsed_since_last_swap_s = 0.0
-        added_s = 0.0 if coincides_with_stop else self.standalone_duration_s
-        self.swap_log.append(dict(t_s=t_now_s, x_m=x_m,
-                                   piggybacked=coincides_with_stop,
-                                   added_s=added_s))
-        return added_s
+DE_POPSIZE = 8                            
+DE_MAXITER = 60                           
 
-
-def _is_mandatory_stop_zone(route: Route, x_m: float) -> bool:
-    if not route: return False
-    x = route.df["distance_m"].to_numpy()
-    idx = min(int(np.searchsorted(x, x_m)), len(route.df) - 1)
-    row = route.df.iloc[idx]
-    return bool(row["control_stop"]) or str(row["seg_type"]).startswith("loop_")
-
-def simulate_breakdown(p_net):
-    inputs={"p_net":p_net}
-    scenarios=[{"name":"Battery Failure","type":"Electrical","input":"p_net","duration":10*60,"prob": lambda s: 0 if s <= 2000 else (1.0 if s >= 4100 else 0.05 + 0.95 * ((s - 2000) / 2100) ** 3)}]
-    seed=random.random()
-    stop_time=0
-    for scenario in scenarios:
-        if seed < scenario["prob"](inputs[scenario["input"]]):
-            stop_time+=scenario["duration"]
-            break
-    return stop_time
 
 # ===========================================================================
-# 2. Sharp-turn speed caps (iv)
+# 1. Sharp-turn speed caps
 # ===========================================================================
 
 def _sharp_turn_mask(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
                       heading_delta_threshold_deg: float) -> np.ndarray:
+    """True for each control segment containing a rapid bearing change."""
     if not route: return np.zeros(len(seg_start_m), dtype=bool)
     x = route.df["distance_m"].to_numpy()
     bearing = route.df["bearing_deg"].to_numpy()
     raw_delta = np.diff(bearing, prepend=bearing[0])
-    wrapped = (raw_delta + 180.0) % 360.0 - 180.0          # signed, [-180, 180]
+    wrapped = (raw_delta + 180.0) % 360.0 - 180.0          
     sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
 
     seg_end_m = seg_start_m + seg_len_m
@@ -135,25 +65,17 @@ def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
                            heading_delta_threshold_deg: float = SHARP_TURN_HEADING_DELTA_DEG,
                            turn_speed_limit_kmh: float = SHARP_TURN_SPEED_LIMIT_KMH,
                            ) -> np.ndarray:
+    """Clamp v_max to turn_speed_limit_kmh wherever the route bearing turns sharply."""
     sharp = _sharp_turn_mask(route, seg_start_m, seg_len_m, heading_delta_threshold_deg)
     return np.where(sharp, np.minimum(v_max_kmh, turn_speed_limit_kmh), v_max_kmh)
 
 
 # ===========================================================================
-# 3. Day-level evaluation
+# 2. Day-level evaluation
 # ===========================================================================
 
-@dataclasses.dataclass
-class DayEvalResult:
-    final_soc_pct: float
-    total_time_s: float
-    driver_swaps: list
-    v_ms: np.ndarray
-    t_s: np.ndarray
-    x_m: np.ndarray
-
-
 class DayEvaluator:
+    """Runs one candidate speed vector through physics + timing via forward_sim."""
     def __init__(self, route: Route, car: CarState, solar_provider,
                  wind_provider, t0_s: float, start_soc_pct: float,
                  seg_start_m: np.ndarray, seg_len_m: float = CONTROL_SEGMENT_M,
@@ -167,9 +89,9 @@ class DayEvaluator:
         self.seg_start_m = seg_start_m
         self.seg_len_m = seg_len_m
         self.energy_grid_m = energy_grid_m
-        self._cache: dict[bytes, DayEvalResult] = {}
+        self._cache: dict[bytes, forward_sim.DayEvalResult] = {}
 
-    def __call__(self, v_kmh: np.ndarray) -> DayEvalResult:
+    def __call__(self, v_kmh: np.ndarray) -> forward_sim.DayEvalResult:
         key = np.asarray(v_kmh, dtype=float).round(6).tobytes()
         cached = self._cache.get(key)
         if cached is not None:
@@ -178,59 +100,24 @@ class DayEvaluator:
         self._cache[key] = result
         return result
 
-    def _simulate(self, v_kmh: np.ndarray) -> DayEvalResult:
-        battery = Battery(self.car, self.start_soc_pct)
-        swap_scheduler = DriverSwapScheduler()
-        t_s = float(self.t0_s)
-        x_m = float(self.seg_start_m[0]) if len(self.seg_start_m) > 0 else 0.0
-
-        n_substeps = max(1, round(self.seg_len_m / self.energy_grid_m))
-        substep_len_km = (self.seg_len_m / n_substeps) / 1000.0
-
-        t_array = []
-        x_array = []
-
-        for v in v_kmh:
-            v_ms = float(v) / 3.6
-            for _ in range(n_substeps):
-                slope = self.route.slope_pct_at(x_m) if self.route else 0.0
-                ghi = self.solar_provider.ghi_wm2(t_s, x_m)
-                p_net, dt_s = physics.net_power(
-                    self.car, v_ms, v_ms, slope, ghi, substep_len_km)
-                battery.apply_energy_wh(float(p_net) * float(dt_s) / 3600.0)
-                
-                t_array.append(t_s)
-                x_array.append(x_m)
-                
-                t_s += float(dt_s)
-                x_m += substep_len_km * 1000.0
-
-                stop_here = _is_mandatory_stop_zone(self.route, x_m)
-                breakdown_time=simulate_breakdown(p_net)
-                t_s += swap_scheduler.advance(
-                    float(dt_s), t_s, x_m, coincides_with_stop=stop_here)
-                t_s+=breakdown_time
-
-        return DayEvalResult(
-            final_soc_pct=battery.soc_pct,
-            total_time_s=t_s - self.t0_s,
-            driver_swaps=swap_scheduler.swap_log,
-            v_ms=v_kmh / 3.6,
-            t_s=np.array(t_array),
-            x_m=np.array(x_array)
+    def _simulate(self, v_kmh: np.ndarray) -> forward_sim.DayEvalResult:
+        return forward_sim.simulate_variable_speed(
+            v_kmh=v_kmh, route=self.route, car=self.car,
+            solar_provider=self.solar_provider, wind_provider=self.wind_provider,
+            t0_s=self.t0_s, start_soc_pct=self.start_soc_pct,
+            seg_start_m=self.seg_start_m, seg_len_m=self.seg_len_m,
+            energy_grid_m=self.energy_grid_m
         )
 
 
 # ===========================================================================
-# 4. Objective / constraints
+# 3. Objective / constraints
 # ===========================================================================
 
 def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
-    """Maximise end-of-day SOC == minimise -SOC (Plan v3 §8 L2 objective)."""
     def _objective(v_kmh: np.ndarray) -> float:
         return -evaluator(v_kmh).final_soc_pct
     return _objective
-
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
                               alpha_next_day_pct: float) -> NonlinearConstraint:
@@ -238,7 +125,6 @@ def _terminal_soc_constraint(evaluator: DayEvaluator,
         lambda v: evaluator(v).final_soc_pct - alpha_next_day_pct,
         lb=0.0, ub=np.inf,
     )
-
 
 def _time_cutoff_constraint(evaluator: DayEvaluator,
                              allowed_time_s: float) -> NonlinearConstraint:
@@ -249,7 +135,7 @@ def _time_cutoff_constraint(evaluator: DayEvaluator,
 
 
 # ===========================================================================
-# 5. Swappable global search (i) — strategy pattern
+# 4. Swappable global search
 # ===========================================================================
 
 class GlobalSearchResult(_t.NamedTuple):
@@ -257,12 +143,10 @@ class GlobalSearchResult(_t.NamedTuple):
     fun: float
     method: str
 
-
 class GlobalSearchStrategy(_t.Protocol):
     def search(self, objective: _t.Callable[[np.ndarray], float], bounds: Bounds,
                constraints: list[NonlinearConstraint],
                seed: int | None = None) -> GlobalSearchResult: ...
-
 
 class DifferentialEvolutionSearch:
     def __init__(self, popsize: int = DE_POPSIZE, maxiter: int = DE_MAXITER,
@@ -282,7 +166,6 @@ class DifferentialEvolutionSearch:
             constraints=tuple(constraints), polish=False, seed=seed, tol=1e-6,
         )
         return GlobalSearchResult(x=result.x, fun=result.fun, method="de")
-
 
 class GeneticAlgorithmSearch:
     def __init__(self, population: int = SCFG.GA_POPULATION,
@@ -342,26 +225,21 @@ class GeneticAlgorithmSearch:
         best_x = pop[best_i]
         return GlobalSearchResult(x=best_x, fun=objective(best_x), method="ga")
 
-
 GLOBAL_SEARCH_REGISTRY: dict[str, type] = {
     "de": DifferentialEvolutionSearch,
     "ga": GeneticAlgorithmSearch,
 }
 
-
 def get_global_search(method: str, **kwargs) -> GlobalSearchStrategy:
     try:
         cls = GLOBAL_SEARCH_REGISTRY[method]
     except KeyError:
-        raise KeyError(
-            f"Unknown global_method={method!r}; choose from "
-            f"{sorted(GLOBAL_SEARCH_REGISTRY)}."
-        )
+        raise KeyError(f"Unknown global_method={method!r}")
     return cls(**kwargs)
 
 
 # ===========================================================================
-# 6. Integer km/h projection (v)
+# 5. Integer km/h projection
 # ===========================================================================
 
 def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
@@ -388,7 +266,7 @@ def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
 
 
 # ===========================================================================
-# 7. solve() — frozen API
+# 6. solve() — frozen API
 # ===========================================================================
 
 def solve(route: Route, car: CarState, solar_provider, wind_provider,
@@ -397,11 +275,9 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
           dist_done_km: float = 0.0, elapsed_s: float = 0.0, cs_taken: bool = False,
           **kwargs):
     
-    # 1. Truncate array length to only the remaining distance
     rem_m = (route.total_m - dist_done_km * 1000.0) if route else 0.0
     n_segments = max(1, int(np.ceil(rem_m / CONTROL_SEGMENT_M)))
     
-    # Offset the start by distance already driven
     seg_start_m = (dist_done_km * 1000.0) + np.arange(n_segments) * CONTROL_SEGMENT_M
 
     v_max_kmh = route.v_max_ms_at(seg_start_m) * 3.6 if route else np.full(n_segments, car.v_max_ms * 3.6)
@@ -410,7 +286,6 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         
     bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh) 
 
-    # Shift clock to reflect time already spent
     t0_s = race_config.day_start_time_s(day_index) + elapsed_s
     
     evaluator = DayEvaluator(route, car, solar_provider, wind_provider,
@@ -421,7 +296,6 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     objective = _build_objective(evaluator)
 
     n_loops = len(loops_committed) if loops_committed else 0
-    # Remove time already spent, and refund control stop if taken
     allowed_time_s = (
         (race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index))
         - elapsed_s
@@ -434,11 +308,9 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         _time_cutoff_constraint(evaluator, allowed_time_s),
     ]
 
-    # --- stage 1: swappable global search (i) -------------------------------
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
         warm_x = np.asarray(kwargs["warm_start_kmh"])
         if len(warm_x) == n_segments:
-            # Bypass global search if warm start provided
             global_result = GlobalSearchResult(x=warm_x, fun=objective(warm_x), method="warm")
         else:
             global_search = get_global_search(global_method)
@@ -447,14 +319,12 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         global_search = get_global_search(global_method)
         global_result = global_search.search(objective, bounds, constraints, seed=seed)
 
-    # --- stage 2: SLSQP polish ------------------------------------------------
     slsqp_result = minimize(
         objective, x0=global_result.x, method="SLSQP",
         bounds=bounds, constraints=constraints,
         options=dict(maxiter=SCFG.SLSQP_MAX_ITER, ftol=SCFG.SLSQP_FTOL),
     )
 
-    # --- stage 3: integer km/h projection (v) ----------------------------------
     v_final_kmh = project_to_integer_kmh(
         evaluator, slsqp_result.x, v_max_kmh, constraints=constraints)
     final_eval = evaluator(v_final_kmh)
