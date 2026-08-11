@@ -919,10 +919,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 KML_FILENAME_HINT = "2026 Sasol Solar Challenge Route (Publish).kml"
 
-RACE_START_DATE = date(2025, 9, 10)
-# NOTE: the KML hint above says "2026 ... Route" but this date is 2025-09-10.
-# Flagging rather than silently changing it - confirm which is right before
-# this goes near real stage dates; if it's a typo it should be 2026-09-10.
+RACE_START_DATE = date(2026, 9, 10)
 
 STAGE_START_TIME_DAY1 = time(9, 0, 0)    # Day 1 start, SAST
 STAGE_START_TIME_OTHER = time(8, 0, 0)   # Days 2+ start, SAST
