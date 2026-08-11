@@ -18,6 +18,7 @@ from configs.car_config import CarState
 from core import physics
 from core.battery import Battery
 from core.route import Route
+from core import wind as wind_core
 
 _DRIVER_SWAP_STANDALONE_DURATION_S = race_config.LOOP_STOP_DURATION_S
 
@@ -107,8 +108,17 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             slope = route.slope_pct_at(x_m) if route else 0.0
             ghi = solar_provider.ghi_wm2(t_s, x_m)
             
+            # --- PATCH: Check if this 10m grid point is on a trailered segment ---
+            is_trailered = route.red_flag_at(x_m) if route else False
+            
             p_net, dt_s = physics.net_power(
                 car, v_ms, v_ms, slope, ghi, substep_len_km)
+                
+            # --- PATCH: If trailered, zero out motor drain but keep solar charging! ---
+            if is_trailered:
+                solar_only = (car.array_area_m2 * car.array_efficiency * ghi) - car.p_idle_w
+                p_net = solar_only
+
             battery.apply_energy_wh(float(p_net) * float(dt_s) / 3600.0)
             
             t_array.append(t_s)
