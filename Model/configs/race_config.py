@@ -114,6 +114,7 @@ CONTROL_STOP_UNTOUCHABLE_S = 25 * 60     # SR 2.28.14: no team member may touch
 # ---------------------------------------------------------------------------
 LOOP_STOP_DURATION_S = 5 * 60            # SR 2.29.5: mandatory 5-min loop stop
                                          #   BEFORE EVERY loop attempt
+LOOP_CRUISE_SPEED_MS = 55 / 3.6
 # SR 2.29.6: loops optional; teams must declare intent to Loop Stop Manager
 # each time (maps 1:1 to MPC commit/abort decision point, Plan v3 §2.2).
 # SR 2.29.2: loop-km determine "most km clocked" -> 2026 Champions.
