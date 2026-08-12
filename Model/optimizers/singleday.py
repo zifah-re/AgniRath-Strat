@@ -11,8 +11,10 @@ objects to work directly with method="SLSQP" in `minimize`.
 
 from __future__ import annotations
 
+from tqdm import tqdm
 import typing as _t
 import numpy as np
+import logging
 from scipy.optimize import Bounds, NonlinearConstraint, differential_evolution, minimize
 
 from configs.car_config import CarState
@@ -23,12 +25,13 @@ from core.route import Route
 # Import the centralized forward integrator
 from simulator import forward_sim
 
+logger = logging.getLogger(__name__)
 
 # ===========================================================================
 # 0. Local config overrides
 # ===========================================================================
 
-CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M // 5
+CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M
 
 SHARP_TURN_HEADING_DELTA_DEG = 30.0      
 SHARP_TURN_SPEED_LIMIT_KMH = 20.0        
@@ -205,7 +208,8 @@ class GeneticAlgorithmSearch:
                              for ind in pop])
         n_elite = max(1, int(self.elite_frac * self.population))
 
-        for _ in range(self.generations):
+        for gen in tqdm(range(self.generations), desc="GA gens", leave=False):
+
             order = np.argsort(fitness)
             pop, fitness = pop[order], fitness[order]
             new_pop = [pop[i].copy() for i in range(n_elite)]
@@ -318,6 +322,12 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     else:
         global_search = get_global_search(global_method)
         global_result = global_search.search(objective, bounds, constraints, seed=seed)
+
+    _iter_count = [0]
+    def _cb(xk):
+        _iter_count[0] += 1
+        logger.info(f"SLSQP iter {_iter_count[0]}/{SCFG.SLSQP_MAX_ITER}")
+
 
     slsqp_result = minimize(
         objective, x0=global_result.x, method="SLSQP",

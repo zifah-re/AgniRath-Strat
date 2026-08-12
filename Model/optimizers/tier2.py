@@ -3,6 +3,7 @@ optimizers/hierarchical/tier2.py — Tier 2 high-fidelity local sampler.
 """
 
 from __future__ import annotations
+from tqdm import tqdm
 
 import inspect
 import logging
@@ -12,12 +13,12 @@ import numpy as np
 from configs import race_config as rc
 from configs.car_config import CarState
 from optimizers import singleday
-from optimizers.multiday_dp import _DayPlan
-from .tier1 import relaxed_loop_combos
+from .tier1 import _DayPlan
+from .tier1 import relaxed_loop_combos 
 
 logger = logging.getLogger(__name__)
 
-SOC_OFFSETS_PCT = (-4.0, -2.0, 0.0, 2.0, 4.0)
+SOC_OFFSETS_PCT = (-4.0,-2.0,0.0,2.0,4.0) 
 SAMPLE_WINDOW_PCT = max(abs(o) for o in SOC_OFFSETS_PCT)
 
 _L2_WARMSTART_KW = "warm_start_kmh"
@@ -70,7 +71,7 @@ def _sweep_one_offset(task: dict) -> dict:
 
     out: dict[tuple, tuple] = {}
     warm = None  
-    for reps, _loop_km in ordered:
+    for reps, _loop_km in tqdm(ordered, desc=f"day {day_index} combos", leave=False):
         loops_committed = _reps_to_committed(plan, reps)
 
         kwargs = dict(global_method=global_method, seed=seed)
@@ -147,6 +148,8 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
                   dist_done_km=dist_done_km, elapsed_s=elapsed_s, cs_taken=cs_taken)
              for s in start_socs]
 
+    parallel = False   #Set this to TRUE if possible to use parallel processing
+
     if parallel and len(tasks) > 1:
         with mp.Pool(processes=n_workers or min(len(tasks), mp.cpu_count())) as pool:
             sweeps = pool.map(_sweep_one_offset, tasks)
@@ -173,7 +176,7 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
                     cs_taken: bool = False, loops_done: dict | None = None,
                     **kwargs) -> dict:
     per_day = {}
-    for d in range(start_day, len(plans)):
+    for d in tqdm(range(start_day, len(plans)), desc="Tier2 days"):
         route = routes[d] if routes and d < len(routes) else None
         alpha = alpha_next_pct.get(d, car.soc_min_pct)
 

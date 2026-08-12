@@ -37,9 +37,9 @@ class HourlyJSONWindProvider(WindProvider):
     Consumes a point-by-point JSON containing hourly weather arrays.
     Maps x_m to the nearest spatial node and converts wind speed to m/s.
     """
-    def __init__(self, json_path: str, route):
-        with open(json_path, 'r', encoding="utf-8") as f:
-            data = json.load(f)
+    def __init__(self, json_paths: list[str] | str, route):
+        if isinstance(json_paths, str):
+            json_paths = [json_paths]
             
         self.route = route
         self.t_s_array = np.arange(24) * 3600.0
@@ -48,11 +48,16 @@ class HourlyJSONWindProvider(WindProvider):
         self.speed_matrix = []
         self.dir_matrix = []
         
-        for node in data:
-            coords.append([node["latitude"], node["longitude"]])
-            speed_kmh = np.array(node["historical_weather"]["hourly"]["wind_speed_10m"], dtype=float)
-            self.speed_matrix.append(speed_kmh / 3.6)
-            self.dir_matrix.append(node["historical_weather"]["hourly"]["wind_direction_10m"])
+        # Loop through EVERY file for this day and extract the nodes
+        for jp in json_paths:
+            with open(jp, 'r', encoding="utf-8") as f:
+                data = json.load(f)
+                
+            for node in data:
+                coords.append([node["latitude"], node["longitude"]])
+                speed_kmh = np.array(node["historical_weather"]["hourly"]["wind_speed_10m"], dtype=float)
+                self.speed_matrix.append(speed_kmh / 3.6)
+                self.dir_matrix.append(node["historical_weather"]["hourly"]["wind_direction_10m"])
             
         self.tree = cKDTree(np.array(coords))
         self.speed_matrix = np.array(self.speed_matrix, dtype=float)

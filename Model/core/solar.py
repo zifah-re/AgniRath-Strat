@@ -86,9 +86,10 @@ class HourlyJSONSolarProvider(SolarProvider):
     Maps the solver's x_m distance request to a lat/lon coordinate, then 
     uses a KDTree to find the nearest weather node.
     """
-    def __init__(self, json_path: str, route):
-        with open(json_path, 'r', encoding="utf-8") as f:
-            data = json.load(f)
+    def __init__(self, json_paths: list[str] | str, route):
+        # Convert to list if a single string is passed
+        if isinstance(json_paths, str):
+            json_paths = [json_paths]
             
         self.route = route
         self.t_s_array = np.arange(24) * 3600.0  
@@ -96,11 +97,16 @@ class HourlyJSONSolarProvider(SolarProvider):
         coords = []
         self.spline_models = []
         
-        for node in data:
-            coords.append([node["latitude"], node["longitude"]])
-            ghi_array = np.array(node["historical_weather"]["hourly"]["shortwave_radiation"], dtype=float)
-            spline_fit = CubicSpline(self.t_s_array, ghi_array, bc_type='natural')
-            self.spline_models.append(spline_fit)
+        # Loop through EVERY file for this day and extract the nodes
+        for jp in json_paths:
+            with open(jp, 'r', encoding="utf-8") as f:
+                data = json.load(f)
+                
+            for node in data:
+                coords.append([node["latitude"], node["longitude"]])
+                ghi_array = np.array(node["historical_weather"]["hourly"]["shortwave_radiation"], dtype=float)
+                spline_fit = CubicSpline(self.t_s_array, ghi_array, bc_type='natural')
+                self.spline_models.append(spline_fit)
             
         self.tree = cKDTree(np.array(coords))
 

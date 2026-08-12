@@ -4,6 +4,7 @@ optimizers/hierarchical/tier1.py — Tier 1 coarse baseline guesser.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -16,12 +17,31 @@ from core import physics
 from core import solar as solar_core
 from core import wind as wind_core
 from core.battery import Battery
-from optimizers.multiday_dp import _DayPlan, _get_day_plan
 
 logger = logging.getLogger(__name__)
 
 TIER1_SAMPLE_M = 500.0
 _DEFAULT_REGEN_CAP_W = None     
+
+@dataclasses.dataclass(frozen=True)
+class _DayPlan:
+    """A day's route in driving order: Stage 1 -> named loop zone(s) -> Stage 2."""
+    stage1_km: float
+    stage2_km: float
+    loops: tuple[tuple[str, float], ...]
+
+def _get_day_plan(day_index: int) -> _DayPlan:
+    """Nominal (not-yet-driven) route plan for a day, from route notes."""
+    note = rc.DAY_ROUTE_NOTES[day_index]
+    if note["stage1_km"] is None:
+        stage1_km, stage2_km = 230.0, 0.0  # Fallback for full-blind days
+    else:
+        stage1_km, stage2_km = note["stage1_km"], note["stage2_km"]
+        
+    loops = tuple(note["loops"]) if note["loops"] else (
+        ("blind_loop_placeholder", rc.BLIND_LOOP_PLACEHOLDER_KM),
+    )
+    return _DayPlan(stage1_km, stage2_km, loops)
 
 def _regen_cap_w(car: CarState) -> float:
     explicit = getattr(car, "p_regen_max_w", None)
@@ -322,7 +342,11 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 end_soc = evaluate_day(
                     car, route, plan, reps, offset_km, v_base_ms, loop_speed_ms,
                     pre_attempt_stop_s, solar_provider, wind_provider, t0_s, s0, 
-                    is_today, cs_taken, kml_paths, d)
+                    day_index=d,
+                    is_today=is_today,
+                    cs_taken=cs_taken,
+                    kml_paths=kml_paths
+                )
 
                 floor = car.soc_min_pct + (_completion_margin() if completion else 0.0)
                 if end_soc < floor:

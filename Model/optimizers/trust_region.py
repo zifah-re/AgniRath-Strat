@@ -7,11 +7,13 @@ from __future__ import annotations
 import logging
 import numpy as np
 import dataclasses
+import glob
+import pandas as pd
 
 from configs import race_config as rc
 from configs.car_config import CarState
 from optimizers import singleday
-from optimizers.multiday_dp import _get_day_plan
+from .tier1 import _get_day_plan
 from . import tier1, tier2, tier3
 from .tier1 import _adjust_plan_for_today
 
@@ -225,50 +227,141 @@ def fast_replan_today(route, base_car: CarState, solar_providers: dict, wind_pro
 
 if __name__ == "__main__":
     import os
+    import glob
     import logging
+    import json
     from configs.car_config import CarState
     from core.solar import HourlyJSONSolarProvider, GaussianProvider
     from core.wind import HourlyJSONWindProvider, ConstantWindProvider
+    from core.route import Route  # <-- Ensure this is imported!
 
     logging.basicConfig(level=logging.INFO)
 
-    # 1. Initialize Car (uses defaults from your configs)
+    # 1. Initialize Car
     car = CarState() 
 
-    # 2. Load Routes 
-    # Placeholder: Replace with your actual route loader. 
-    # Using None defaults to the "Blind Day" fallback logic.
-    routes = {d: None for d in range(8)} 
+    # 2. Setup Directories
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    json_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "solar"))
+    kml_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "shaded"))
+    save_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "processed"))
 
-    # 3. Load Weather Providers
+    # 3. Load Routes, Weather, and KMLs
+    routes = {}
     solar_providers = {}
     wind_providers = {}
+    kml_paths = {}
     
-    # Ensure this points to the directory where your web scraper saved the JSONs
-    json_dir = r"data/processed/solar" 
-
     for d in range(8):
-        json_path = os.path.join(json_dir, f"Day {d+1}_historical_solar.json")
-        current_route = routes.get(d)
+# --- ROUTE LOADING ---
+        route_search = os.path.join(save_dir, f"*Day {d+1}*.save")
+        day_route_files = glob.glob(route_search)
         
-        if os.path.exists(json_path):
-            solar_providers[d] = HourlyJSONSolarProvider(json_path, current_route)
-            wind_providers[d] = HourlyJSONWindProvider(json_path, current_route)
+        # Specific filter for Day 3 (Index 2)
+        if d == 2:
+            day_route_files = [f for f in day_route_files if "prahlad" in f.lower()]
+            
+        if day_route_files:
+            import pandas as pd
+            
+            # Smart-sort files so the car drives them in the right physical order
+            def route_sort_key(filepath):
+                name = filepath.lower()
+                if "stage 1" in name: return 1
+                if "loop" in name: return 2
+                if "stage 2" in name: return 3
+                return 4
+            
+            day_route_files = sorted(day_route_files, key=route_sort_key)
+            
+            day_dfs = []
+            current_dist_offset = 0.0
+            
+            for filepath in day_route_files:
+                logger.info(f"Day {d+1}: Loading part -> {os.path.basename(filepath)}")
+                
+                # 1. Open and parse the JSON .save file
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    route_data = json.load(f)
+                
+                # 2. Extract arrays
+                prof = route_data["profile"]
+                dists = [x * 1000.0 for x in prof["Distance"]]
+                slopes = prof["Gradient"]
+                bearings = prof.get("Headings", [0.0] * len(dists))
+                alts = prof.get("Altitude", [0.0] * len(dists))       
+                lats = [c[0] for c in prof["Coordinates"]]
+                lons = [c[1] for c in prof["Coordinates"]]
+                v_maxs = [v / 3.6 for v in prof["SpeedLimit"]]
+                
+                # 3. Truncate off-by-one errors
+                min_len = min(len(dists), len(slopes), len(bearings), len(alts), len(lats), len(lons), len(v_maxs))
+                
+                # 4. Build the chunk DataFrame
+                part_df = pd.DataFrame({
+                    "distance_m": dists[:min_len],
+                    "elevation_m": alts[:min_len],          
+                    "slope_pct": slopes[:min_len],
+                    "bearing_deg": bearings[:min_len],
+                    "lat": lats[:min_len],
+                    "lon": lons[:min_len],
+                    "v_max_ms": v_maxs[:min_len],
+                    "curvature_1pm": 0.0,                   
+                    "circle_id": 0,                         
+                    "red_flag_trailer": False,              
+                    "control_stop": False,                  
+                    "day": d + 1,                           
+                    "seg_type": "stage"
+                })
+                
+                # 5. Shift distances so the segments connect seamlessly
+                part_df["distance_m"] += current_dist_offset
+                current_dist_offset = part_df["distance_m"].max()
+                
+                day_dfs.append(part_df)
+            
+            # Combine all chunks into one massive route for the day
+            route_df = pd.concat(day_dfs, ignore_index=True)
+            routes[d] = Route(route_df) 
         else:
-            logger.warning(f"Weather JSON for Day {d+1} not found. Using mathematical fallbacks.")
+            logger.warning(f"Route .save for Day {d+1} not found. Using flat fallback.")
+            routes[d] = None
+
+        # --- WEATHER LOADING ---
+        weather_search = os.path.join(json_dir, f"*Day {d+1}*.json")
+        day_weather_files = glob.glob(weather_search)
+        
+        if day_weather_files:
+            logger.info(f"Day {d+1}: loading weather from {day_weather_files[0]}")
+            solar_providers[d] = HourlyJSONSolarProvider(day_weather_files[0], routes.get(d))
+            wind_providers[d] = HourlyJSONWindProvider(day_weather_files[0], routes.get(d))
+        else:
+            logger.warning(f"Day {d+1}: no weather JSON found, using GaussianProvider/zero-wind fallback")
             solar_providers[d] = GaussianProvider()
             wind_providers[d] = ConstantWindProvider(speed_ms=0.0, dir_deg_from=0.0)
 
+        # --- KML TRAILERING LOADING ---
+        kml_search = os.path.join(kml_dir, f"*Day {d+1}*.kml")
+        day_kml_files = glob.glob(kml_search)
+        
+        if day_kml_files:
+            kml_paths[d] = day_kml_files[0]
+        else:
+            kml_paths[d] = None
+
     # 4. Launch the Multi-Day Optimizer
-    logger.info("Starting Trust-Region Convergence Loop...")
+    logger.info("Starting Trust-Region Convergence Loop (Sequential Mode)...")
     
     result = optimize(
-        routes=routes,
+        routes=routes,           
         car=car,
         solar_providers=solar_providers,
         wind_providers=wind_providers,
+        kml_paths=kml_paths,       
         start_soc_pct=100.0,
-        start_day=0
+        start_day=0,
+        parallel=False,            
+        max_iters=2                
     )
 
     print("\n" + "="*50)
