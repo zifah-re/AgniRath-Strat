@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _base_km(plan) -> float:
     return plan.stage1_km + plan.stage2_km
 
-def allocate(car: CarState, solar_provider, per_day_samples: dict, plans: list,
+def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans: list,
              start_soc_pct: float, start_day: int = 0) -> dict:
     
     n_days = len(plans)
@@ -33,6 +33,7 @@ def allocate(car: CarState, solar_provider, per_day_samples: dict, plans: list,
 
     for d in range(n_days - 1, start_day - 1, -1):
         surro = per_day_samples[d]["surrogates"]
+        solar_provider = solar_providers.get(d)
         gain = overnight_soc_gain(car, solar_provider, d)
         base_km = _base_km(plans[d])
 
@@ -79,6 +80,7 @@ def allocate(car: CarState, solar_provider, per_day_samples: dict, plans: list,
                         if reps and reps[i] > 0}
         total_km += _base_km(plans[d]) + model.loop_km
         end_soc = model.predict(cur)
+        solar_provider = solar_providers.get(d)
         cur = min(end_soc + overnight_soc_gain(car, solar_provider, d), car.soc_max_pct)
 
     return dict(s1_pct=s1, loop_plan=loop_plan, total_distance_km=total_km, feasible=feasible)

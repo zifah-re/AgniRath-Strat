@@ -167,7 +167,7 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
     surrogates = _fit_surrogates(points_by_combo, s0_pct, plan)
     return dict(surrogates=surrogates, s0_pct=s0_pct, n_l2_solves=n_solves)
 
-def sample_all_days(routes: list, car: CarState, solar_provider, wind_provider,
+def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
                     s0_traj: np.ndarray, plans: list, alpha_next_pct: dict,
                     start_day: int = 0, dist_done_km: float = 0.0, elapsed_s: float = 0.0,
                     cs_taken: bool = False, loops_done: dict | None = None,
@@ -176,6 +176,9 @@ def sample_all_days(routes: list, car: CarState, solar_provider, wind_provider,
     for d in range(start_day, len(plans)):
         route = routes[d] if routes and d < len(routes) else None
         alpha = alpha_next_pct.get(d, car.soc_min_pct)
+
+        solar_provider = solar_providers.get(d)
+        wind_provider = wind_providers.get(d)
         
         is_today = (d == start_day)
         d_dist = dist_done_km if is_today else 0.0

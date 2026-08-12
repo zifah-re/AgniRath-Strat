@@ -246,7 +246,7 @@ def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float
         yield reps, sum(n * loops[i][1] for i, n in enumerate(reps))
 
 
-def guess_baseline(routes: list, car: CarState, solar_provider, wind_provider,
+def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
                    start_soc_pct: float, start_day: int = 0, dist_done_km: float = 0.0,
                    elapsed_s: float = 0.0, cs_taken: bool = False, loops_done: dict | None = None,
                    kml_paths: dict | None = None) -> dict:
@@ -270,6 +270,10 @@ def guess_baseline(routes: list, car: CarState, solar_provider, wind_provider,
     for d in range(n_days - 1, start_day - 1, -1):
         is_today = (d == start_day)
         route = routes[d] if routes and d < len(routes) else None
+        
+        # Extract today's weather
+        solar_provider = solar_providers.get(d)
+        wind_provider = wind_providers.get(d)
         
         nom_plan = plans[d]
         if is_today and dist_done_km > 0:
@@ -352,7 +356,7 @@ def guess_baseline(routes: list, car: CarState, solar_provider, wind_provider,
         if not np.isfinite(end):
             feasible = False
             break
-        cur = min(end + overnight_soc_gain(car, solar_provider, d), car.soc_max_pct)
+        cur = min(end + overnight_soc_gain(car, solar_providers.get(d), d), car.soc_max_pct)
 
     return dict(s0_pct=s0_traj, day_plans=plans, feasible=feasible)
 
