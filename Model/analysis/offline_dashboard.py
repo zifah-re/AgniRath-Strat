@@ -588,24 +588,195 @@ def run_dashboard(df: pd.DataFrame | None = None,
     app = create_app(df, car, day_index=day_index, stops=stops)
     app.run(host=host, port=port, debug=debug)
 
-
-# ===========================================================================
-# CLI
-# ===========================================================================
-
+def load_day_dir(day_dir: str | pathlib.Path) -> pd.DataFrame:
+    """Load all per-stage CSVs in a day folder, concatenating them in order.
+ 
+    Files are sorted by the stage ordering convention:
+      stage1_* < loop_* < stage2_*
+    Distance values are re-accumulated so the combined DataFrame is
+    continuous (each stage picks up where the last one ended).
+    """
+    day_dir = pathlib.Path(day_dir)
+    csv_files = sorted(day_dir.glob("*.csv"), key=_stage_sort_key)
+ 
+    if not csv_files:
+        raise FileNotFoundError(f"No CSV files found in {day_dir}")
+ 
+    frames = []
+    dist_offset = 0.0
+ 
+    for csv_path in csv_files:
+        df = pd.read_csv(csv_path).fillna(0)
+        df["CumulativeDistance"] += dist_offset
+        df["_stage_label"] = csv_path.stem   # for transition markers
+        dist_offset = float(df["CumulativeDistance"].iloc[-1])
+        frames.append(df)
+ 
+    combined = pd.concat(frames, ignore_index=True)
+    return combined
+ 
+ 
+def load_tree(tree_dir: str | pathlib.Path) -> dict:
+    """Load an entire variant tree: summary.json + all day CSVs.
+ 
+    Returns {
+        "summary": dict (from summary.json),
+        "days": {1: DataFrame, 2: DataFrame, ...},
+        "variant": str,
+    }
+    """
+    tree_dir = pathlib.Path(tree_dir)
+    summary_path = tree_dir / "summary.json"
+ 
+    summary = {}
+    if summary_path.exists():
+        with open(summary_path, 'r') as f:
+            summary = json.load(f)
+ 
+    days = {}
+    for day_subdir in sorted(tree_dir.glob("day*")):
+        if not day_subdir.is_dir():
+            continue
+        # Extract day number from "day1", "day2", etc.
+        day_num = int(day_subdir.name.replace("day", ""))
+        try:
+            days[day_num] = load_day_dir(day_subdir)
+        except FileNotFoundError:
+            pass
+ 
+    return {
+        "summary": summary,
+        "days": days,
+        "variant": tree_dir.name,
+    }
+ 
+ 
+def _stage_sort_key(path: pathlib.Path) -> int:
+    """Sort CSV files in physical driving order."""
+    name = path.stem.lower()
+    if name.startswith("stage1") or "stage_1" in name:
+        return 1
+    if "loop" in name:
+        return 2
+    if name.startswith("stage2") or "stage_2" in name:
+        return 3
+    return 4
+ 
+ 
+def create_race_app(tree_data: dict, car: CarState) -> "dash.Dash":
+    """Full-race dashboard with per-day tabs + SOC arc overview.
+ 
+    tree_data: output of load_tree()
+    """
+    import dash
+    from dash import dcc, html
+    import plotly.graph_objs as go
+ 
+    summary = tree_data["summary"]
+    days = tree_data["days"]
+    variant = tree_data["variant"]
+ 
+    app = dash.Dash(__name__, external_stylesheets=_EXTERNAL_STYLESHEETS)
+ 
+    # ── SOC trajectory overview ───────────────────────────────────────────
+    soc_traj = summary.get("soc_trajectory_pct", [])
+    day_labels = [f"Day {i + 1}" for i in range(len(soc_traj))]
+ 
+    soc_fig = go.Figure()
+    soc_fig.add_trace(go.Scatter(
+        x=day_labels, y=soc_traj,
+        mode="lines+markers+text",
+        text=[f"{s:.0f}%" for s in soc_traj],
+        textposition="top center",
+        name="Start SOC",
+        line=dict(width=3),
+    ))
+    soc_fig.update_layout(
+        title=f"SOC Trajectory — {variant}",
+        yaxis=dict(title="SOC (%)", range=[0, 105]),
+        xaxis=dict(title="Race Day"),
+    )
+ 
+    # ── Per-day tabs ──────────────────────────────────────────────────────
+    tabs = []
+    for day_num in sorted(days.keys()):
+        df = days[day_num]
+        dist = df["CumulativeDistance"].to_numpy()
+        vel = df["Velocity"].to_numpy()
+        batt = df["Battery"].to_numpy()
+ 
+        tab_content = html.Div([
+            dcc.Graph(figure=dict(
+                data=[go.Scatter(x=dist / 1000, y=vel * 3.6,
+                                 mode="lines", name="Speed (km/h)")],
+                layout=go.Layout(title=f"Day {day_num} Velocity",
+                                  xaxis=dict(title="Distance (km)"),
+                                  yaxis=dict(title="km/h"))
+            )),
+            dcc.Graph(figure=dict(
+                data=[go.Scatter(x=dist / 1000, y=batt,
+                                 mode="lines", name="Battery %")],
+                layout=go.Layout(title=f"Day {day_num} Battery",
+                                  xaxis=dict(title="Distance (km)"),
+                                  yaxis=dict(title="SOC (%)"))
+            )),
+        ])
+ 
+        tabs.append(dcc.Tab(label=f"Day {day_num}", children=tab_content))
+ 
+    # ── Layout ────────────────────────────────────────────────────────────
+    app.layout = html.Div([
+        html.H1(f"Race Overview — {variant}",
+                style={"text-align": "center",
+                       "font-family": '"Roboto Slab", serif'}),
+        _config_panel(car),
+        html.Div([
+            html.H3("Race Summary"),
+            html.P(f"Converged: {summary.get('converged')}"),
+            html.P(f"Total Distance: {summary.get('total_distance_km', 0):.1f} km"),
+            html.P(f"Iterations: {summary.get('iterations')}"),
+        ], style={"text-align": "center", "padding": "20px"}),
+        dcc.Graph(figure=soc_fig,
+                  style={"width": "93%", "margin": "auto"}),
+        dcc.Tabs(tabs),
+    ], style={"background-color": "#ffffff", "padding": "20px"})
+ 
+    return app
+ 
+ 
+# ── Replace _main() with this ────────────────────────────────────────────
+ 
 def _main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__.split("Usage")[0])
-    ap.add_argument("--csv", default="run_dat.csv",
-                    help="run_dat.csv path (default: run_dat.csv)")
-    ap.add_argument("--day", type=int, default=1,
-                    help="1-based race day, for time-window overlays")
+    ap = argparse.ArgumentParser(
+        description="Strategy Dashboard — single stage, full day, or full race")
+    group = ap.add_mutually_exclusive_group(required=True)
+    group.add_argument("--csv", help="Single stage CSV (Kevin-style view)")
+    group.add_argument("--day", help="Day folder with per-stage CSVs")
+    group.add_argument("--tree", help="Variant folder (e.g. data/results/prahlad/)")
+    ap.add_argument("--day-index", type=int, default=1,
+                    help="1-based race day for time-window overlays (--csv mode)")
     ap.add_argument("--port", type=int, default=8050)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--no-debug", action="store_true")
     args = ap.parse_args()
-    run_dashboard(csv_path=args.csv, day_index=args.day - 1,
-                  host=args.host, port=args.port, debug=not args.no_debug)
-
-
-if __name__ == "__main__":  # pragma: no cover
-    _main()
+ 
+    debug = not args.no_debug
+ 
+    if args.csv:
+        # Existing single-file mode
+        run_dashboard(csv_path=args.csv, day_index=args.day_index - 1,
+                      host=args.host, port=args.port, debug=debug)
+ 
+    elif args.day:
+        # Full-day mode: concat per-stage CSVs
+        df = load_day_dir(args.day)
+        run_dashboard(df=df, day_index=args.day_index - 1,
+                      host=args.host, port=args.port, debug=debug)
+ 
+    elif args.tree:
+        # Full-race mode: summary + per-day tabs
+        tree_data = load_tree(args.tree)
+        from configs.car_config import default_car
+        car = default_car()
+        app = create_race_app(tree_data, car)
+        app.run(host=args.host, port=args.port, debug=debug)
