@@ -459,7 +459,7 @@ if __name__ == "__main__":
  
         logger.info(f"Extracting final velocity profiles for '{variant_name}'...")
         solve_outputs = extract_final_profiles(
-            routes=list(routes.values()) if isinstance(routes, dict) else routes,
+            routes=routes,
             base_car=car,
             solar_providers=solar_providers,
             wind_providers=wind_providers,

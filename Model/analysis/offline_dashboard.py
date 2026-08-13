@@ -55,11 +55,13 @@ swapped to call it instead. That swap is the only expected change.
 """
 
 from __future__ import annotations
-
+import dash
+from dash import dcc, html
+import plotly.graph_objs as go
 import argparse
 import pathlib
 import typing as _t
-
+import json
 import numpy as np
 import pandas as pd
 
@@ -668,9 +670,6 @@ def create_race_app(tree_data: dict, car: CarState) -> "dash.Dash":
  
     tree_data: output of load_tree()
     """
-    import dash
-    from dash import dcc, html
-    import plotly.graph_objs as go
  
     summary = tree_data["summary"]
     days = tree_data["days"]
