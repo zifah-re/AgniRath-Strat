@@ -1,9 +1,13 @@
 """
 optimizers/singleday.py — L2 single-day velocity optimizer
 
-Mode-specific loss functions (charging/cruising/traffic) are intentionally
-NOT included in this pass, per instruction — objective is plain end-of-day
-SOC maximisation, matching Plan v3 §8's stated L2 objective.
+Enriched objective (13/08):
+  J = -final_soc_pct
+      + w_solar * solar_underutil_penalty
+      + w_risk  * expected_breakdown_frac
+
+The bare -final_soc_pct from Plan v3 §8 is recovered by setting
+w_solar=0 and w_risk=0 in core.options.SolverWeights.
 
 Requires scipy>=1.14 (pinned in Model/requirements.txt) for NonlinearConstraint
 objects to work directly with method="SLSQP" in `minimize`.
@@ -21,6 +25,7 @@ from configs.car_config import CarState
 from configs import solver_config as SCFG
 from configs import race_config
 from core.route import Route
+from core.options import WEIGHTS as _W
 
 # Import the centralized forward integrator
 from simulator import forward_sim
@@ -33,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M
 
-SHARP_TURN_HEADING_DELTA_DEG = 30.0      
-SHARP_TURN_SPEED_LIMIT_KMH = 20.0        
+SHARP_TURN_HEADING_DELTA_DEG = 30.0
+SHARP_TURN_SPEED_LIMIT_KMH = 20.0
 
-DE_POPSIZE = 8                            
-DE_MAXITER = 60                           
+DE_POPSIZE = 8
+DE_MAXITER = 60
 
 
 # ===========================================================================
@@ -51,7 +56,7 @@ def _sharp_turn_mask(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
     x = route.df["distance_m"].to_numpy()
     bearing = route.df["bearing_deg"].to_numpy()
     raw_delta = np.diff(bearing, prepend=bearing[0])
-    wrapped = (raw_delta + 180.0) % 360.0 - 180.0          
+    wrapped = (raw_delta + 180.0) % 360.0 - 180.0
     sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
 
     seg_end_m = seg_start_m + seg_len_m
@@ -86,7 +91,7 @@ class DayEvaluator:
         self.route = route
         self.car = car
         self.solar_provider = solar_provider
-        self.wind_provider = wind_provider 
+        self.wind_provider = wind_provider
         self.t0_s = t0_s
         self.start_soc_pct = start_soc_pct
         self.seg_start_m = seg_start_m
@@ -117,9 +122,35 @@ class DayEvaluator:
 # 3. Objective / constraints
 # ===========================================================================
 
-def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
+def _build_objective(evaluator: DayEvaluator,
+                     day_window_s: float) -> _t.Callable[[np.ndarray], float]:
+    """Enriched cost function (options.py decision #6).
+
+    J = -final_soc_pct
+        + w_solar * (solar_underutil_j / normalizer)
+        + w_risk  * (breakdown_s / day_window_s)
+
+    With w_solar=0, w_risk=0 this reduces to bare -final_soc_pct.
+    """
     def _objective(v_kmh: np.ndarray) -> float:
-        return -evaluator(v_kmh).final_soc_pct
+        res = evaluator(v_kmh)
+
+        # Base term: maximize end-of-day SOC
+        obj = -res.final_soc_pct
+
+        # Solar underutilization penalty (normalized by day's solar budget)
+        if _W.w_solar > 0.0 and day_window_s > 0:
+            car = evaluator.car
+            # Rough normalizer: peak solar power * day window
+            peak_solar_w = car.array_area_m2 * car.array_efficiency * 1000.0  # ~1000 W/m2 peak
+            normalizer = max(peak_solar_w * day_window_s, 1.0)
+            obj += _W.w_solar * (res.solar_underutil_j / normalizer)
+
+        # Breakdown risk penalty (fraction of day lost to expected stalls)
+        if _W.w_risk > 0.0 and day_window_s > 0:
+            obj += _W.w_risk * (res.breakdown_s / day_window_s)
+
+        return obj
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
@@ -278,34 +309,36 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
           loops_committed, global_method: str = "ga", seed: int | None = None,
           dist_done_km: float = 0.0, elapsed_s: float = 0.0, cs_taken: bool = False,
           **kwargs):
-    
+
     rem_m = (route.total_m - dist_done_km * 1000.0) if route else 0.0
     n_segments = max(1, int(np.ceil(rem_m / CONTROL_SEGMENT_M)))
-    
+
     seg_start_m = (dist_done_km * 1000.0) + np.arange(n_segments) * CONTROL_SEGMENT_M
 
     v_max_kmh = route.v_max_ms_at(seg_start_m) * 3.6 if route else np.full(n_segments, car.v_max_ms * 3.6)
     if route:
         v_max_kmh = apply_turn_speed_caps(route, v_max_kmh, seg_start_m)
-        
-    bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh) 
+
+    bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh)
 
     t0_s = race_config.day_start_time_s(day_index) + elapsed_s
-    
+
     evaluator = DayEvaluator(route, car, solar_provider, wind_provider,
                               t0_s=t0_s,
                               start_soc_pct=start_soc_pct,
                               seg_start_m=seg_start_m)
 
-    objective = _build_objective(evaluator)
-
+    # Compute day window for objective normalization
     n_loops = len(loops_committed) if loops_committed else 0
     allowed_time_s = (
         (race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index))
         - elapsed_s
         - (0.0 if cs_taken else race_config.CONTROL_STOP_DURATION_S)
         - n_loops * race_config.LOOP_STOP_DURATION_S
-    ) 
+    )
+    day_window_s = race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index)
+
+    objective = _build_objective(evaluator, day_window_s)
 
     constraints = [
         _terminal_soc_constraint(evaluator, alpha_next_day_pct),
@@ -347,6 +380,8 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         t_s=final_eval.t_s,
         x_m=final_eval.x_m,
         driver_swaps=final_eval.driver_swaps,
+        breakdown_s=final_eval.breakdown_s,
+        solar_underutil_j=final_eval.solar_underutil_j,
         global_method=global_result.method,
         diagnostics=dict(
             global_fun=global_result.fun,

@@ -1,3 +1,18 @@
+# ============================================================================
+# WARNING: DERIVED / FROZEN COPY — DO NOT EDIT FOR 2026 PLANNING
+#
+# This file is consumed ONLY by:
+#   - Model/data/scripts/traffic.py (TomTom API constants)
+#   - Model/optimizers/mpc/mpc.py and mpc_ipopt.py (MPC solver)
+#
+# The car physics constants below (MASS, CDA, CRR, etc.) are DASHBOARD-era
+# WSC'25 values and are NOT the 2026 car. The single source of truth for
+# 2026 car parameters is:  configs/car_config.py :: CarState
+#
+# If MPC is ever brought online for 2026, it must import from car_config.py
+# instead of reading these numbers.
+# ============================================================================
+
 # ==========================================
 # CONSTANTS FOR TRAFFIC.PY
 # ==========================================
@@ -113,13 +128,13 @@ SOC_CURVE = [
     (69.02, 1.0),
     (68.60, 0.0),
 ]
-BATTERY_CAPACITY_WH = 3528.0  # Nominal capacity: 5.0Ah * 4.2V * 28S = 588Wh
+BATTERY_CAPACITY_WH = 3528.0  # FROZEN WSC'25: 5.0Ah * 4.2V * 28S = 588Wh
 BATTERY_CAPACITY_AH= 30.0 #5.0Ah * 28
 # CMU reports cell voltage in mV; dashboard displays volts (valid ~2.5–4.2 V).
 INVALID_CELL_MV = 10_000.0
 
 # ==========================================
-# CONSTANTS FOR MPC.PY
+# CONSTANTS FOR MPC.PY (FROZEN WSC'25 — see warning above)
 # ==========================================
 MASS = 300.0          # Total car + driver mass (kg)
 CDA = 0.16            # Aerodynamic drag area (Cd * A)

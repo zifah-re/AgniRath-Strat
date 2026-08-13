@@ -11,12 +11,8 @@ RULES OF THIS FILE:
     layer re-runs against the updated state
     (e.g.  replan --set array_area_m2=4.1 --from-position <x>).
 
-Two inherited parameter sets exist and DISAGREE (different cars/eras):
-  * DASHBOARD (WSC'25 AgniRath-Strat/Dashboard/constants.py) — most recent.
-  * LEGACY_KR (Kevin/Ramana race_completion/race_config.py) — older car,
-    but the motor-level loss model (core/physics.py:motor_power_kr) uses
-    its wheel/thermal constants.
-Defaults below start from DASHBOARD and must be re-verified for 2026.
+Canonical source: Model/data/scripts/constants.py (MPC section).
+LEGACY_KR is preserved for the motor-level loss model tests only.
 """
 
 from __future__ import annotations
@@ -33,7 +29,7 @@ import typing as _t
 # graceful-degrade flag below forces constant CdA (Plan v3 §6.2).
 # ---------------------------------------------------------------------------
 CDA_VS_YAW_DEG: _t.List[_t.Tuple[float, float]] = [
-    (0.0, 0.16),     # head-on == DASHBOARD CDA
+    (0.0, 0.16),     # head-on == CDA
     (30.0, 0.18),    # placeholder: mild crosswind typically raises CdA
     (60.0, 0.21),    # placeholder
     (90.0, 0.24),    # placeholder: beam wind worst-case guess
@@ -55,31 +51,34 @@ class CarState:
     """
 
     # ---- mass & rolling -------------------------------------------------
-    mass_kg: float = 300.0               # source: DASHBOARD constants.py
+    mass_kg: float = 300.0               # source: data/scripts/constants.py
                                          # (car+driver). TODO-VERIFY 2026 mass
                                          # incl. >=80 kg driver/ballast rule.
-    crr: float = 0.007                   # source: DASHBOARD. TODO-VERIFY
-                                         # (LEGACY_KR used 0.0045).
+    crr: float = 0.007                   # source: data/scripts/constants.py CRR.
 
     # ---- aero -----------------------------------------------------------
-    cda_m2: float = 0.16                 # source: DASHBOARD. TODO-VERIFY
-                                         # (LEGACY_KR used 0.092).
+    cda_m2: float = 0.16                 # source: data/scripts/constants.py CDA.
+    air_density: float = 1.2             # source: data/scripts/constants.py RHO.
 
     # ---- solar array ----------------------------------------------------
-    array_area_m2: float = 5.95          # source: DASHBOARD. TODO-VERIFY class
-                                         # decision (4 vs 6 m2) is car team's.
-    array_efficiency: float = 0.18       # source: DASHBOARD. TODO-VERIFY
-                                         # (LEGACY_KR used 0.19 on 6 m2).
-    panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
-    albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
+    array_area_m2: float = 5.95          # source: data/scripts/constants.py
+                                         # SOLAR_AREA.
+    array_efficiency: float = 0.18       # source: data/scripts/constants.py
+                                         # SOLAR_EFF.
+    panel_tilt_base_deg: float = 4.0     # source: data/scripts/constants.py
+                                         # PANEL_TILT.
+    albedo: float = 0.2                  # source: data/scripts/constants.py
+                                         # ALBEDO.
 
     # ---- drivetrain -----------------------------------------------------
-    motor_eff: float = 0.95              # source: DASHBOARD MOTOR_EFF.
-    regen_eff: float = 0.70              # source: DASHBOARD REGEN_EFF.
-    p_idle_w: float = 70.0               # source: DASHBOARD POWER_LOSS (constant
-                                         # electronics/parasitic draw). Plan v3
-                                         # §6.1 P_idle: also subtracted during
-                                         # stationary charging intervals.
+    motor_eff: float = 0.95              # source: data/scripts/constants.py
+                                         # MOTOR_EFF.
+    regen_eff: float = 0.70              # source: data/scripts/constants.py
+                                         # REGEN_EFF.
+    p_idle_w: float = 70.0               # source: data/scripts/constants.py
+                                         # POWER_LOSS. Plan v3 §6.1 P_idle:
+                                         # also subtracted during stationary
+                                         # charging intervals.
                                          # TODO-VERIFY split driving/stopped.
     p_max_continuous_w: float = 1800.0   # TODO-VERIFY: continuous motor power
                                          # limit for trailering red-flag
@@ -90,17 +89,17 @@ class CarState:
 
     # ---- battery --------------------------------------------------------
     n_packs: int = 6                     # source: user (senior), 24 Jul 2026.
-    pack_wh_nominal: float = 588.0       # source: DASHBOARD comment
-                                         # (5.0 Ah * 4.2 V * 28S = 588 Wh).
-    soc_min_pct: float = 20.0            # TODO-VERIFY usable SOC window floor
-                                         # (LEGACY_KR DeepDischargeCap=0.2).
+    pack_wh_nominal: float = 588.0       # source: data/scripts/constants.py
+                                         # 5.0 Ah * 4.2 V * 28S = 588 Wh.
+                                         # Total: 6 * 588 = 3528 Wh.
+    soc_min_pct: float = 20.0            # source: LEGACY_KR DeepDischargeCap=0.2.
     soc_max_pct: float = 100.0
     battery_derate: float = 1.0          # TODO-VERIFY temperature/age derating.
     charge_eff: float = 0.96             # TODO-VERIFY (Paper 4 used eta_bt=0.96).
     discharge_eff: float = 0.96          # TODO-VERIFY (Paper 4 eta_bd=0.96).
 
     # ---- speed/accel envelope ------------------------------------------
-    v_max_ms: float = 85.0 / 3.6         # source: DASHBOARD MAX_SPEED=85 km/h.
+    v_max_ms: float = 85.0 / 3.6         # source: Dashboard MAX_SPEED=85 km/h.
                                          # TODO-VERIFY 2026 car max.
     a_max_ms2: float = 0.5               # Paper 1 field finding: <=0.5 m/s^2 is
                                          # safe & driver-followable (Plan v3 §8).
@@ -162,7 +161,7 @@ LEGACY_KR = dict(                        # race_completion/race_config.py
     bus_voltage_v=4.2 * 38,
 )
 
-DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
+DASHBOARD = dict(                        # data/scripts/constants.py (MPC section)
     mass_kg=300.0,
     crr=0.007,
     cda_m2=0.16,
@@ -172,6 +171,6 @@ DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
     motor_eff=0.95,
     regen_eff=0.70,
     power_loss_w=70.0,
-    battery_wh=3528.0,
+    battery_wh=3528.0,                   # 6 * 588 Wh
     max_speed_kmh=85.0,
 )

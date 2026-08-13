@@ -11,13 +11,15 @@ own inline simulate_breakdown() calling raw random.random() every substep,
 which meant every DE/GA/SLSQP candidate evaluation saw a different fitness for
 the *same* speed vector — noise the optimizer reads as "this direction is bad"
 even when it isn't. That copy is deleted. We now use core.options.BreakdownModel,
-called the same way core/options.py's own OptionsDayEvaluator.simulate() calls
-it: rng=None -> deterministic expected_stop_s() (smooth, no RNG, safe inside an
+called the same way core/options.py's own BreakdownModel docstring requires:
+rng=None -> deterministic expected_stop_s() (smooth, no RNG, safe inside an
 optimizer loop); rng=<seeded random.Random> -> one stochastic sample_stop_s()
-draw per substep, for MC/scenario/robustness runs only. Same BreakdownModel
-also carries the blacklist/cooldown (decaying per-category risk accumulator)
-that the old inline version never had — see core/options.py's module docstring
-decisions #1, #4, #5 if you want the reasoning.
+draw per substep, for MC/scenario/robustness runs only.
+
+SOLAR UNDERUTILIZATION TRACKING (13/08 addition):
+  solar_underutil_j tracks wasted solar capacity — energy the panel could
+  produce but the battery can't absorb (SOC ceiling, or motor draw < solar
+  output). This feeds into singleday.py's enriched cost function.
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ class DayEvalResult:
     v_ms: np.ndarray
     t_s: np.ndarray
     x_m: np.ndarray
-    # NEW: total breakdown stall time folded into total_time_s above.
+    # Total breakdown stall time folded into total_time_s above.
     # rng=None runs -> sum of expected_stop_s per substep (deterministic).
     # rng=<Random> runs -> sum of realized sample_stop_s draws (stochastic).
     breakdown_s: float = 0.0
@@ -54,6 +56,10 @@ class DayEvalResult:
     # that actually triggered a failure. Empty on deterministic runs since
     # there's no discrete "triggered" event in the expected-value path.
     breakdown_log: list = dataclasses.field(default_factory=list)
+    # Solar energy the panel could produce but the system couldn't absorb (J).
+    # Non-zero when: battery at SOC ceiling, or motor draw << solar output
+    # and the excess can't be stored. Used by singleday.py's cost function.
+    solar_underutil_j: float = 0.0
 
 
 class DriverSwapScheduler:
@@ -116,6 +122,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     x_m = float(seg_start_m[0]) if len(seg_start_m) > 0 else 0.0
     total_breakdown_s = 0.0
     breakdown_log: list[dict] = []
+    solar_underutil_j = 0.0
 
     n_substeps = max(1, round(seg_len_m / energy_grid_m))
     substep_len_km = (seg_len_m / n_substeps) / 1000.0
@@ -129,57 +136,60 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             slope = route.slope_pct_at(x_m) if route else 0.0
             ghi = solar_provider.ghi_wm2(t_s, x_m)
 
-            # --- PATCH: Check if this 10m grid point is on a trailered segment ---
+            # --- Check if this grid point is on a trailered segment ---
             is_trailered = route.red_flag_at(x_m) if route else False
 
-            p_net, dt_s = physics.net_power(
+            p_net, dt_s_step = physics.net_power(
                 car, v_ms, v_ms, slope, ghi, substep_len_km)
 
-            # --- PATCH: If trailered, zero out motor drain but keep solar charging! ---
+            # --- If trailered, zero out motor drain but keep solar charging ---
             if is_trailered:
                 solar_only = (car.array_area_m2 * car.array_efficiency * ghi) - car.p_idle_w
                 p_net = solar_only
 
-            battery.apply_energy_wh(float(p_net) * float(dt_s) / 3600.0)
+            # --- Solar underutilization tracking ---
+            # p_net = p_solar - p_electric - p_idle (core/physics.py convention)
+            # Available solar power at this instant:
+            p_solar_w = car.array_area_m2 * car.array_efficiency * ghi
+            # Total consumption (motor + idle):
+            p_consumed_w = p_solar_w - float(p_net)
+            # If solar exceeds consumption AND battery is near full, excess is wasted:
+            solar_excess_w = max(0.0, p_solar_w - p_consumed_w)
+            # Check if battery can absorb the excess (SOC headroom)
+            soc_headroom_wh = (car.soc_max_pct - battery.soc_pct) / 100.0 * car.battery_nominal_wh
+            absorbable_wh = soc_headroom_wh  # how much the battery can still take
+            excess_wh_this_step = solar_excess_w * float(dt_s_step) / 3600.0
+            if excess_wh_this_step > absorbable_wh and absorbable_wh >= 0:
+                wasted_wh = excess_wh_this_step - absorbable_wh
+                solar_underutil_j += wasted_wh * 3600.0  # convert Wh -> J
+
+            battery.apply_energy_wh(float(p_net) * float(dt_s_step) / 3600.0)
 
             t_array.append(t_s)
             x_array.append(x_m)
 
-            t_s += float(dt_s)
+            t_s += float(dt_s_step)
             x_m += substep_len_km * 1000.0
 
             stop_here = _is_mandatory_stop_zone(route, x_m)
             t_s += swap_scheduler.advance(
-                float(dt_s), t_s, x_m, coincides_with_stop=stop_here)
+                float(dt_s_step), t_s, x_m, coincides_with_stop=stop_here)
 
-            # BreakdownModel call — same rng=None/rng-given split as
-            # core/options.py's OptionsDayEvaluator.simulate(), same call
-            # order (hazard/expected/sample THEN .step()) the model's own
-            # docstring requires.
+            # BreakdownModel call — same rng=None/rng-given split as the
+            # model's own docstring requires.
             #
-            # Input fix: DEFAULT_SCENARIOS' "p_net" threshold (2000-4100 W)
-            # is Hafiz/Prahlad's motor-power BMS-trip number — it means motor
-            # ELECTRICAL DRAW, not physics.net_power's return value (which is
-            # net power INTO the battery: positive while solar-charging,
-            # negative while the motor is drawing hard). Passing net_power
-            # straight in and clamping negative to 0 means the scenario can
-            # only ever fire while net-charging in strong sun, and is exactly
-            # 0 during the high-draw cruising/climbing conditions it's meant
-            # to catch (verified: 90 km/h flat cruise at 700 W/m2 GHI gives
-            # p_net = -1441 W -> clamped to 0 -> zero risk, while the actual
-            # motor draw at that moment is ~2121 W, well inside the scenario's
-            # curve). Back out the draw from the already-computed solar term
-            # instead: p_net = p_solar - p_electric - p_idle (core/physics.py's
-            # convention), so p_electric = p_solar - p_net - p_idle.
-            p_solar_w = car.array_area_m2 * car.array_efficiency * ghi
+            # Input: motor ELECTRICAL DRAW, not physics.net_power's return.
+            # DEFAULT_SCENARIOS' "p_net" threshold (2000-4100 W) is the
+            # motor-power BMS-trip number. Back out from the solar term:
+            # p_net = p_solar - p_electric - p_idle => p_electric = p_solar - p_net - p_idle
             motor_draw_w = max(0.0, p_solar_w - float(p_net) - car.p_idle_w)
             inputs = {"p_net": motor_draw_w}
             if rng is None:
                 breakdown_s = breakdown_model.expected_stop_s(inputs)
-                breakdown_model.step(float(dt_s), inputs)
+                breakdown_model.step(float(dt_s_step), inputs)
             else:
                 breakdown_s, triggered_category = breakdown_model.sample_stop_s(inputs, rng)
-                breakdown_model.step(float(dt_s), inputs,
+                breakdown_model.step(float(dt_s_step), inputs,
                                       triggered_category=triggered_category,
                                       triggered_duration_s=breakdown_s)
                 if triggered_category is not None:
@@ -198,4 +208,5 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         x_m=np.array(x_array),
         breakdown_s=total_breakdown_s,
         breakdown_log=breakdown_log,
+        solar_underutil_j=solar_underutil_j,
     )
