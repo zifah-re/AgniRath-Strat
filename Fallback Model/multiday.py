@@ -2,7 +2,7 @@ import numpy as np
 import json 
 from pathlib import Path
 
-folder = Path('Model\data\solar')
+folder = Path(r'Model\data\solar')
 
 def extractSolarData(json_file):
     with open(json_file, 'r') as f:
