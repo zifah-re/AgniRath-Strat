@@ -319,6 +319,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     if route:
         v_max_kmh = apply_turn_speed_caps(route, v_max_kmh, seg_start_m)
 
+    v_max_kmh = np.maximum(v_max_kmh, 5.0)
     bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh)
 
     t0_s = race_config.day_start_time_s(day_index) + elapsed_s
