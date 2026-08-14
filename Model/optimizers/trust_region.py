@@ -26,7 +26,10 @@ def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int) -
     n = len(s1_pct)
     floors = {}
     for d in range(start_day, n):
-        floors[d] = float(s1_pct[d + 1]) if d + 1 < n else car.soc_min_pct
+        val = float(s1_pct[d + 1]) if d + 1 < n else car.soc_min_pct
+        # NaN from infeasible Tier 1 → fall back to minimum SOC floor.
+        # This gives Tier 2 maximum freedom to find feasible solutions.
+        floors[d] = val if np.isfinite(val) else car.soc_min_pct
     return floors
 
 def replan(routes: list, base_car: CarState, solar_providers: dict, wind_providers: dict,
@@ -59,6 +62,19 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
     s_center = base["s0_pct"].copy()
     if not base["feasible"]:
         logger.warning("Tier 1 baseline infeasible from start_soc=%.1f%%", start_soc_pct)
+        # Fill NaN entries so Tier 2 gets usable start-SOC guesses.
+        # Strategy: linearly interpolate from last known SOC down to 50%.
+        nan_mask = ~np.isfinite(s_center)
+        if nan_mask.any():
+            first_nan = int(np.argmax(nan_mask))
+            last_known = float(s_center[first_nan - 1]) if first_nan > 0 else start_soc_pct
+            n_nan = int(nan_mask.sum())
+            # Spread from last_known toward 50% (mid-range guess)
+            target = max(car.soc_min_pct + 10.0, 50.0)
+            fill = np.linspace(last_known, target, n_nan + 2)[1:-1]
+            s_center[nan_mask] = fill
+            logger.info("Filled %d NaN SOC entries: %s",
+                        n_nan, [round(float(x), 1) for x in s_center])
 
     history = []
     result = None

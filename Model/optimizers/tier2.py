@@ -180,6 +180,11 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
     for d in tqdm(range(start_day, len(plans)), desc="Tier2 days"):
         route = routes[d] if routes and d < len(routes) else None
         alpha = alpha_next_pct.get(d, car.soc_min_pct)
+        # Guard: if alpha is NaN (from infeasible Tier 1 cascade), use soc_min_pct
+        if not np.isfinite(alpha):
+            logger.warning("Day %d: alpha_next is NaN, falling back to soc_min=%.1f%%",
+                           d, car.soc_min_pct)
+            alpha = car.soc_min_pct
 
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
@@ -197,8 +202,12 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
         else:
             plan_to_use = nom_plan
 
+        s0_d = float(s0_traj[d])
+        if not np.isfinite(s0_d):
+            logger.warning("Day %d: s0_traj is NaN, falling back to 50%%", d)
+            s0_d = 50.0
         per_day[d] = sample_day(
             route, car, solar_provider, wind_provider, d, plan_to_use,
-            float(s0_traj[d]), alpha, is_today=is_today, dist_done_km=d_dist, 
+            s0_d, alpha, is_today=is_today, dist_done_km=d_dist,
             elapsed_s=d_elap, cs_taken=d_cs, **kwargs)
     return per_day

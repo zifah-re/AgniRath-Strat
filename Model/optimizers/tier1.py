@@ -371,7 +371,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
     s0_traj = np.full(n_days, np.nan)
     feasible = True
     cur = float(np.clip(start_soc_pct, car.soc_min_pct, car.soc_max_pct))
-    
+ 
     for d in range(start_day, n_days):
         s0_traj[d] = cur
         s_idx = int(np.clip(np.searchsorted(soc_buckets, cur) - 1, 0, nb - 1))
@@ -379,9 +379,29 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
         end = best_end_soc[d, s_idx]
         if not np.isfinite(end):
             feasible = False
+            # Diagnostic: which day broke and what the DP saw
+            n_finite = int(np.isfinite(V[d]).sum())
+            logger.error(
+                "Tier1 forward trace broke at Day %d (soc_bucket=%.1f%%, idx=%d). "
+                "No feasible combo found for this bucket. "
+                "V[d] has %d/%d finite entries. "
+                "Plan: stage1=%.1fkm, stage2=%.1fkm, loops=%s",
+                d + 1, soc_buckets[s_idx], s_idx, n_finite, nb,
+                plans[d].stage1_km, plans[d].stage2_km,
+                [(n, k) for n, k in plans[d].loops])
+            # Log which SOC buckets DO have feasible solutions for this day
+            feasible_buckets = soc_buckets[np.isfinite(V[d]) & (V[d] > -np.inf)]
+            if len(feasible_buckets) > 0:
+                logger.error("  Day %d IS feasible for SOC buckets: %.1f%% - %.1f%%",
+                             d + 1, feasible_buckets[0], feasible_buckets[-1])
+            else:
+                logger.error("  Day %d has NO feasible SOC buckets at all!", d + 1)
             break
-        cur = min(end + overnight_soc_gain(car, solar_providers.get(d), d), car.soc_max_pct)
-
+        gain = overnight_soc_gain(car, solar_providers.get(d), d)
+        cur = min(end + gain, car.soc_max_pct)
+        logger.info("Tier1 Day %d: start=%.1f%% end=%.1f%% +overnight=%.1f%% -> next=%.1f%%",
+                    d + 1, s0_traj[d], end, gain, cur)
+ 
     return dict(s0_pct=s0_traj, day_plans=plans, feasible=feasible)
 
 def _completion_margin() -> float:
