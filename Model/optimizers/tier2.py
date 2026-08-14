@@ -18,7 +18,7 @@ from .tier1 import relaxed_loop_combos
 
 logger = logging.getLogger(__name__)
 
-SOC_OFFSETS_PCT = (-4.0,-2.0,0.0,2.0,4.0) 
+SOC_OFFSETS_PCT = (-3.0, 0.0, 3.0)
 SAMPLE_WINDOW_PCT = max(abs(o) for o in SOC_OFFSETS_PCT)
 
 _L2_WARMSTART_KW = "warm_start_kmh"
@@ -44,7 +44,8 @@ def _ordered_combos(plan: _DayPlan, day_index: int, car: CarState, is_today: boo
             n * ((plan.loops[i][1] * 1000.0) / loop_speed_ms + pre_attempt_stop_s)
             for i, n in enumerate(reps)) if reps else 0.0
 
-    return sorted(combos, key=_loop_time)
+    MAX_COMBOS = 5
+    return sorted(combos, key=_loop_time)[:MAX_COMBOS]
 
 def _l2_result_feasible(res: dict, car: CarState, day_index: int) -> bool:
     if res is None: return False
