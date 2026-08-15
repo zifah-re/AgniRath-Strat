@@ -21,7 +21,7 @@ from core.battery import Battery
 logger = logging.getLogger(__name__)
 
 TIER1_SAMPLE_M = 500.0
-_DEFAULT_REGEN_CAP_W = None     
+_DEFAULT_REGEN_CAP_W = None
 
 @dataclasses.dataclass(frozen=True)
 class _DayPlan:
@@ -37,7 +37,7 @@ def _get_day_plan(day_index: int) -> _DayPlan:
         stage1_km, stage2_km = 230.0, 0.0  # Fallback for full-blind days
     else:
         stage1_km, stage2_km = note["stage1_km"], note["stage2_km"]
-        
+
     loops = tuple(note["loops"]) if note["loops"] else (
         ("blind_loop_placeholder", rc.BLIND_LOOP_PLACEHOLDER_KM),
     )
@@ -88,7 +88,7 @@ def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, da
     latlons = route_df[["lat", "lon"]].to_numpy()
     tree_kd = cKDTree(np.array(trailered_coords))
     dists, _ = tree_kd.query(latlons, distance_upper_bound=0.001)
-    
+
     is_trailered = dists != float('inf')
 
     # Enforce the whole stage rule: if any segment in stage is trailered, entire stage is trailered
@@ -122,11 +122,51 @@ def _wind_arrays(wind_provider, t_s: np.ndarray, x_m: np.ndarray, bearing_deg: n
         _, yaw[i] = wind_core.relative_wind(float(v_ms[i]), spd, dir_from, float(bearing_deg[i]))
     return along, yaw
 
-def _solar_geom(slope_pct: np.ndarray, bearing_deg: np.ndarray) -> np.ndarray:
+
+def _solar_geom(slope_pct: np.ndarray, bearing_deg: np.ndarray,
+                lat_deg: float, day_of_year: int,
+                t_solar_s: np.ndarray,
+                panel_tilt_base_deg: float = 4.0) -> np.ndarray:
+    """Vectorized slope geometry correction.
+
+    Calls solar_core.slope_geometry_factor with all 6 required args:
+      (lat_deg, day_of_year, t_solar_s, road_slope_pct, route_bearing_deg, panel_tilt_base_deg)
+
+    Returns array of correction factors (1.0 fallback if the function is
+    unavailable or any element errors).
+    """
     fn = getattr(solar_core, "slope_geometry_factor", None)
-    if fn is None: return np.ones_like(slope_pct)
-    try: return np.asarray(fn(slope_pct, bearing_deg), dtype=float)
-    except Exception: return np.ones_like(slope_pct)
+    if fn is None:
+        return np.ones_like(slope_pct)
+    out = np.ones_like(slope_pct, dtype=float)
+    for i in range(len(slope_pct)):
+        try:
+            out[i] = fn(
+                lat_deg,
+                day_of_year,
+                float(t_solar_s[i]),
+                float(slope_pct[i]),
+                float(bearing_deg[i]),
+                panel_tilt_base_deg,
+            )
+        except Exception:
+            out[i] = 1.0
+    return out
+
+
+def _get_route_lat(route, x_m: np.ndarray) -> float:
+    """Extract a representative latitude from the route for solar geometry.
+    Falls back to Johannesburg latitude if route has no lat data."""
+    if route is None:
+        return -26.2  # Johannesburg, South Africa (race start area)
+    try:
+        # Use the midpoint latitude of the segment
+        mid_x = float(x_m[len(x_m) // 2]) if len(x_m) > 0 else 0.0
+        lat = route.latlon_at(mid_x)[0]
+        return float(lat)
+    except Exception:
+        return -26.2
+
 
 def _net_power_vectorised(car: CarState, v_ms: np.ndarray, slope_pct: np.ndarray,
                           ghi: np.ndarray, wind_along_ms: np.ndarray,
@@ -176,30 +216,35 @@ def _build_day_arrays(route, plan: _DayPlan, reps: tuple[int, ...],
 def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
                  route_offset_km: float, v_base_ms: float, loop_speed_ms: float,
                  pre_attempt_stop_s: float, solar_provider, wind_provider,
-                 t0_s: float, start_soc_pct: float, day_index: int, 
+                 t0_s: float, start_soc_pct: float, day_index: int,
                  is_today: bool = False, cs_taken: bool = False, kml_paths: dict = None) -> float:
-                 
+
     slope, bearing, seglen_m, v_ms, gap_s = _build_day_arrays(
         route, plan, reps, route_offset_km, v_base_ms, loop_speed_ms, pre_attempt_stop_s)
     if len(seglen_m) == 0:
         return start_soc_pct
 
     dt_s = seglen_m / np.maximum(v_ms, 0.1)
-    t_pt = t0_s + np.cumsum(gap_s) + np.cumsum(dt_s) - dt_s 
+    t_pt = t0_s + np.cumsum(gap_s) + np.cumsum(dt_s) - dt_s
     x_m = route_offset_km * 1000.0 + np.cumsum(seglen_m) - seglen_m
 
     ghi = np.array([solar_provider.ghi_wm2(float(t_pt[i]), float(x_m[i])) for i in range(len(x_m))])
     wind_along, yaw = _wind_arrays(wind_provider, t_pt, x_m, bearing, v_ms)
-    geom = _solar_geom(slope, bearing)
+
+    # --- FIXED: pass all 6 required args to slope_geometry_factor ---
+    lat_deg = _get_route_lat(route, x_m)
+    race_date = rc.RACE_DAY_DATES[day_index]
+    day_of_year = race_date.timetuple().tm_yday
+    geom = _solar_geom(slope, bearing, lat_deg, day_of_year, t_pt, car.panel_tilt_base_deg)
 
     trailered_mask = _get_trailered_mask(route, x_m, kml_paths, day_index)
 
     p_net = _net_power_vectorised(car, v_ms, slope, ghi, wind_along, yaw, geom, _regen_cap_w(car))
-    
+
     # Mask electrical drive drain if on trailer (keep solar gain)
     solar_only_net = (car.array_area_m2 * car.array_efficiency * ghi * geom) - car.p_idle_w
     p_net = np.where(trailered_mask, solar_only_net, p_net)
-    
+
     energy_wh = p_net * dt_s / 3600.0
 
     bat = Battery(car, start_soc_pct)
@@ -209,9 +254,9 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
     # Stationary Solar capture (Control Stop + Unplanned)
     base_km = plan.stage1_km + plan.stage2_km
     t_cs = t0_s + ((base_km / 2.0 * 1000.0) / max(v_base_ms, 1e-6) if base_km > 0 else 0.0)
-    p_cs = (car.array_area_m2 * car.array_efficiency * 
+    p_cs = (car.array_area_m2 * car.array_efficiency *
             solar_provider.ghi_wm2(t_cs, route_offset_km + base_km / 2) - car.p_idle_w)
-            
+
     cs_duration = (0.0 if (is_today and cs_taken) else rc.CONTROL_STOP_DURATION_S)
     total_stop_s = cs_duration + rc.UNPLANNED_STOP_BUDGET_S
     bat.apply_energy_wh(p_cs * total_stop_s / 3600.0)
@@ -221,7 +266,7 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
     t_loop = t0_s + ((plan.stage1_km * 1000.0) / max(v_base_ms, 1e-6) if plan.stage1_km > 0 else 0.0)
     for i, (_, k) in enumerate(plan.loops):
         if reps and reps[i] > 0:
-            p_l = (car.array_area_m2 * car.array_efficiency * 
+            p_l = (car.array_area_m2 * car.array_efficiency *
                    solar_provider.ghi_wm2(t_loop, cur_x) - car.p_idle_w)
             bat.apply_energy_wh(p_l * reps[i] * pre_attempt_stop_s / 3600.0)
         cur_x += k
@@ -230,20 +275,41 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
 
 def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
+    """Morning parc-fermé charging gain (battery unsealed 06:00 → race start).
+
+    During this window only the BMS + MPPT charge controller are active,
+    so we use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W)
+    rather than the full 70 W driving electronics.
+    GHI is integrated in 15-minute steps for accuracy during the steep
+    sunrise ramp, rather than a single midpoint sample.
+    """
     if day_index >= rc.N_RACE_DAYS - 1:
         return 0.0
-    t_start = rc.BATTERY_UNSEAL_TIME_S
-    t_end = rc.day_start_time_s(day_index + 1)
-    dur = max(0.0, t_end - t_start)
-    ghi = solar_provider.ghi_wm2(t_start + dur / 2.0, 0.0)
-    p_solar = car.array_area_m2 * car.array_efficiency * ghi - car.p_idle_w
-    delta_wh = p_solar * dur / 3600.0
+
+    t_start = rc.BATTERY_UNSEAL_TIME_S              # 06:00
+    t_end   = rc.day_start_time_s(day_index + 1)    # 08:00 (or 09:00 Day 1)
+    dur     = max(0.0, t_end - t_start)
+    if dur == 0.0:
+        return 0.0
+
+    # Reduced idle: only BMS + charge controller, not full driving electronics
+    parc_idle_w = getattr(rc, "PARC_FERME_IDLE_W", 10.0)
+
+    # Integrate GHI in 15-min steps (sunrise ramp makes midpoint sampling lossy)
+    n_steps = max(1, int(dur / 900.0))
+    dt = dur / n_steps
+    delta_wh = 0.0
+    for i in range(n_steps):
+        t_mid = t_start + (i + 0.5) * dt
+        ghi = solar_provider.ghi_wm2(t_mid, 0.0)
+        p_net = car.array_area_m2 * car.array_efficiency * ghi - parc_idle_w
+        delta_wh += p_net * dt / 3600.0
 
     if getattr(rc, "CHARGING_MODE", "normal") == "extended_2h":
         extra_s = getattr(rc, "EXTENDED_EVENING_CHARGE_S", 2.0 * 3600.0)
         t_eve = rc.day_finish_time_s(day_index) - extra_s / 2.0
         ghi_eve = solar_provider.ghi_wm2(t_eve, 0.0)
-        p_eve = car.array_area_m2 * car.array_efficiency * ghi_eve - car.p_idle_w
+        p_eve = car.array_area_m2 * car.array_efficiency * ghi_eve - parc_idle_w
         delta_wh += p_eve * extra_s / 3600.0
 
     stored = delta_wh * car.charge_eff if delta_wh >= 0 else delta_wh / car.discharge_eff
@@ -270,7 +336,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                    start_soc_pct: float, start_day: int = 0, dist_done_km: float = 0.0,
                    elapsed_s: float = 0.0, cs_taken: bool = False, loops_done: dict | None = None,
                    kml_paths: dict | None = None) -> dict:
-    
+
     n_days = rc.N_RACE_DAYS
     completion = (rc.RACE_MODE == "completion")
     soc_buckets = np.arange(car.soc_min_pct, car.soc_max_pct + 1e-9, sc.DP_SOC_BUCKET_PCT)
@@ -290,17 +356,17 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
     for d in range(n_days - 1, start_day - 1, -1):
         is_today = (d == start_day)
         route = routes[d] if routes and d < len(routes) else None
-        
+
         # Extract today's weather
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
-        
+
         nom_plan = plans[d]
         if is_today and dist_done_km > 0:
             plan = _adjust_plan_for_today(nom_plan, dist_done_km, loops_done)
         else:
             plan = nom_plan
-            
+
         base_km = plan.stage1_km + plan.stage2_km
 
         t_window = max(0.0, rc.day_finish_time_s(d) - rc.day_start_time_s(d) - (elapsed_s if is_today else 0.0))
@@ -320,12 +386,12 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 t_stops = t_stops_base + n_att * pre_attempt_stop_s
                 t_loop_drive = (loop_km * 1000.0) / loop_speed_ms if loop_km else 0.0
                 t_avail_base = t_window - t_stops - t_loop_drive
-                
+
                 if t_avail_base <= 0 and base_km > 0:
                     continue
 
                 t_base_vmax = (base_km * 1000.0) / car.v_max_ms if base_km > 0 else 0.0
-                
+
                 # Late penalty tracking
                 if t_avail_base < t_base_vmax:
                     late_s = t_base_vmax - t_avail_base
@@ -341,7 +407,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 offset_km = dist_done_km if is_today else 0.0
                 end_soc = evaluate_day(
                     car, route, plan, reps, offset_km, v_base_ms, loop_speed_ms,
-                    pre_attempt_stop_s, solar_provider, wind_provider, t0_s, s0, 
+                    pre_attempt_stop_s, solar_provider, wind_provider, t0_s, s0,
                     day_index=d,
                     is_today=is_today,
                     cs_taken=cs_taken,
@@ -359,7 +425,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
 
                 dist_km = base_km + loop_km
                 p_loss_km = (pen_s * v_base_ms / 1000.0) if pen_s > 0 else 0.0
-                
+
                 val = (1.0 + v_next) if completion else (dist_km + v_next - p_loss_km)
                 if val > best_val:
                     best_val = val
@@ -371,7 +437,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
     s0_traj = np.full(n_days, np.nan)
     feasible = True
     cur = float(np.clip(start_soc_pct, car.soc_min_pct, car.soc_max_pct))
- 
+
     for d in range(start_day, n_days):
         s0_traj[d] = cur
         s_idx = int(np.clip(np.searchsorted(soc_buckets, cur) - 1, 0, nb - 1))
@@ -379,17 +445,11 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
         end = best_end_soc[d, s_idx]
         if not np.isfinite(end):
             feasible = False
-            # Diagnostic: which day broke and what the DP saw
             n_finite = int(np.isfinite(V[d]).sum())
             logger.error(
                 "Tier1 forward trace broke at Day %d (soc_bucket=%.1f%%, idx=%d). "
-                "No feasible combo found for this bucket. "
-                "V[d] has %d/%d finite entries. "
-                "Plan: stage1=%.1fkm, stage2=%.1fkm, loops=%s",
-                d + 1, soc_buckets[s_idx], s_idx, n_finite, nb,
-                plans[d].stage1_km, plans[d].stage2_km,
-                [(n, k) for n, k in plans[d].loops])
-            # Log which SOC buckets DO have feasible solutions for this day
+                "V[d] has %d/%d finite entries.",
+                d + 1, soc_buckets[s_idx], s_idx, n_finite, nb)
             feasible_buckets = soc_buckets[np.isfinite(V[d]) & (V[d] > -np.inf)]
             if len(feasible_buckets) > 0:
                 logger.error("  Day %d IS feasible for SOC buckets: %.1f%% - %.1f%%",
@@ -401,7 +461,7 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
         cur = min(end + gain, car.soc_max_pct)
         logger.info("Tier1 Day %d: start=%.1f%% end=%.1f%% +overnight=%.1f%% -> next=%.1f%%",
                     d + 1, s0_traj[d], end, gain, cur)
- 
+
     return dict(s0_pct=s0_traj, day_plans=plans, feasible=feasible)
 
 def _completion_margin() -> float:
