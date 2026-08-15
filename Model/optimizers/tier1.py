@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 TIER1_SAMPLE_M = 500.0
 _DEFAULT_REGEN_CAP_W = None
 
+# Energy diagnostic: fires once per day at high SOC to avoid log spam
+_energy_diag_logged: set = set()
+
 @dataclasses.dataclass(frozen=True)
 class _DayPlan:
     """A day's route in driving order: Stage 1 -> named loop zone(s) -> Stage 2."""
@@ -239,13 +242,38 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
     trailered_mask = _get_trailered_mask(route, x_m, kml_paths, day_index)
 
-    p_net = _net_power_vectorised(car, v_ms, slope, ghi, wind_along, yaw, geom, _regen_cap_w(car))
+    regen_cap = _regen_cap_w(car)
+    p_net = _net_power_vectorised(car, v_ms, slope, ghi, wind_along, yaw, geom, regen_cap)
 
     # Mask electrical drive drain if on trailer (keep solar gain)
     solar_only_net = (car.array_area_m2 * car.array_efficiency * ghi * geom) - car.p_idle_w
     p_net = np.where(trailered_mask, solar_only_net, p_net)
 
     energy_wh = p_net * dt_s / 3600.0
+
+    # ---- Diagnostic logging (once per day at ~100% SOC) ----
+    if day_index not in _energy_diag_logged and start_soc_pct >= 95.0:
+        _energy_diag_logged.add(day_index)
+        f = physics.forces(car, v_ms, slope, wind_along_ms=wind_along, yaw_deg=yaw)
+        p_mech = (f["drag"] + f["rolling"] + f["gravity"]) * v_ms
+        p_solar_raw = car.array_area_m2 * car.array_efficiency * ghi * geom
+
+        # Regen waste from cap
+        uncapped_regen = np.where(p_mech < 0, -p_mech * car.regen_eff, 0.0)
+        capped_regen = np.where(p_mech < 0, np.minimum(uncapped_regen, regen_cap), 0.0)
+        regen_waste_wh = ((uncapped_regen - capped_regen) * dt_s / 3600.0).sum()
+
+        logger.info(
+            "Day %d ENERGY DIAG (v=%.1fkm/h, %d segs, %.1fkm): "
+            "solar=+%.0fWh idle=-%.0fWh regen_waste=-%.0fWh net=%+.0fWh (%+.1f%% SOC) | "
+            "slopes: |avg|=%.1f%% max=%.1f%% | GHI avg=%.0f | trailered=%d | loops=%s",
+            day_index + 1, v_base_ms * 3.6, len(slope), seglen_m.sum() / 1000,
+            (p_solar_raw * dt_s / 3600).sum(),
+            car.p_idle_w * dt_s.sum() / 3600,
+            regen_waste_wh,
+            energy_wh.sum(), energy_wh.sum() / car.battery_nominal_wh * 100,
+            np.abs(slope).mean(), np.abs(slope).max(),
+            ghi.mean(), trailered_mask.sum(), reps)
 
     bat = Battery(car, start_soc_pct)
     for e in energy_wh:
@@ -336,6 +364,8 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                    start_soc_pct: float, start_day: int = 0, dist_done_km: float = 0.0,
                    elapsed_s: float = 0.0, cs_taken: bool = False, loops_done: dict | None = None,
                    kml_paths: dict | None = None) -> dict:
+
+    _energy_diag_logged.clear()  # reset for fresh run
 
     n_days = rc.N_RACE_DAYS
     completion = (rc.RACE_MODE == "completion")

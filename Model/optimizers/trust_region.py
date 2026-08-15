@@ -22,13 +22,31 @@ logger = logging.getLogger(__name__)
 MAX_ITERS = 4                          
 CONVERGENCE_WINDOW_PCT = tier2.SAMPLE_WINDOW_PCT
 
-def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int) -> dict:
+def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int,
+                            overnight_gains: dict | None = None) -> dict:
+    """Compute end-of-day SOC floors for Tier 2.
+
+    s1_pct contains START-of-day SOCs (which include overnight gain from the
+    previous day). singleday.solve uses alpha as the END-of-day constraint
+    (before overnight charging). So we subtract the overnight gain to get
+    the actual end-of-day target.
+
+    Without this correction, alpha is set ~2-9% too high (the overnight
+    gap), causing singleday.solve to mark feasible combos as infeasible.
+    """
     n = len(s1_pct)
     floors = {}
     for d in range(start_day, n):
         val = float(s1_pct[d + 1]) if d + 1 < n else car.soc_min_pct
         # NaN from infeasible Tier 1 → fall back to minimum SOC floor
-        floors[d] = val if np.isfinite(val) else car.soc_min_pct
+        if not np.isfinite(val):
+            val = car.soc_min_pct
+        # Subtract overnight gain: s1_pct[d+1] = end_soc[d] + overnight[d]
+        # So end_soc[d] = s1_pct[d+1] - overnight[d]
+        if overnight_gains and d in overnight_gains:
+            val = val - overnight_gains[d]
+        # Never go below absolute minimum
+        floors[d] = max(val, car.soc_min_pct)
     return floors
 
 def replan(routes: list, base_car: CarState, solar_providers: dict, wind_providers: dict,
@@ -73,19 +91,53 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
             logger.info("Filled %d NaN SOC entries: %s",
                         n_nan, [round(float(x), 1) for x in s_center])
 
+    # Pre-compute overnight gains so alpha_floors can subtract them.
+    # alpha_floors represent END-of-day targets (before overnight charging),
+    # but s_center contains START-of-day SOCs (after overnight charging).
+    overnight_gains = {}
+    for d in range(start_day, len(plans)):
+        sp = solar_providers.get(d)
+        if sp is not None:
+            overnight_gains[d] = tier1.overnight_soc_gain(car, sp, d)
+        else:
+            overnight_gains[d] = 0.0
+    logger.info("Overnight gains: %s",
+                {d+1: f"{g:+.1f}%" for d, g in overnight_gains.items()})
+
     history = []
     result = None
-    
+
     for it in range(max_iters):
         alpha_floors = _alpha_floors_from_traj(
-            np.append(s_center, car.soc_min_pct)[: len(plans) + 1], car, start_day) \
-            if result is None else _alpha_floors_from_traj(result["s1_pct"], car, start_day)
+            np.append(s_center, car.soc_min_pct)[: len(plans) + 1], car, start_day,
+            overnight_gains=overnight_gains) \
+            if result is None else _alpha_floors_from_traj(
+                result["s1_pct"], car, start_day,
+                overnight_gains=overnight_gains)
+
+        logger.info("Tier2 it=%d alpha_floors (end-of-day targets): %s",
+                    it, {d+1: f"{v:.1f}%" for d, v in alpha_floors.items()})
+        logger.info("Tier2 it=%d s_center (start-of-day): %s",
+                    it, [f"D{d+1}={v:.1f}%" for d, v in enumerate(s_center) if np.isfinite(v)])
 
         per_day = tier2.sample_all_days(
             routes, car, solar_providers, wind_providers, s_center, plans,
-            alpha_floors, start_day=start_day, dist_done_km=dist_done_km, 
+            alpha_floors, start_day=start_day, dist_done_km=dist_done_km,
             elapsed_s=elapsed_s, cs_taken=cs_taken, loops_done=loops_done,
             parallel=parallel, n_workers=n_workers, global_method=global_method, seed=seed)
+
+        # Tier 2 surrogate diagnostic
+        for d in range(start_day, len(plans)):
+            dd = per_day.get(d)
+            if dd is None:
+                logger.warning("Tier2 Day %d: no data returned at all!", d + 1)
+                continue
+            surr = dd.get("surrogates", {})
+            n_keys = len(surr) if isinstance(surr, dict) else 0
+            if n_keys > 0:
+                logger.info("Tier2 Day %d: %d surrogate(s) populated", d + 1, n_keys)
+            else:
+                logger.warning("Tier2 Day %d: EMPTY surrogates — singleday.solve combos all infeasible!", d + 1)
 
         result = tier3.allocate(car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day)
         s_refined = result["s1_pct"]
@@ -468,7 +520,7 @@ if __name__ == "__main__":
             kml_paths=kml_paths,
             start_soc_pct=100.0,
             start_day=0,
-            parallel=False,
+            parallel=True,
             max_iters=2,
         )
 
