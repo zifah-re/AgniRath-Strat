@@ -44,22 +44,24 @@ DE_MAXITER = 60
 # 1. Sharp-turn speed caps
 # ===========================================================================
 
-def _sharp_turn_mask(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
-                      heading_delta_threshold_deg: float) -> np.ndarray:
-    """True for each control segment containing a rapid bearing change."""
-    if not route: return np.zeros(len(seg_start_m), dtype=bool)
+def _sharp_turn_fraction(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
+                          heading_delta_threshold_deg: float) -> np.ndarray:
+    """Fraction of each control segment's length flagged as a sharp turn."""
+    if not route: return np.zeros(len(seg_start_m))
     x = route.df["distance_m"].to_numpy()
     bearing = route.df["bearing_deg"].to_numpy()
     raw_delta = np.diff(bearing, prepend=bearing[0])
-    wrapped = (raw_delta + 180.0) % 360.0 - 180.0          
+    wrapped = (raw_delta + 180.0) % 360.0 - 180.0
     sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
 
     seg_end_m = seg_start_m + seg_len_m
-    mask = np.zeros(len(seg_start_m), dtype=bool)
+    frac = np.zeros(len(seg_start_m))
     for i, (s, e) in enumerate(zip(seg_start_m, seg_end_m)):
         in_seg = (x >= s) & (x < e)
-        mask[i] = bool(np.any(sharp_point[in_seg]))
-    return mask
+        n = int(np.sum(in_seg))
+        if n > 0:
+            frac[i] = float(np.sum(sharp_point[in_seg])) / n
+    return frac
 
 
 def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
@@ -68,10 +70,12 @@ def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
                            heading_delta_threshold_deg: float = SHARP_TURN_HEADING_DELTA_DEG,
                            turn_speed_limit_kmh: float = SHARP_TURN_SPEED_LIMIT_KMH,
                            ) -> np.ndarray:
-    """Clamp v_max to turn_speed_limit_kmh wherever the route bearing turns sharply."""
-    sharp = _sharp_turn_mask(route, seg_start_m, seg_len_m, heading_delta_threshold_deg)
-    return np.where(sharp, np.minimum(v_max_kmh, turn_speed_limit_kmh), v_max_kmh)
-
+    """Blend v_max toward turn_speed_limit_kmh in proportion to how much of the
+    segment is actually a sharp turn, instead of capping the whole segment for
+    a single flagged point."""
+    frac = _sharp_turn_fraction(route, seg_start_m, seg_len_m, heading_delta_threshold_deg)
+    v_eff = 1.0 / (frac / turn_speed_limit_kmh + (1.0 - frac) / np.maximum(v_max_kmh, 1e-6))
+    return v_eff
 
 # ===========================================================================
 # 2. Day-level evaluation
@@ -287,7 +291,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     v_max_kmh = route.v_max_ms_at(seg_start_m) * 3.6 if route else np.full(n_segments, car.v_max_ms * 3.6)
     if route:
         v_max_kmh = apply_turn_speed_caps(route, v_max_kmh, seg_start_m)
-        
+
     v_max_kmh = np.maximum(v_max_kmh, 5.0)    
     bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh) 
 
