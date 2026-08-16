@@ -26,27 +26,23 @@ def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int,
                             overnight_gains: dict | None = None) -> dict:
     """Compute end-of-day SOC floors for Tier 2.
 
-    s1_pct contains START-of-day SOCs (which include overnight gain from the
-    previous day). singleday.solve uses alpha as the END-of-day constraint
-    (before overnight charging). So we subtract the overnight gain to get
-    the actual end-of-day target.
+    Tier 2's job is to BUILD SURROGATES by sampling the full feasible space.
+    The alpha passed to singleday.solve is only a minimum-SOC guard — it
+    should be as lenient as possible so combos aren't rejected prematurely.
 
-    Without this correction, alpha is set ~2-9% too high (the overnight
-    gap), causing singleday.solve to mark feasible combos as infeasible.
+    Tier 1's uniform-speed DP produces end-of-day SOCs (e.g. 26.8%) that
+    singleday.solve — with variable speeds, turn caps and tighter time
+    budgets — often can't replicate (27977s vs 27000s allowed). Using those
+    as alpha floors causes ALL combos to be marked infeasible, leaving
+    surrogates empty for 7/8 days.
+
+    Fix: use soc_min_pct for every day. Tier 3 handles inter-day SOC
+    allocation using the populated surrogates.
     """
     n = len(s1_pct)
     floors = {}
     for d in range(start_day, n):
-        val = float(s1_pct[d + 1]) if d + 1 < n else car.soc_min_pct
-        # NaN from infeasible Tier 1 → fall back to minimum SOC floor
-        if not np.isfinite(val):
-            val = car.soc_min_pct
-        # Subtract overnight gain: s1_pct[d+1] = end_soc[d] + overnight[d]
-        # So end_soc[d] = s1_pct[d+1] - overnight[d]
-        if overnight_gains and d in overnight_gains:
-            val = val - overnight_gains[d]
-        # Never go below absolute minimum
-        floors[d] = max(val, car.soc_min_pct)
+        floors[d] = car.soc_min_pct
     return floors
 
 def replan(routes: list, base_car: CarState, solar_providers: dict, wind_providers: dict,
@@ -91,29 +87,14 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
             logger.info("Filled %d NaN SOC entries: %s",
                         n_nan, [round(float(x), 1) for x in s_center])
 
-    # Pre-compute overnight gains so alpha_floors can subtract them.
-    # alpha_floors represent END-of-day targets (before overnight charging),
-    # but s_center contains START-of-day SOCs (after overnight charging).
-    overnight_gains = {}
-    for d in range(start_day, len(plans)):
-        sp = solar_providers.get(d)
-        if sp is not None:
-            overnight_gains[d] = tier1.overnight_soc_gain(car, sp, d)
-        else:
-            overnight_gains[d] = 0.0
-    logger.info("Overnight gains: %s",
-                {d+1: f"{g:+.1f}%" for d, g in overnight_gains.items()})
-
     history = []
     result = None
 
     for it in range(max_iters):
+        # Alpha floors = soc_min_pct for all days.  Tier 2 samples the full
+        # feasible space; Tier 3 handles multi-day SOC allocation.
         alpha_floors = _alpha_floors_from_traj(
-            np.append(s_center, car.soc_min_pct)[: len(plans) + 1], car, start_day,
-            overnight_gains=overnight_gains) \
-            if result is None else _alpha_floors_from_traj(
-                result["s1_pct"], car, start_day,
-                overnight_gains=overnight_gains)
+            np.append(s_center, car.soc_min_pct)[: len(plans) + 1], car, start_day)
 
         logger.info("Tier2 it=%d alpha_floors (end-of-day targets): %s",
                     it, {d+1: f"{v:.1f}%" for d, v in alpha_floors.items()})
@@ -126,18 +107,40 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
             elapsed_s=elapsed_s, cs_taken=cs_taken, loops_done=loops_done,
             parallel=parallel, n_workers=n_workers, global_method=global_method, seed=seed)
 
-        # Tier 2 surrogate diagnostic
+        # Tier 2 surrogate diagnostic + Tier 1 fallback for empty days
         for d in range(start_day, len(plans)):
             dd = per_day.get(d)
             if dd is None:
                 logger.warning("Tier2 Day %d: no data returned at all!", d + 1)
-                continue
+                dd = {}
             surr = dd.get("surrogates", {})
             n_keys = len(surr) if isinstance(surr, dict) else 0
             if n_keys > 0:
                 logger.info("Tier2 Day %d: %d surrogate(s) populated", d + 1, n_keys)
             else:
-                logger.warning("Tier2 Day %d: EMPTY surrogates — singleday.solve combos all infeasible!", d + 1)
+                # ── Tier 1 fallback surrogate ──────────────────────────
+                # singleday.solve failed for every combo at all offsets.
+                # Build a synthetic linear surrogate from Tier 1's coarse
+                # energy model so Tier 3 can still allocate this day.
+                logger.warning("Tier2 Day %d: EMPTY — building Tier 1 fallback surrogate", d + 1)
+                s0 = float(s_center[d])
+                # Estimate end-of-day SOC from Tier 1 trajectory
+                if d + 1 < len(s_center) and np.isfinite(s_center[d + 1]):
+                    sp = solar_providers.get(d)
+                    gain = tier1.overnight_soc_gain(car, sp, d) if sp else 0.0
+                    end_est = float(s_center[d + 1]) - gain
+                else:
+                    end_est = car.soc_min_pct
+                end_est = max(end_est, car.soc_min_pct)
+                # Linear surrogate:  predict(s) = end_est + 1.0*(s - s0)
+                reps = (0,) * len(plans[d].loops)
+                fb = tier2.LinearSurrogate(
+                    a=float(end_est), b=1.0, s0=s0, loop_km=0.0, reps=reps,
+                    soc_lo=car.soc_min_pct, soc_hi=car.soc_max_pct)
+                per_day[d] = {"surrogates": {reps: fb}, "s0_pct": s0,
+                              "n_l2_solves": 0}
+                logger.info("Tier2 Day %d: fallback a=%.1f b=%.2f s0=%.1f",
+                            d + 1, end_est, 1.0, s0)
 
         result = tier3.allocate(car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day)
         s_refined = result["s1_pct"]
@@ -322,13 +325,27 @@ if __name__ == "__main__":
     def _route_sort_key(filepath):
         name = filepath.lower()
         if "stage 1" in name: return 1
-        if "loop"    in name: return 2
         if "stage 2" in name: return 3
+        # Dedicated loop files (contain "loop" but NOT "stage") sort last
+        if "loop" in name and "stage" not in name: return 2
         return 4
 
+    def _is_loop_file(filepath):
+        """True only for DEDICATED loop files, not stage files with 'loop' in a place name."""
+        bn = os.path.basename(filepath).lower()
+        return "loop" in bn and "stage" not in bn
+
     def _load_route(route_files, day_num):
-        """Parse .save files into a single Route for one day."""
+        """Parse .save files into a single Route for one day.
+
+        Dedicated loop .save files are EXCLUDED from the base route.
+        A file is a loop file only if it contains 'loop' but NOT 'stage'
+        in its name — this avoids false positives on South African place
+        names like 'Loopspruit' that appear in stage file names.
+        """
         route_files = sorted(route_files, key=_route_sort_key)
+        # Remove dedicated loop files only.
+        route_files = [f for f in route_files if not _is_loop_file(f)]
         day_dfs = []
         offset = 0.0
         for filepath in route_files:
@@ -438,8 +455,12 @@ if __name__ == "__main__":
             # Day 3 loaded separately as multi-variant below
             continue
         if route_files:
+            # Log which files are stage vs loop (dedicated loops excluded by _load_route)
+            stage_files = [f for f in route_files if not _is_loop_file(f)]
+            loop_files  = [f for f in route_files if _is_loop_file(f)]
             routes[d] = _load_route(route_files, day_num)
-            logger.info("Day %d: route loaded (%d files)", day_num, len(route_files))
+            logger.info("Day %d: route loaded (%d stage files, %d loop files excluded)",
+                        day_num, len(stage_files), len(loop_files))
         else:
             logger.warning("Day %d: no route .save files found — flat fallback", day_num)
             routes[d] = None
@@ -533,7 +554,68 @@ if __name__ == "__main__":
         all_results[variant_name] = {"result": result, "profiles": profiles}
 
     # ------------------------------------------------------------------ #
-    # 6.  Print summary for all variants
+    # 6.  Helpers for per-day strategy plan
+    # ------------------------------------------------------------------ #
+
+    plans = [_get_day_plan(d) for d in range(8)]
+    DAY_NAMES = {
+        0: "Johannesburg → Rustenburg",
+        1: "Rustenburg → Zeerust",
+        2: "Zeerust → Vryburg",          # Day 3 (variant-dependent)
+        3: "Vryburg → Upington",
+        4: "Upington → Springbok",
+        5: "Springbok → Van Rhynsdorp",
+        6: "Van Rhynsdorp → Clanwilliam",
+        7: "Clanwilliam → Cape Town",
+    }
+
+    def _hms(seconds: float) -> str:
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        return f"{h:02d}:{m:02d}"
+
+    def _clock(abs_s: float) -> str:
+        """Absolute seconds from midnight → HH:MM clock string."""
+        return _hms(abs_s)
+
+    # Car constants for output calculations (DASHBOARD values)
+    _SOLAR_AREA  = getattr(car, 'solar_area',  5.95)
+    _SOLAR_EFF   = getattr(car, 'solar_eff',   0.18)
+    _BATT_CAP_WH = getattr(car, 'battery_capacity_wh', 3528.0)
+
+    def _estimate_solar_input_wh(solar_prov, day_index: int) -> float:
+        """Rough total solar energy over the race window (Wh)."""
+        if solar_prov is None:
+            return 0.0
+        t0 = rc.day_start_time_s(day_index)
+        t1 = rc.day_finish_time_s(day_index)
+        dt = 300.0  # 5-min steps
+        total = 0.0
+        t = t0
+        while t < t1:
+            ghi = solar_prov.ghi_wm2(t, 0.0)
+            total += ghi * _SOLAR_AREA * _SOLAR_EFF * dt
+            t += dt
+        return total
+
+    def _estimate_stall_points(start_soc, end_soc, distance_km, solar_wh,
+                               battery_cap=_BATT_CAP_WH):
+        """Flag if SOC likely dips below 25% mid-day (rough linear check)."""
+        drain_wh = (start_soc - end_soc) / 100.0 * battery_cap
+        motor_wh = drain_wh + solar_wh
+        if motor_wh <= 0:
+            return "None — net energy positive"
+        # Approximate lowest SOC (assumes linear drain, solar ramps up mid-day)
+        # Worst case: first 25% of distance has low solar but full motor drain
+        early_drain_pct = 0.25 * drain_wh / battery_cap * 100
+        early_solar_pct = 0.10 * solar_wh / battery_cap * 100  # ~10% of solar in first quarter
+        min_soc_est = start_soc - early_drain_pct + early_solar_pct
+        if min_soc_est < 25.0:
+            return f"RISK — estimated min SOC ≈ {min_soc_est:.0f}% in first quarter"
+        return "None"
+
+    # ------------------------------------------------------------------ #
+    # 7.  Print full strategy plan for all variants
     # ------------------------------------------------------------------ #
     print("\n" + "=" * 70)
     print("OPTIMIZATION COMPLETE — ALL DAY 3 VARIANTS")
@@ -543,35 +625,137 @@ if __name__ == "__main__":
         result   = data["result"]
         profiles = data["profiles"]
 
-        print(f"\n{'─' * 70}")
+        print(f"\n{'━' * 70}")
         print(f"  Day 3 variant: {variant_name.upper()}")
-        print(f"{'─' * 70}")
+        print(f"{'━' * 70}")
         print(f"  Converged:  {result.get('converged')}")
         print(f"  Feasible:   {result.get('feasible')}")
         print(f"  Iterations: {result.get('iterations')}")
-        print(f"  Total km:   {result.get('total_distance_km', 0):.1f}")
+        print(f"  Total Expected Distance: {result.get('total_distance_km', 0):.1f} km")
 
-        if result.get("alpha_day_pct"):
-            print("  SOC trajectory:")
-            for d_idx in sorted(result["alpha_day_pct"]):
-                print(f"    Day {d_idx + 1} start: {result['alpha_day_pct'][d_idx]:.1f}%")
+        if not result.get("feasible"):
+            print("  ⚠ Infeasible — no per-day plan available")
+            continue
 
-        if result.get("loop_plan"):
-            print("  Loop plan:")
-            for d_idx in sorted(result["loop_plan"]):
-                lp = result["loop_plan"][d_idx]
-                if lp:
-                    print(f"    Day {d_idx + 1}: {lp}")
+        loop_plan = result.get("loop_plan", {})
+        s_start = result.get("s_start_pct")
 
-        if profiles:
-            print("  Speed profiles (km/h per segment):")
-            for d_idx in sorted(profiles):
+        print(f"\n  {'─' * 66}")
+        print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5}")
+        print(f"  {'─' * 66}")
+
+        for d_idx in range(8):
+            plan = plans[d_idx]
+            lp = loop_plan.get(d_idx, {})
+            n_loops = sum(lp.values()) if lp else 0
+            loop_km = sum(cnt * km for (name, km) in plan.loops
+                          for cnt in [lp.get(name, 0)])
+            day_km = plan.stage1_km + plan.stage2_km + loop_km
+            route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
+
+            # SOC
+            soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+
+            # End SOC + ETA from profiles if available
+            if profiles and d_idx in profiles:
                 p = profiles[d_idx]
-                v = p.get("velocity_profile_kmh")
-                if v is not None:
-                    v_arr = np.asarray(v)
-                    print(f"    Day {d_idx + 1}: "
-                          f"SOC {p['start_soc_pct']:.1f}% → {p['end_soc_pct']:.1f}% | "
-                          f"v = [{', '.join(f'{x:.1f}' for x in v_arr)}]")
+                soc_end = p.get("end_soc_pct", 0.0)
+                total_t = p.get("time_array_s")
+                if total_t is not None:
+                    total_t = max(total_t) if hasattr(total_t, '__iter__') else total_t
+                else:
+                    total_t = 0.0
+            else:
+                # Estimate from surrogate
+                soc_end = 0.0
+                total_t = 0.0
+
+            t_start_abs = rc.day_start_time_s(d_idx)
+            eta_abs = t_start_abs + total_t
+            eta_str = _clock(eta_abs) if total_t > 0 else "—"
+
+            print(f"  {d_idx+1:>5} │ {route_name:<30} │ {day_km:>6.1f} │ {n_loops:>5} │ "
+                  f"{soc_start:>5.1f}% → {soc_end:>5.1f}% │ {eta_str:>5}")
+
+        # ── Detailed per-day strategy ──
+        print(f"\n  {'═' * 66}")
+        print("  DETAILED DAILY STRATEGY")
+        print(f"  {'═' * 66}")
+
+        for d_idx in range(8):
+            plan = plans[d_idx]
+            lp = loop_plan.get(d_idx, {})
+            n_loops = sum(lp.values()) if lp else 0
+            loop_km = sum(cnt * km for (name, km) in plan.loops
+                          for cnt in [lp.get(name, 0)])
+            day_km = plan.stage1_km + plan.stage2_km + loop_km
+            route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
+            soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+
+            print(f"\n  ── Day {d_idx + 1}: {route_name} ──")
+
+            # 1. Km planned + loops
+            loop_detail = ", ".join(f"{name}×{cnt}" for name, cnt in lp.items()) if lp else "none"
+            print(f"  1) Distance: {day_km:.1f} km | Loops: {loop_detail}")
+
+            # 2. End of day SOC
+            if profiles and d_idx in profiles:
+                p = profiles[d_idx]
+                soc_end = p.get("end_soc_pct", 0.0) or 0.0
+                total_time = 0.0
+                t_arr = p.get("time_array_s")
+                if t_arr is not None and hasattr(t_arr, '__iter__'):
+                    total_time = float(max(t_arr))
+                v_arr = p.get("velocity_profile_kmh")
+            else:
+                soc_end = 0.0
+                total_time = 0.0
+                v_arr = None
+            print(f"  2) End-of-day SOC: {soc_end:.1f}%")
+
+            # 3. SOC curve (key checkpoints)
+            soc_drain_pct = soc_start - soc_end
+            solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+            drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
+            motor_wh = drain_wh + solar_wh
+            # Approximate hourly SOC (linear interpolation)
+            t_window = rc.day_finish_time_s(d_idx) - rc.day_start_time_s(d_idx)
+            n_hours = max(1, int(t_window / 3600))
+            hourly_soc = [soc_start - (soc_drain_pct * h / n_hours) for h in range(n_hours + 1)]
+            hourly_labels = [_clock(rc.day_start_time_s(d_idx) + h * 3600) for h in range(n_hours + 1)]
+            soc_str = " → ".join(f"{s:.0f}%" for s in hourly_soc[::max(1, len(hourly_soc)//5)])
+            print(f"  3) SOC curve (approx): {soc_str}")
+
+            # 4. Solar input
+            print(f"  4) Solar input: {solar_wh:.0f} Wh total")
+
+            # 5. Energy consumption
+            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery drain: {drain_wh:.0f} Wh ({soc_drain_pct:.1f}%)")
+
+            # 6. Stall risk
+            stall = _estimate_stall_points(soc_start, soc_end, day_km, solar_wh)
+            print(f"  6) Stall risk: {stall}")
+
+            # 7. Early start strategy (6-8 AM solar charging)
+            if soc_start < 40.0:
+                print(f"  7) Start strategy: EARLY START recommended — prop car roadside"
+                      f" at 6 AM for 2h solar charge before driving (est. +{2*solar_wh/n_hours/_BATT_CAP_WH*100:.0f}% SOC)")
+            else:
+                print(f"  7) Start strategy: Normal start at {_clock(rc.day_start_time_s(d_idx))}")
+
+            # 8. ETA
+            t_start_abs = rc.day_start_time_s(d_idx)
+            eta_abs = t_start_abs + total_time
+            if total_time > 0:
+                print(f"  8) ETA: {_clock(eta_abs)} (drive time {_hms(total_time)})")
+            else:
+                avg_speed_kmh = day_km / (t_window / 3600) if t_window > 0 else 40.0
+                est_time = day_km / avg_speed_kmh * 3600
+                print(f"  8) ETA: ~{_clock(t_start_abs + est_time)} (est. drive time {_hms(est_time)})")
+
+            # Speed summary
+            if v_arr is not None:
+                v_np = np.asarray(v_arr)
+                print(f"      Speed: avg {v_np.mean():.1f} km/h, min {v_np.min():.1f}, max {v_np.max():.1f}")
 
     print("\n" + "=" * 70)

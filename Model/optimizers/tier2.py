@@ -14,12 +14,18 @@ from configs import race_config as rc
 from configs.car_config import CarState
 from optimizers import singleday
 from .tier1 import _DayPlan
-from .tier1 import relaxed_loop_combos 
+from .tier1 import relaxed_loop_combos
 
 logger = logging.getLogger(__name__)
 
-SOC_OFFSETS_PCT = (-3.0, 0.0, 3.0)
-SAMPLE_WINDOW_PCT = max(abs(o) for o in SOC_OFFSETS_PCT)
+# ── Tuning knobs ──────────────────────────────────────────────────────
+# Full-range sampling: test at soc_min+5 and soc_max so the linear
+# surrogate covers every start SOC Tier 3 might need.  Tier 1's
+# s_center can be far from what singleday.solve actually produces,
+# so narrow offsets around s_center leave the surrogate window too
+# tight for Tier 3 to chain days together.
+SAMPLE_WINDOW_PCT = 5.0          # convergence drift threshold
+MAX_COMBOS = 3
 
 _L2_WARMSTART_KW = "warm_start_kmh"
 
@@ -44,7 +50,6 @@ def _ordered_combos(plan: _DayPlan, day_index: int, car: CarState, is_today: boo
             n * ((plan.loops[i][1] * 1000.0) / loop_speed_ms + pre_attempt_stop_s)
             for i, n in enumerate(reps)) if reps else 0.0
 
-    MAX_COMBOS = 5
     return sorted(combos, key=_loop_time)[:MAX_COMBOS]
 
 def _l2_result_feasible(res: dict, car: CarState, day_index: int) -> bool:
@@ -65,13 +70,13 @@ def _sweep_one_offset(task: dict) -> dict:
     ordered = task["ordered_combos"]
     global_method = task["global_method"]
     seed = task["seed"]
-    
+
     d_dist = task.get("dist_done_km", 0.0)
     d_elap = task.get("elapsed_s", 0.0)
     d_cs = task.get("cs_taken", False)
 
     out: dict[tuple, tuple] = {}
-    warm = None  
+    warm = None
     for reps, _loop_km in tqdm(ordered, desc=f"day {day_index} combos", leave=False):
         loops_committed = _reps_to_committed(plan, reps)
 
@@ -81,8 +86,8 @@ def _sweep_one_offset(task: dict) -> dict:
 
         res = singleday.solve(route, car, solar_provider, wind_provider,
                               day_index, start_soc, alpha_next,
-                              loops_committed, 
-                              dist_done_km=d_dist, elapsed_s=d_elap, cs_taken=d_cs, 
+                              loops_committed,
+                              dist_done_km=d_dist, elapsed_s=d_elap, cs_taken=d_cs,
                               **kwargs)
 
         if not _l2_result_feasible(res, car, day_index):
@@ -119,14 +124,17 @@ def _fit_surrogates(points_by_combo: dict, s0: float, plan: _DayPlan):
         xs = np.array([p[0] for p in pts], dtype=float)
         ys = np.array([p[1] for p in pts], dtype=float)
         if len(np.unique(xs)) >= 2:
-            b, a_at_zero = np.polyfit(xs - s0, ys, 1)  
+            b, a_at_zero = np.polyfit(xs - s0, ys, 1)
             a = a_at_zero
         else:
             a, b = float(ys[0]), 0.0
         loop_km = sum((reps[i] if reps else 0) * km for i, (_n, km) in enumerate(plan.loops))
+        # Allow full-range extrapolation.  The linear model is valid across
+        # the entire SOC range; restricting to the sampled window caused
+        # Tier 3 to fail when Tier 1's s_center was far from reality.
         surro[tuple(reps)] = LinearSurrogate(
             a=float(a), b=float(b), s0=s0, loop_km=loop_km, reps=tuple(reps),
-            soc_lo=float(xs.min()), soc_hi=float(xs.max()))
+            soc_lo=0.0, soc_hi=110.0)
     return surro
 
 def sample_day(route, car: CarState, solar_provider, wind_provider,
@@ -134,13 +142,17 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
                alpha_next_day_pct: float, *, parallel: bool = True,
                n_workers: int | None = None, global_method: str = "ga",
                seed: int | None = None,
-               offsets_pct=SOC_OFFSETS_PCT, 
-               is_today: bool = False, dist_done_km: float = 0.0, 
+               offsets_pct=None,
+               is_today: bool = False, dist_done_km: float = 0.0,
                elapsed_s: float = 0.0, cs_taken: bool = False) -> dict:
 
     ordered = _ordered_combos(plan, day_index, car, is_today, elapsed_s)
-    start_socs = [float(np.clip(s0_pct + o, car.soc_min_pct, car.soc_max_pct))
-                  for o in offsets_pct]
+
+    # Full-range sampling: test at low and high SOC so the linear
+    # surrogate covers every start SOC Tier 3's DP might visit.
+    lo = float(np.clip(car.soc_min_pct + 5.0, car.soc_min_pct, car.soc_max_pct))
+    hi = float(car.soc_max_pct)
+    start_socs = sorted(set([lo, hi]))  # 2 levels (or 1 if lo==hi)
 
     tasks = [dict(route=route, car=car, solar_provider=solar_provider,
                   wind_provider=wind_provider, day_index=day_index, plan=plan,
@@ -149,13 +161,8 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
                   dist_done_km=dist_done_km, elapsed_s=elapsed_s, cs_taken=cs_taken)
              for s in start_socs]
 
-    parallel = False   #Set this to TRUE if possible to use parallel processing
-
-    if parallel and len(tasks) > 1:
-        with mp.Pool(processes=n_workers or min(len(tasks), mp.cpu_count())) as pool:
-            sweeps = pool.map(_sweep_one_offset, tasks)
-    else:
-        sweeps = [_sweep_one_offset(t) for t in tasks]
+    # Serial execution — Windows can't pickle Route/SolarProvider for mp.
+    sweeps = [_sweep_one_offset(t) for t in tasks]
 
     points_by_combo: dict[tuple, list] = {}
     seen_keys: set = set()
@@ -180,7 +187,6 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
     for d in tqdm(range(start_day, len(plans)), desc="Tier2 days"):
         route = routes[d] if routes and d < len(routes) else None
         alpha = alpha_next_pct.get(d, car.soc_min_pct)
-        # Guard: if alpha is NaN (from infeasible Tier 1 cascade), use soc_min_pct
         if not np.isfinite(alpha):
             logger.warning("Day %d: alpha_next is NaN, falling back to soc_min=%.1f%%",
                            d, car.soc_min_pct)
@@ -188,13 +194,13 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
 
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
-        
+
         is_today = (d == start_day)
         d_dist = dist_done_km if is_today else 0.0
         d_elap = elapsed_s if is_today else 0.0
         d_cs = cs_taken if is_today else False
         d_loops = loops_done if is_today else None
-        
+
         nom_plan = plans[d]
         if is_today and d_dist > 0:
             from .tier1 import _adjust_plan_for_today

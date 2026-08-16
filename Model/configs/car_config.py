@@ -55,7 +55,7 @@ class CarState:
     """
 
     # ---- mass & rolling -------------------------------------------------
-    mass_kg: float = 300.0               # source: DASHBOARD constants.py
+    mass_kg: float = 310.0               # source: DASHBOARD constants.py
                                          # (car+driver). TODO-VERIFY 2026 mass
                                          # incl. >=80 kg driver/ballast rule.
     crr: float = 0.007                   # source: DASHBOARD. TODO-VERIFY
@@ -68,7 +68,7 @@ class CarState:
     # ---- solar array ----------------------------------------------------
     array_area_m2: float = 5.95          # source: DASHBOARD. TODO-VERIFY class
                                          # decision (4 vs 6 m2) is car team's.
-    array_efficiency: float = 0.18       # source: DASHBOARD. TODO-VERIFY
+    array_efficiency: float = 0.22     # source: DASHBOARD. TODO-VERIFY
                                          # (LEGACY_KR used 0.19 on 6 m2).
     panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
     albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
@@ -76,12 +76,12 @@ class CarState:
     # ---- drivetrain -----------------------------------------------------
     motor_eff: float = 0.95              # source: DASHBOARD MOTOR_EFF.
     regen_eff: float = 0.70              # source: DASHBOARD REGEN_EFF.
-    p_idle_w: float = 70.0               # source: DASHBOARD POWER_LOSS (constant
+    p_idle_w: float = 5.0              # source: DASHBOARD POWER_LOSS (constant
                                          # electronics/parasitic draw). Plan v3
                                          # §6.1 P_idle: also subtracted during
                                          # stationary charging intervals.
                                          # TODO-VERIFY split driving/stopped.
-    p_max_continuous_w: float = 1800.0   # TODO-VERIFY: continuous motor power
+    p_max_continuous_w: float = 3000.0   # TODO-VERIFY: continuous motor power
                                          # limit for trailering red-flag
                                          # (Plan v3 §5.1). PLACEHOLDER — need
                                          # the 2026 motor spec from car team.
@@ -100,9 +100,9 @@ class CarState:
     discharge_eff: float = 0.96          # TODO-VERIFY (Paper 4 eta_bd=0.96).
 
     # ---- speed/accel envelope ------------------------------------------
-    v_max_ms: float = 85.0 / 3.6         # source: DASHBOARD MAX_SPEED=85 km/h.
+    v_max_ms: float = 90.0 / 3.6         # source: DASHBOARD MAX_SPEED=85 km/h.
                                          # TODO-VERIFY 2026 car max.
-    a_max_ms2: float = 0.5               # Paper 1 field finding: <=0.5 m/s^2 is
+    a_max_ms2: float = 2.0               # Paper 1 field finding: <=0.5 m/s^2 is
                                          # safe & driver-followable (Plan v3 §8).
 
     # ---- convenience ----------------------------------------------------
@@ -163,15 +163,15 @@ LEGACY_KR = dict(                        # race_completion/race_config.py
 )
 
 DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
-    mass_kg=300.0,
+    mass_kg=310.0,
     crr=0.007,
     cda_m2=0.16,
     air_density=1.2,
     array_area_m2=5.95,
-    array_efficiency=0.18,
+    array_efficiency=0.22,
     motor_eff=0.95,
     regen_eff=0.70,
-    power_loss_w=70.0,
+    power_loss_w=5.0,
     battery_wh=3528.0,
-    max_speed_kmh=85.0,
+    max_speed_kmh=90.0,
 )
