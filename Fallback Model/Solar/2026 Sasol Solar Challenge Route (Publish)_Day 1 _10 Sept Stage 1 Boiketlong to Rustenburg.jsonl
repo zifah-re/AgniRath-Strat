@@ -10,7 +10,7 @@
                 "ghi": 0,
                 "wind_speed_10m": 2.3,
                 "wind_direction_10m": 157
-            },
+            },+
             {
                 "period_end": "2026-08-16T18:15:00+00:00",
                 "air_temp": 15,
