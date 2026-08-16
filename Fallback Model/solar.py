@@ -19,7 +19,8 @@ def main(file):
     coords=np.array(data['profile']['Coordinates'])
     lats,lons=coords[:,0],coords[:,1]
     n=1
-    query_dist=np.linspace(0.0,distances[-1],n)
+    query_dist=np.linspace(0.0,distances[-1],n+2)
+    query_dist=query_dist[1:len(query_dist)-1]
     solar_data=[]
     lat_list,lon_list=np.interp(query_dist,distances,lats),np.interp(query_dist,distances,lons)
     for i in range(n):
