@@ -27,22 +27,22 @@ from simulator import forward_sim
 
 logger = logging.getLogger(__name__)
 
-# ===========================================================================
+# ===============================================================================
 # 0. Local config overrides
-# ===========================================================================
+# ===============================================================================
 
 CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M
 
 SHARP_TURN_HEADING_DELTA_DEG = 30.0      
-SHARP_TURN_SPEED_LIMIT_KMH = 20.0        
+SHARP_TURN_SPEED_LIMIT_KMH = 20.0       
 
 DE_POPSIZE = 8                            
 DE_MAXITER = 60                           
 
 
-# ===========================================================================
+# ===============================================================================
 # 1. Sharp-turn speed caps
-# ===========================================================================
+# ===============================================================================
 
 def _sharp_turn_fraction(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
                           heading_delta_threshold_deg: float) -> np.ndarray:
@@ -77,9 +77,9 @@ def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
     v_eff = 1.0 / (frac / turn_speed_limit_kmh + (1.0 - frac) / np.maximum(v_max_kmh, 1e-6))
     return v_eff
 
-# ===========================================================================
+# ===============================================================================
 # 2. Day-level evaluation
-# ===========================================================================
+# ===============================================================================
 
 class DayEvaluator:
     """Runs one candidate speed vector through physics + timing via forward_sim."""
@@ -117,9 +117,9 @@ class DayEvaluator:
         )
 
 
-# ===========================================================================
+# ===============================================================================
 # 3. Objective / constraints
-# ===========================================================================
+# ===============================================================================
 
 def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
     def _objective(v_kmh: np.ndarray) -> float:
@@ -141,9 +141,9 @@ def _time_cutoff_constraint(evaluator: DayEvaluator,
     )
 
 
-# ===========================================================================
+# ===============================================================================
 # 4. Swappable global search
-# ===========================================================================
+# ===============================================================================
 
 class GlobalSearchResult(_t.NamedTuple):
     x: np.ndarray
@@ -246,9 +246,9 @@ def get_global_search(method: str, **kwargs) -> GlobalSearchStrategy:
     return cls(**kwargs)
 
 
-# ===========================================================================
+# ===============================================================================
 # 5. Integer km/h projection
-# ===========================================================================
+# ===============================================================================
 
 def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
                             v_max_kmh: np.ndarray, v_min_kmh: float = 5.0,
@@ -273,9 +273,9 @@ def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
     return best
 
 
-# ===========================================================================
+# ===============================================================================
 # 6. solve() — frozen API
-# ===========================================================================
+# ===============================================================================
 
 def solve(route: Route, car: CarState, solar_provider, wind_provider,
           day_index: int, start_soc_pct: float, alpha_next_day_pct: float,
@@ -353,6 +353,8 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         x_m=final_eval.x_m,
         driver_swaps=final_eval.driver_swaps,
         global_method=global_result.method,
+        trailered_km=getattr(final_eval, 'trailered_km', 0.0),
+        trailered_substeps=getattr(final_eval, 'trailered_substeps', 0),
         diagnostics=dict(
             global_fun=global_result.fun,
             slsqp_fun=slsqp_result.fun,

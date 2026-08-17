@@ -73,6 +73,14 @@ class Route:
     def red_flag_at(self, x_m) -> bool:
         return bool(self.df["red_flag_trailer"].to_numpy()[self._idx(x_m)])
 
+    def red_flag_at(self, x_m: float) -> bool:
+        if "red_flag_trailer" not in self.df.columns:
+            return False
+        x = self.df["distance_m"].to_numpy()
+        idx = min(int(np.searchsorted(x, x_m)), len(self.df) - 1)
+        return bool(self.df.iloc[idx]["red_flag_trailer"])
+ 
+
     @property
     def total_m(self) -> float:
         return float(self._x[-1])

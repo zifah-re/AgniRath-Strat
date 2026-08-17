@@ -64,13 +64,18 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
              kml_paths: dict | None = None, parallel: bool = True,
              n_workers: int | None = None, global_method: str = "ga",
              seed: int | None = None, max_iters: int = MAX_ITERS,
-             window_pct: float = CONVERGENCE_WINDOW_PCT) -> dict:
-             
-    base = tier1.guess_baseline(routes, car, solar_providers, wind_providers,
-                                start_soc_pct, start_day=start_day, 
-                                dist_done_km=dist_done_km, elapsed_s=elapsed_s,
-                                cs_taken=cs_taken, loops_done=loops_done,
-                                kml_paths=kml_paths)
+             window_pct: float = CONVERGENCE_WINDOW_PCT,
+             tier1_baseline: dict | None = None) -> dict:
+
+    if tier1_baseline is not None:
+        base = tier1_baseline
+        logger.info("Using pre-computed Tier 1 baseline (skipping recomputation)")
+    else:
+        base = tier1.guess_baseline(routes, car, solar_providers, wind_providers,
+                                    start_soc_pct, start_day=start_day,
+                                    dist_done_km=dist_done_km, elapsed_s=elapsed_s,
+                                    cs_taken=cs_taken, loops_done=loops_done,
+                                    kml_paths=kml_paths)
     plans = base["day_plans"]
     s_center = base["s0_pct"].copy()
     if not base["feasible"]:
@@ -232,8 +237,11 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "loops_committed": loops_committed,
             "end_soc_pct": res.get("final_soc_pct"),
             "velocity_profile_kmh": res.get("v_kmh"),
-            "time_array_s": res.get("t_s"),          
-            "distance_array_m": res.get("x_m")       
+            "time_array_s": res.get("t_s"),
+            "distance_array_m": res.get("x_m"),
+            "total_time_s": res.get("total_time_s"),  # actual drive duration (not absolute)
+            "trailered_km": res.get("trailered_km", 0.0),
+            "trailered_substeps": res.get("trailered_substeps", 0),
         }
         
     return final_race_plan
@@ -358,7 +366,9 @@ if __name__ == "__main__":
             alts     = prof.get("Altitude",   [0.0] * len(dists))
             lats     = [c[0] for c in prof["Coordinates"]]
             lons     = [c[1] for c in prof["Coordinates"]]
-            v_maxs   = [v / 3.6 for v in prof["SpeedLimit"]]
+            # Clamp speed limits: some route data has erroneous 5 km/h entries.
+            # Floor at 30 km/h (highway minimum) to avoid artificial slowdowns.
+            v_maxs   = [max(v, 30.0) / 3.6 for v in prof["SpeedLimit"]]
             ml = min(len(dists), len(slopes), len(bearings),
                      len(alts), len(lats), len(lons), len(v_maxs))
             part_df = pd.DataFrame({
@@ -508,8 +518,26 @@ if __name__ == "__main__":
         day3_variant_weather[vname] = matched
 
     # ------------------------------------------------------------------ #
-    # 5.  Run optimizer for each Day 3 variant
+    # 5.  Compute Tier 1 once, then run optimizer for each variant
     # ------------------------------------------------------------------ #
+    # Tier 1 is expensive (~10 min) and only Day 3 changes between variants.
+    # Compute it once with the first variant's Day 3 and reuse for all.
+    first_vname = list(day3_variants.keys())[0]
+    first_vfiles = day3_variants[first_vname]
+    if first_vfiles:
+        routes[2] = _load_route(first_vfiles, 3)
+    else:
+        routes[2] = None
+    weather_files = day3_variant_weather.get(first_vname, [])
+    solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
+    kml_files_d3 = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
+    kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
+
+    logger.info("Computing shared Tier 1 baseline (using Day 3 = %s)...", first_vname)
+    shared_baseline = tier1.guess_baseline(
+        routes, car, solar_providers, wind_providers, 100.0,
+        start_day=0, kml_paths=kml_paths)
+
     all_results = {}
 
     for variant_name, variant_route_files in day3_variants.items():
@@ -529,10 +557,9 @@ if __name__ == "__main__":
         solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
 
         # KML for Day 3
-        kml_files = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
-        kml_paths[2] = kml_files[0] if kml_files else None
+        kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
 
-        # --- Run trust-region optimizer ---
+        # --- Run trust-region optimizer (reuse Tier 1 baseline) ---
         result = optimize(
             routes=routes,
             car=car,
@@ -542,7 +569,8 @@ if __name__ == "__main__":
             start_soc_pct=100.0,
             start_day=0,
             parallel=True,
-            max_iters=2,
+            max_iters=4,
+            tier1_baseline=shared_baseline,
         )
 
         # --- Extract final speed profiles if feasible ---
@@ -556,8 +584,8 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-
     plans = [_get_day_plan(d) for d in range(8)]
+    
     DAY_NAMES = {
         0: "Johannesburg → Rustenburg",
         1: "Rustenburg → Zeerust",
@@ -594,7 +622,7 @@ if __name__ == "__main__":
         t = t0
         while t < t1:
             ghi = solar_prov.ghi_wm2(t, 0.0)
-            total += ghi * _SOLAR_AREA * _SOLAR_EFF * dt
+            total += ghi * _SOLAR_AREA * _SOLAR_EFF * dt / 3600.0  # Wh, not joules
             t += dt
         return total
 
@@ -640,9 +668,9 @@ if __name__ == "__main__":
         loop_plan = result.get("loop_plan", {})
         s_start = result.get("s_start_pct")
 
-        print(f"\n  {'─' * 66}")
-        print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5}")
-        print(f"  {'─' * 66}")
+        print(f"\n  {'─' * 80}")
+        print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5} │ {'TRAILER':>8}")
+        print(f"  {'─' * 80}")
 
         for d_idx in range(8):
             plan = plans[d_idx]
@@ -660,22 +688,30 @@ if __name__ == "__main__":
             if profiles and d_idx in profiles:
                 p = profiles[d_idx]
                 soc_end = p.get("end_soc_pct", 0.0)
-                total_t = p.get("time_array_s")
-                if total_t is not None:
-                    total_t = max(total_t) if hasattr(total_t, '__iter__') else total_t
-                else:
-                    total_t = 0.0
+                # Use total_time_s (drive duration) if available; fall back to
+                # deriving from t_s (but t_s is ABSOLUTE clock time, not duration).
+                drive_time = p.get("total_time_s")
+                if drive_time is None:
+                    t_arr = p.get("time_array_s")
+                    if t_arr is not None and hasattr(t_arr, '__iter__'):
+                        # t_s is absolute → duration = max(t_s) - day_start
+                        drive_time = float(max(t_arr)) - rc.day_start_time_s(d_idx)
+                    else:
+                        drive_time = 0.0
             else:
-                # Estimate from surrogate
                 soc_end = 0.0
-                total_t = 0.0
+                drive_time = 0.0
 
             t_start_abs = rc.day_start_time_s(d_idx)
-            eta_abs = t_start_abs + total_t
-            eta_str = _clock(eta_abs) if total_t > 0 else "—"
+            eta_abs = t_start_abs + drive_time
+            eta_str = _clock(eta_abs) if drive_time > 0 else "—"
 
+            trailer_km = 0.0
+            if profiles and d_idx in profiles:
+                trailer_km = profiles[d_idx].get("trailered_km", 0.0) or 0.0
+            trailer_str = f"{trailer_km:.1f}km" if trailer_km > 0 else "—"
             print(f"  {d_idx+1:>5} │ {route_name:<30} │ {day_km:>6.1f} │ {n_loops:>5} │ "
-                  f"{soc_start:>5.1f}% → {soc_end:>5.1f}% │ {eta_str:>5}")
+                  f"{soc_start:>5.1f}% → {soc_end:>5.1f}% │ {eta_str:>5} │ {trailer_str:>8}")
 
         # ── Detailed per-day strategy ──
         print(f"\n  {'═' * 66}")
@@ -702,10 +738,14 @@ if __name__ == "__main__":
             if profiles and d_idx in profiles:
                 p = profiles[d_idx]
                 soc_end = p.get("end_soc_pct", 0.0) or 0.0
-                total_time = 0.0
-                t_arr = p.get("time_array_s")
-                if t_arr is not None and hasattr(t_arr, '__iter__'):
-                    total_time = float(max(t_arr))
+                # total_time_s is the actual drive duration (not absolute clock)
+                total_time = p.get("total_time_s")
+                if total_time is None:
+                    t_arr = p.get("time_array_s")
+                    if t_arr is not None and hasattr(t_arr, '__iter__'):
+                        total_time = float(max(t_arr)) - rc.day_start_time_s(d_idx)
+                    else:
+                        total_time = 0.0
                 v_arr = p.get("velocity_profile_kmh")
             else:
                 soc_end = 0.0
@@ -753,9 +793,110 @@ if __name__ == "__main__":
                 est_time = day_km / avg_speed_kmh * 3600
                 print(f"  8) ETA: ~{_clock(t_start_abs + est_time)} (est. drive time {_hms(est_time)})")
 
+            # 9. Trailering
+            if profiles and d_idx in profiles:
+                t_km = profiles[d_idx].get("trailered_km", 0.0) or 0.0
+                t_sub = profiles[d_idx].get("trailered_substeps", 0) or 0
+                if t_km > 0:
+                    print(f"  9) Trailered: {t_km:.1f} km ({t_sub} segments) — no power in/out")
+                else:
+                    print(f"  9) Trailered: none")
+            else:
+                print(f"  9) Trailered: n/a")
+
             # Speed summary
             if v_arr is not None:
                 v_np = np.asarray(v_arr)
                 print(f"      Speed: avg {v_np.mean():.1f} km/h, min {v_np.min():.1f}, max {v_np.max():.1f}")
 
     print("\n" + "=" * 70)
+
+    # ------------------------------------------------------------------ #
+    # 8.  Save durable JSON output for dashboard
+    # ------------------------------------------------------------------ #
+    import datetime as _dt
+
+    output_dir = os.path.abspath(os.path.join(current_dir, "..", "output"))
+    os.makedirs(output_dir, exist_ok=True)
+
+    for variant_name, data in all_results.items():
+        result   = data["result"]
+        profiles = data["profiles"]
+
+        json_out = {
+            "variant": variant_name,
+            "timestamp": _dt.datetime.now().isoformat(),
+            "converged": result.get("converged"),
+            "feasible": result.get("feasible"),
+            "iterations": result.get("iterations"),
+            "total_distance_km": result.get("total_distance_km", 0),
+            "history": result.get("history", []),
+            "days": {},
+        }
+
+        if result.get("feasible"):
+            loop_plan = result.get("loop_plan", {})
+            s_start = result.get("s_start_pct")
+
+            for d_idx in range(8):
+                plan = plans[d_idx]
+                lp = loop_plan.get(d_idx, {})
+                n_loops = sum(lp.values()) if lp else 0
+                loop_km = sum(cnt * km for (name, km) in plan.loops
+                              for cnt in [lp.get(name, 0)])
+                day_km = plan.stage1_km + plan.stage2_km + loop_km
+                soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+
+                day_data = {
+                    "route": DAY_NAMES.get(d_idx, f"Day {d_idx + 1}"),
+                    "distance_km": round(day_km, 1),
+                    "stage1_km": round(plan.stage1_km, 1),
+                    "stage2_km": round(plan.stage2_km, 1),
+                    "loop_km": round(loop_km, 1),
+                    "loops": {name: cnt for name, cnt in lp.items()} if lp else {},
+                    "n_loops": n_loops,
+                    "soc_start_pct": round(soc_start, 1),
+                }
+
+                solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+                day_data["solar_input_wh"] = round(solar_wh, 0)
+
+                if profiles and d_idx in profiles:
+                    p = profiles[d_idx]
+                    soc_end = p.get("end_soc_pct", 0.0) or 0.0
+                    drive_t = p.get("total_time_s")
+                    if drive_t is None:
+                        t_arr = p.get("time_array_s")
+                        if t_arr is not None and hasattr(t_arr, '__iter__'):
+                            drive_t = float(max(t_arr)) - rc.day_start_time_s(d_idx)
+                        else:
+                            drive_t = 0.0
+                    v_arr = p.get("velocity_profile_kmh")
+                    day_data["soc_end_pct"] = round(soc_end, 1)
+                    day_data["drive_time_s"] = round(drive_t, 0)
+                    day_data["eta"] = _clock(rc.day_start_time_s(d_idx) + drive_t)
+                    if v_arr is not None:
+                        v_np = np.asarray(v_arr)
+                        day_data["speed_avg_kmh"] = round(float(v_np.mean()), 1)
+                        day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
+                        day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
+                        day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
+
+                if profiles and d_idx in profiles:
+                    day_data["trailered_km"] = round(profiles[d_idx].get("trailered_km", 0.0) or 0.0, 1)
+                    day_data["trailered_substeps"] = profiles[d_idx].get("trailered_substeps", 0) or 0
+
+                soc_drain = soc_start - day_data.get("soc_end_pct", soc_start)
+                drain_wh = soc_drain / 100.0 * _BATT_CAP_WH
+                day_data["battery_drain_wh"] = round(drain_wh, 0)
+                day_data["battery_drain_pct"] = round(soc_drain, 1)
+                day_data["motor_energy_wh"] = round(drain_wh + solar_wh, 0)
+
+                json_out["days"][str(d_idx + 1)] = day_data
+
+        out_path = os.path.join(output_dir, f"strategy_{variant_name}.json")
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(json_out, f, indent=2, default=str)
+        logger.info("Saved strategy → %s", out_path)
+
+    logger.info("All variant results saved to %s/", output_dir)
