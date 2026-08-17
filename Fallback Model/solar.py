@@ -29,7 +29,7 @@ def main(file):
             longitude=lon_list[i],
             output_parameters=['air_temp','dni','ghi','wind_speed_10m','wind_direction_10m'],
             period="PT5M",
-            terrain_shading=True,
+            terrain_shading=False,
             hours=335
         )
         df=response.to_pandas()

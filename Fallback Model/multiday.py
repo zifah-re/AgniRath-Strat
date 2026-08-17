@@ -89,7 +89,7 @@ DAY_ROUTE_NOTES = [
 ]
 
 #____ Solar and Wind_____#
-weather_folder = Path(r'Model\data\solar')
+weather_folder = Path(r'Fallback Model\Solar_Processed')
 
 def extractSolarData(json_file):
     with open(json_file, 'r') as f:

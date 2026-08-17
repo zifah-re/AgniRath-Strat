@@ -1,9 +1,21 @@
-from datetime import datetime, time
+from datetime import datetime, time, date
+from zoneinfo import ZoneInfo
 import json
 from pathlib import Path
 import numpy as np
+import re
 
-# 97
+SA_TZ=ZoneInfo("Africa/Johannesburg")
+DATES={
+  "Day 1": date(2026,9,10),
+  "Day 2": date(2026,9,11),
+  "Day 3": date(2026,9,12),
+  "Day 4": date(2026,9,13),
+  "Day 5": date(2026,9,14),
+  "Day 6": date(2026,9,15),
+  "Day 7": date(2026,9,16),
+  "Day 8": date(2026,9,17)
+}
 
 folder = Path(r'Fallback Model\Solar')
 output_folder = Path(r'Fallback Model\Solar_Processed')
@@ -16,7 +28,7 @@ def extractSolarData(json_file):
   return data
 
 
-def trimSolarData(solar_data, start_time=time(8, 0), end_time=time(17, 0)):
+def trimSolarData(solar_data, start_time=time(8, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
   trimmed_data = []
   for entry in solar_data:
     entry_time = datetime.fromisoformat(entry['period_end']).time()
@@ -25,7 +37,7 @@ def trimSolarData(solar_data, start_time=time(8, 0), end_time=time(17, 0)):
   return trimmed_data
 
 
-def meanSolar(solar_data, start_time=time(8, 0), end_time=time(17, 0)):
+def meanSolar(solar_data, day, start_time=time(8, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
   time_dict = {
       f'{m // 60:02d}:{m % 60:02d}': []
       for m in range(
@@ -36,7 +48,7 @@ def meanSolar(solar_data, start_time=time(8, 0), end_time=time(17, 0)):
   }
 
   for entry in solar_data:
-    entry_time = datetime.fromisoformat(entry['period_end']).time()
+    entry_time = datetime.fromisoformat(entry['period_end']).astimezone(SA_TZ).time()
     if start_time <= entry_time <= end_time:
       time_str = f'{entry_time.hour:02d}:{entry_time.minute:02d}'
       if time_str in time_dict:
@@ -49,7 +61,10 @@ def meanSolar(solar_data, start_time=time(8, 0), end_time=time(17, 0)):
           for key in v[0]
           if key != 'period_end'
       }
-      mean_entry['period_end'] = f'{k}:00'
+      parsed_time = datetime.strptime(f"{k}:00", "%H:%M:%S").time()
+      # Combine today's date with the parsed time and attach SAST timezone
+      dt = datetime.combine(DATES[day], parsed_time, tzinfo=SA_TZ)
+      mean_entry["period_end"] = dt.isoformat()
       time_dict[k] = mean_entry
     else:
       time_dict[k] = None
@@ -65,11 +80,11 @@ for json_file in folder.glob('*.jsonl'):
   stage_point_lat = stage_point_raw[0]['lat']
   stage_point_long = stage_point_raw[0]['lon']
   stage_point_data = stage_point_raw[0]['data']
-
+  day=re.search(r"Day [1-8]",json_file.name).group(0)
   if 'Day 1' in file_name:
-    mean_data = meanSolar(stage_point_data, time(9, 0))
+    mean_data = meanSolar(stage_point_data, day, time(9, 0,tzinfo=SA_TZ))
   else:
-    mean_data = meanSolar(stage_point_data)
+    mean_data = meanSolar(stage_point_data, day)
 
   output_data = [{
       'lat': stage_point_lat,
