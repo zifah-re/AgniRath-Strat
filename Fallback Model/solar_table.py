@@ -4,7 +4,7 @@ import numpy as np
 import re
 
 class SolarResultProxy:
-    """A ultra-lightweight proxy to mimic the .data() access method without class overhead."""
+    """Lightweight proxy exposing .data() over an array-valued metric dict."""
     __slots__ = ('_data',)
     def __init__(self, data_dict):
         self._data = data_dict
@@ -62,6 +62,41 @@ class SolarIrradiance:
         dist = [geodesic(target_coord, c).kilometers for c in self._coords]
         return np.argmin(dist)
 
+    def _to_epoch_array(self, t):
+        """Always returns a 1D float64 epoch-seconds array, whatever t is."""
+        arr = np.atleast_1d(t)
+        if arr.dtype.kind in ('U', 'S', 'O'):
+            return np.array(
+                [datetime.fromisoformat(v).timestamp() if isinstance(v, str) else float(v) for v in arr],
+                dtype=np.float64
+            )
+        return arr.astype(np.float64)
+
+    def _interp_indices_and_weights(self, times):
+        """Bucket index + interpolation weight for every entry of times at once."""
+        n = np.floor((times - self._t0) / self._interval).astype(np.int64)
+        n = np.clip(n, 0, len(self._time_list) - 2)
+        t1 = self._time_list[n]
+        t2 = self._time_list[n + 1]
+        span = t2 - t1
+        weight = np.divide(times - t1, span, out=np.zeros_like(times), where=span != 0)
+        return n, weight
+
+    def _lookup_vectorized(self, t):
+        """Interpolate every metric, for every coord, across the full time array at once."""
+        times = self._to_epoch_array(t)
+        n, weight = self._interp_indices_and_weights(times)
+
+        results = {}
+        for idx, coord in enumerate(self._coords):
+            coord_results = {}
+            for metric in self._metric_keys:
+                arr = self._metrics[metric][idx]
+                coord_results[metric] = arr[n] + weight * (arr[n + 1] - arr[n])
+            results[coord] = SolarResultProxy(coord_results)
+
+        return results if len(results) > 1 else next(iter(results.values()))
+
     def __getitem__(self, key):
         if isinstance(key, tuple) and len(key) == 2 and not isinstance(key[0], (float, int)):
             x, y = key
@@ -69,57 +104,26 @@ class SolarIrradiance:
             x, y = key, None
 
         if y is not None:
-            if hasattr(x, '__iter__') and not isinstance(x, (str, bytes)):
-                coord_val, time_val = x, y
-            else:
-                coord_val, time_val = y, x
-            
-            t_target = datetime.fromisoformat(time_val).timestamp() if isinstance(time_val, str) else float(time_val)
+            # tuple => coordinate; everything else => time (vector or scalar)
+            coord_val, time_val = (x, y) if isinstance(x, tuple) else (y, x)
             coord_idx = self._get_closest_coord_idx(coord_val)
-            
-            n = int((t_target - self._t0) // self._interval)
-            n = max(0, min(n, len(self._time_list) - 2)) # Safety bound check
-            
-            t1, t2 = self._time_list[n], self._time_list[n+1]
-            weight = (t_target - t1) / (t2 - t1) if t2 != t1 else 0.0
-            
+            times = self._to_epoch_array(time_val)
+            n, weight = self._interp_indices_and_weights(times)
+
             coord_results = {}
             for metric in self._metric_keys:
-                y1 = self._metrics[metric][coord_idx, n]
-                y2 = self._metrics[metric][coord_idx, n+1]
-                coord_results[metric] = y1 + weight * (y2 - y1) # Fast linear interpolation
-                
+                arr = self._metrics[metric][coord_idx]
+                coord_results[metric] = arr[n] + weight * (arr[n + 1] - arr[n])
             return SolarResultProxy(coord_results)
 
-        if hasattr(x, '__iter__') and not isinstance(x, (str, bytes)):
+        # coordinate narrowing to the nearest station
+        if isinstance(x, tuple):
             idx = self._get_closest_coord_idx(x)
             closest_coord = self._coords[idx]
-            return SolarIrradiance({closest_coord: self._data[closest_coord]}, time_key=self._time_key,interval=self._interval)
-            
-        elif isinstance(x, (int, float, str)):
-            t_target = datetime.fromisoformat(x).timestamp() if isinstance(x, str) else float(x)
-            n = int((t_target - self._t0) // self._interval)
-            n = max(0, min(n, len(self._time_list) - 2))
-            
-            t1, t2 = self._time_list[n], self._time_list[n+1]
-            weight = (t_target - t1) / (t2 - t1) if t2 != t1 else 0.0
-            
-            output = {}
-            for idx, coord in enumerate(self._coords):
-                coord_results = {}
-                for metric in self._metric_keys:
-                    y1 = self._metrics[metric][idx, n]
-                    y2 = self._metrics[metric][idx, n+1]
-                    coord_results[metric] = float(y1 + weight * (y2 - y1))
-                coord_results[self._time_key] = datetime.fromtimestamp(t_target, tz=self._tz).isoformat()
-                output[coord] = [coord_results]
-            return SolarIrradiance(output, time_key=self._time_key,interval=self._interval)
+            return SolarIrradiance({closest_coord: self._data[closest_coord]}, time_key=self._time_key, interval=self._interval)
+
+        # everything else is a time lookup, always vectorized
+        return self._lookup_vectorized(x)
 
     def __repr__(self):
         return str(self._data)
-
-    def data(self, key):
-        if len(self._coords) == 1 and len(self._time_list) == 1:
-            if hasattr(key, '__iter__') and not isinstance(key, (str, bytes)):
-                return [self._data[self._coords[0]][0][val] for val in key]
-            return self._data[self._coords[0]][0][key]
