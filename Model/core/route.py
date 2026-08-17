@@ -71,15 +71,11 @@ class Route:
         return (self.df["lat"].to_numpy()[i], self.df["lon"].to_numpy()[i])
 
     def red_flag_at(self, x_m) -> bool:
+        """True if the nearest grid point to x_m is in a trailered (red-flag)
+        block. Single definition — the duplicate KML-era override is removed;
+        the red_flag_trailer column (Plan v3 §5.1) is the one source of truth.
+        The constructor already enforces the column, so no runtime guard."""
         return bool(self.df["red_flag_trailer"].to_numpy()[self._idx(x_m)])
-
-    def red_flag_at(self, x_m: float) -> bool:
-        if "red_flag_trailer" not in self.df.columns:
-            return False
-        x = self.df["distance_m"].to_numpy()
-        idx = min(int(np.searchsorted(x, x_m)), len(self.df) - 1)
-        return bool(self.df.iloc[idx]["red_flag_trailer"])
- 
 
     @property
     def total_m(self) -> float:

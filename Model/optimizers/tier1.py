@@ -21,7 +21,6 @@ from core.battery import Battery
 logger = logging.getLogger(__name__)
 
 TIER1_SAMPLE_M = 500.0
-_DEFAULT_REGEN_CAP_W = None
 
 # Energy diagnostic: fires once per day at high SOC to avoid log spam
 _energy_diag_logged: set = set()
@@ -32,6 +31,7 @@ class _DayPlan:
     stage1_km: float
     stage2_km: float
     loops: tuple[tuple[str, float], ...]
+
 
 def _get_day_plan(day_index: int) -> _DayPlan:
     """Nominal (not-yet-driven) route plan for a day, from route notes."""
@@ -46,11 +46,6 @@ def _get_day_plan(day_index: int) -> _DayPlan:
     )
     return _DayPlan(stage1_km, stage2_km, loops)
 
-def _regen_cap_w(car: CarState) -> float:
-    explicit = getattr(car, "p_regen_max_w", None)
-    if explicit is not None:
-        return float(explicit)
-    return float(car.p_max_continuous_w * car.p_max_derating)
 
 def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
                            loops_completed: dict | None = None) -> _DayPlan:
@@ -61,6 +56,7 @@ def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
         stage2_done_km = max(0.0, distance_done_km_today - plan.stage1_km - loop_drive_km)
         return _DayPlan(0.0, max(0.0, plan.stage2_km - stage2_done_km), ())
     return _DayPlan(0.0, plan.stage2_km, ())
+
 
 def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, day_index: int) -> np.ndarray:
     """Parses routeshader KML and maps (False) blocks via KDTree to the 500m Tier 1 distance array."""
@@ -103,6 +99,7 @@ def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, da
     idx = np.clip(np.searchsorted(route_df["distance_m"].to_numpy(), x_m_array), 0, len(route_df)-1)
     return is_trailered[idx]
 
+
 def _sample_portion(route, start_km: float, dist_km: float):
     if dist_km <= 0: return np.zeros(0), np.zeros(0), np.zeros(0)
     n = max(1, int(round(dist_km * 1000.0 / TIER1_SAMPLE_M)))
@@ -113,6 +110,7 @@ def _sample_portion(route, start_km: float, dist_km: float):
     slope = np.asarray(route.slope_pct_at(mid), dtype=float)
     bearing = np.asarray(route.bearing_deg_at(mid), dtype=float)
     return slope, bearing, seg_len_m
+
 
 def _wind_arrays(wind_provider, t_s: np.ndarray, x_m: np.ndarray, bearing_deg: np.ndarray, v_ms: np.ndarray):
     if wind_provider is None or len(x_m) == 0:
@@ -182,6 +180,7 @@ def _net_power_vectorised(car: CarState, v_ms: np.ndarray, slope_pct: np.ndarray
     p_solar = car.array_area_m2 * car.array_efficiency * ghi * solar_geom
     return p_solar - p_electric - car.p_idle_w
 
+
 def _build_day_arrays(route, plan: _DayPlan, reps: tuple[int, ...],
                       route_offset_km: float, v_base_ms: float,
                       loop_speed_ms: float, pre_attempt_stop_s: float):
@@ -216,6 +215,7 @@ def _build_day_arrays(route, plan: _DayPlan, reps: tuple[int, ...],
     return (np.concatenate(slopes), np.concatenate(bearings),
             np.concatenate(seglens), np.concatenate(vels), np.concatenate(gaps))
 
+
 def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
                  route_offset_km: float, v_base_ms: float, loop_speed_ms: float,
                  pre_attempt_stop_s: float, solar_provider, wind_provider,
@@ -242,7 +242,9 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
     trailered_mask = _get_trailered_mask(route, x_m, kml_paths, day_index)
 
-    regen_cap = _regen_cap_w(car)
+    # Regen charge-back cap lives on CarState.p_regen_max_w (defaults to
+    # p_max_continuous_w * p_max_derating); forward_sim reads the same value.
+    regen_cap = float(car.p_regen_max_w)
     p_net = _net_power_vectorised(car, v_ms, slope, ghi, wind_along, yaw, geom, regen_cap)
 
     # Mask electrical drive drain if on trailer (keep solar gain)
@@ -494,8 +496,10 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
 
     return dict(s0_pct=s0_traj, day_plans=plans, feasible=feasible)
 
+
 def _completion_margin() -> float:
     return getattr(rc, "DP_COMPLETION_MARGIN_PCT", 5.0)
+
 
 def _interp_value(v_row: np.ndarray, buckets: np.ndarray, soc: float) -> float:
     finite = np.isfinite(v_row)

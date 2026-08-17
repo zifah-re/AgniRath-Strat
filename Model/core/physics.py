@@ -92,6 +92,7 @@ def net_power(
     wind_along_ms: np.ndarray | float = 0.0,
     yaw_deg: np.ndarray | float = 0.0,
     solar_geom_factor: np.ndarray | float = 1.0,
+    regen_cap_w: float | np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Net electrical power into the battery over a segment, and dt.
 
@@ -100,6 +101,10 @@ def net_power(
     mech power, regen eff on negative; constant idle loss) with the v3
     upgrades: relative-airspeed drag, CdA(psi), and a solar geometry factor
     (slope/bearing incidence correction from core/solar.py, default 1).
+
+    regen_cap_w (optional): clamps regenerative charge-back power to a hard
+    limit, exactly like Tier 1's _regen_cap_w. Default None leaves the old
+    behaviour (uncapped regen) untouched.
 
     Returns (net_power_w, dt_s). Positive net_power charges the battery.
     """
@@ -115,9 +120,10 @@ def net_power(
     f_total = f["drag"] + f["rolling"] + f["gravity"] + f_acc
 
     p_mech = f_total * v
-    p_electric = np.where(p_mech >= 0.0,
-                          p_mech / car.motor_eff,
-                          p_mech * car.regen_eff)
+    regen_into_pack = np.where(p_mech < 0.0, -p_mech * car.regen_eff, 0.0)
+    if regen_cap_w is not None:
+        regen_into_pack = np.minimum(regen_into_pack, float(regen_cap_w))
+    p_electric = np.where(p_mech >= 0.0, p_mech / car.motor_eff, -regen_into_pack)
 
     p_solar = car.array_area_m2 * car.array_efficiency * \
         np.asarray(ghi_wm2, dtype=float) * solar_geom_factor
@@ -235,9 +241,12 @@ def motor_power_kr(
     )
     torque = _FRICTIONAL_TORQUE_COEFF * np.cos(np.radians(slope_deg)) + drag_torque
 
-    # Iterative thermal loop, verbatim from legacy.
+    # Iterative thermal loop, verbatim from legacy (plus a safety iteration
+    # bound: the legacy loop is `while True` and can spin forever if an input
+    # ever produces NaN/non-convergent temps; 1000 iterations is far beyond
+    # the ~dozen the fixpoint needs, so behaviour is unchanged on golden data).
     temp_prev = np.full_like(speed, _KR_TA, dtype=float)
-    while True:
+    for _iter in range(1000):
         magnetic_remanence = 1.6716 - 0.0006 * (_KR_TA + temp_prev)
         rms_current = 0.561 * magnetic_remanence * torque
         winding_resistance = 0.00022425 * temp_prev - 0.00820525
