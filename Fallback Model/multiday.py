@@ -2,6 +2,9 @@ import numpy as np
 import json 
 from pathlib import Path
 import datetime as _dt
+from solar_table import SolarIrradiance,SolarResultProxy
+import pvlib
+import pandas as pd
 
 
 #______CAR CONSTANTS_______#
@@ -13,6 +16,8 @@ CDA_M2 = 0.16
 AIR_DENSITY = 1.2
 ARRAY_AREA_M2 = 5.95
 ARRAY_EFFICIENCY = 0.18
+PANEL_TILT=4
+ALBEDO=0.2
 
 #drivetrain
 MOTOR_EFF = 0.95
@@ -104,17 +109,59 @@ for json_file in weather_folder.glob('*.json'):
     stage_data_raw = extractSolarData(json_file)
     stage_data = {}
     for point in stage_data_raw:
-        lat = point['historical_weather']['latitude']
-        long = point['historical_weather']['longitude']
-        dump = point['historical_weather']['hourly']
+        lat = point['lat']
+        long = point['lon']
+        dump = point['data']
         stage_data[(lat, long)] = dump
-        
-    weather_logs[json_file.stem] = stage_data
+    weather_logs[json_file.stem] = SolarIrradiance(stage_data,"period_end","PT5M")
 
 
 #____ Power ____ #
-def solar(v):
-    pass
+def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitude_profile):
+    """
+    Computes solar positions for all horizon steps simultaneously using full vectorization.
+    NO loops required.
+    """
+    coords_arr = np.array(coords_list)
+    lats = coords_arr[:, 0]
+    lons = coords_arr[:, 1]
+    
+    tz_times = pd.to_datetime(time_base, unit='s',utc=True).dt.tz_convert('Africa/Johannesburg')
+    
+    solpos = pvlib.solarposition.get_solarposition(
+        tz_times, 
+        lats, 
+        lons, 
+        altitude=np.array(altitude_profile)
+    )
+    
+    apparent_zenith = solpos['apparent_zenith'].values
+    azimuth = solpos['azimuth'].values
+    zenith_rad = np.radians(apparent_zenith)
+    
+    aoi = pvlib.irradiance.aoi(
+        PANEL_TILT, 
+        np.array(heading_profile), 
+        apparent_zenith, 
+        azimuth
+    )
+    
+    tilt_rad = np.radians(PANEL_TILT)
+    sky_factor = (1 + np.cos(tilt_rad)) / 2
+    ground_factor = (1 - np.cos(tilt_rad)) / 2
+    
+    a_headings = np.cos(np.radians(aoi)) - (np.cos(zenith_rad) * sky_factor)
+    
+    b_constants = np.full(len(time_base), sky_factor + ALBEDO * ground_factor)
+    
+    return a_headings, b_constants
+
+def solar(time_base,coords,headings,altitude,solar_obj):
+    a,b=precompute_solar_gti_factors(time_base,coords,headings,altitude)
+    dni,ghi=solar_obj[(0,0)][time_base].data(["dni","ghi"])
+    gti=a*dni + b*ghi
+    solar_irr=gti*ARRAY_EFFICIENCY*ARRAY_AREA_M2
+    return solar_irr
 
 def net_power(v,grad,solar):
     f_drag = 0.5 * AIR_DENSITY * CDA_M2 * (v)**2  #Get v_wind from solar/wind above
@@ -127,3 +174,6 @@ def net_power(v,grad,solar):
     p_electric = solar - p_mech
     p_electric = np.where(p_mech < 0, p_mech * REGEN_EFF,  p_mech / MOTOR_EFF)
     return p_electric
+
+def solve():
+    pass

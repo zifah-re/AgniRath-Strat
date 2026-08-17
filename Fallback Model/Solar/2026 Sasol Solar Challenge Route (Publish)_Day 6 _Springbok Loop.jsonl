@@ -4,166 +4,6 @@
         "lon": 17.817675315372494,
         "data": [
             {
-                "period_end": "2026-08-17T15:30:00+00:00",
-                "air_temp": 21,
-                "dni": 489,
-                "ghi": 148,
-                "wind_speed_10m": 4.3,
-                "wind_direction_10m": 216
-            },
-            {
-                "period_end": "2026-08-17T15:35:00+00:00",
-                "air_temp": 21,
-                "dni": 205,
-                "ghi": 112,
-                "wind_speed_10m": 4.2,
-                "wind_direction_10m": 215
-            },
-            {
-                "period_end": "2026-08-17T15:40:00+00:00",
-                "air_temp": 21,
-                "dni": 0,
-                "ghi": 63,
-                "wind_speed_10m": 4.0,
-                "wind_direction_10m": 214
-            },
-            {
-                "period_end": "2026-08-17T15:45:00+00:00",
-                "air_temp": 20,
-                "dni": 0,
-                "ghi": 40,
-                "wind_speed_10m": 3.9,
-                "wind_direction_10m": 214
-            },
-            {
-                "period_end": "2026-08-17T15:50:00+00:00",
-                "air_temp": 20,
-                "dni": 0,
-                "ghi": 24,
-                "wind_speed_10m": 3.8,
-                "wind_direction_10m": 213
-            },
-            {
-                "period_end": "2026-08-17T15:55:00+00:00",
-                "air_temp": 20,
-                "dni": 0,
-                "ghi": 18,
-                "wind_speed_10m": 3.7,
-                "wind_direction_10m": 212
-            },
-            {
-                "period_end": "2026-08-17T16:00:00+00:00",
-                "air_temp": 19,
-                "dni": 0,
-                "ghi": 15,
-                "wind_speed_10m": 3.6,
-                "wind_direction_10m": 211
-            },
-            {
-                "period_end": "2026-08-17T16:05:00+00:00",
-                "air_temp": 19,
-                "dni": 0,
-                "ghi": 11,
-                "wind_speed_10m": 3.4,
-                "wind_direction_10m": 211
-            },
-            {
-                "period_end": "2026-08-17T16:10:00+00:00",
-                "air_temp": 19,
-                "dni": 0,
-                "ghi": 7,
-                "wind_speed_10m": 3.3,
-                "wind_direction_10m": 210
-            },
-            {
-                "period_end": "2026-08-17T16:15:00+00:00",
-                "air_temp": 18,
-                "dni": 0,
-                "ghi": 4,
-                "wind_speed_10m": 3.2,
-                "wind_direction_10m": 209
-            },
-            {
-                "period_end": "2026-08-17T16:20:00+00:00",
-                "air_temp": 18,
-                "dni": 0,
-                "ghi": 1,
-                "wind_speed_10m": 3.1,
-                "wind_direction_10m": 208
-            },
-            {
-                "period_end": "2026-08-17T16:25:00+00:00",
-                "air_temp": 17,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 3.0,
-                "wind_direction_10m": 207
-            },
-            {
-                "period_end": "2026-08-17T16:30:00+00:00",
-                "air_temp": 17,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.9,
-                "wind_direction_10m": 206
-            },
-            {
-                "period_end": "2026-08-17T16:35:00+00:00",
-                "air_temp": 17,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.8,
-                "wind_direction_10m": 205
-            },
-            {
-                "period_end": "2026-08-17T16:40:00+00:00",
-                "air_temp": 16,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.7,
-                "wind_direction_10m": 203
-            },
-            {
-                "period_end": "2026-08-17T16:45:00+00:00",
-                "air_temp": 16,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.5,
-                "wind_direction_10m": 202
-            },
-            {
-                "period_end": "2026-08-17T16:50:00+00:00",
-                "air_temp": 15,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.4,
-                "wind_direction_10m": 200
-            },
-            {
-                "period_end": "2026-08-17T16:55:00+00:00",
-                "air_temp": 15,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.3,
-                "wind_direction_10m": 199
-            },
-            {
-                "period_end": "2026-08-17T17:00:00+00:00",
-                "air_temp": 15,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.2,
-                "wind_direction_10m": 197
-            },
-            {
-                "period_end": "2026-08-17T17:05:00+00:00",
-                "air_temp": 14,
-                "dni": 0,
-                "ghi": 0,
-                "wind_speed_10m": 2.2,
-                "wind_direction_10m": 195
-            },
-            {
                 "period_end": "2026-08-17T17:10:00+00:00",
                 "air_temp": 14,
                 "dni": 0,
@@ -32170,6 +32010,158 @@
                 "ghi": 395,
                 "wind_speed_10m": 5.6,
                 "wind_direction_10m": 225
+            },
+            {
+                "period_end": "2026-08-31T14:35:00+00:00",
+                "air_temp": 21,
+                "dni": 704,
+                "ghi": 378,
+                "wind_speed_10m": 5.6,
+                "wind_direction_10m": 224
+            },
+            {
+                "period_end": "2026-08-31T14:40:00+00:00",
+                "air_temp": 21,
+                "dni": 694,
+                "ghi": 360,
+                "wind_speed_10m": 5.7,
+                "wind_direction_10m": 222
+            },
+            {
+                "period_end": "2026-08-31T14:45:00+00:00",
+                "air_temp": 21,
+                "dni": 683,
+                "ghi": 343,
+                "wind_speed_10m": 5.7,
+                "wind_direction_10m": 221
+            },
+            {
+                "period_end": "2026-08-31T14:50:00+00:00",
+                "air_temp": 21,
+                "dni": 672,
+                "ghi": 325,
+                "wind_speed_10m": 5.7,
+                "wind_direction_10m": 220
+            },
+            {
+                "period_end": "2026-08-31T14:55:00+00:00",
+                "air_temp": 21,
+                "dni": 659,
+                "ghi": 307,
+                "wind_speed_10m": 5.8,
+                "wind_direction_10m": 219
+            },
+            {
+                "period_end": "2026-08-31T15:00:00+00:00",
+                "air_temp": 21,
+                "dni": 646,
+                "ghi": 289,
+                "wind_speed_10m": 5.8,
+                "wind_direction_10m": 217
+            },
+            {
+                "period_end": "2026-08-31T15:05:00+00:00",
+                "air_temp": 20,
+                "dni": 633,
+                "ghi": 271,
+                "wind_speed_10m": 5.8,
+                "wind_direction_10m": 217
+            },
+            {
+                "period_end": "2026-08-31T15:10:00+00:00",
+                "air_temp": 20,
+                "dni": 615,
+                "ghi": 253,
+                "wind_speed_10m": 5.5,
+                "wind_direction_10m": 216
+            },
+            {
+                "period_end": "2026-08-31T15:15:00+00:00",
+                "air_temp": 20,
+                "dni": 596,
+                "ghi": 235,
+                "wind_speed_10m": 5.3,
+                "wind_direction_10m": 216
+            },
+            {
+                "period_end": "2026-08-31T15:20:00+00:00",
+                "air_temp": 20,
+                "dni": 575,
+                "ghi": 216,
+                "wind_speed_10m": 5.1,
+                "wind_direction_10m": 216
+            },
+            {
+                "period_end": "2026-08-31T15:25:00+00:00",
+                "air_temp": 20,
+                "dni": 553,
+                "ghi": 198,
+                "wind_speed_10m": 4.9,
+                "wind_direction_10m": 216
+            },
+            {
+                "period_end": "2026-08-31T15:30:00+00:00",
+                "air_temp": 19,
+                "dni": 528,
+                "ghi": 179,
+                "wind_speed_10m": 4.7,
+                "wind_direction_10m": 215
+            },
+            {
+                "period_end": "2026-08-31T15:35:00+00:00",
+                "air_temp": 19,
+                "dni": 501,
+                "ghi": 161,
+                "wind_speed_10m": 4.5,
+                "wind_direction_10m": 215
+            },
+            {
+                "period_end": "2026-08-31T15:40:00+00:00",
+                "air_temp": 19,
+                "dni": 469,
+                "ghi": 143,
+                "wind_speed_10m": 4.3,
+                "wind_direction_10m": 214
+            },
+            {
+                "period_end": "2026-08-31T15:45:00+00:00",
+                "air_temp": 19,
+                "dni": 436,
+                "ghi": 125,
+                "wind_speed_10m": 4.1,
+                "wind_direction_10m": 214
+            },
+            {
+                "period_end": "2026-08-31T15:50:00+00:00",
+                "air_temp": 19,
+                "dni": 399,
+                "ghi": 108,
+                "wind_speed_10m": 3.9,
+                "wind_direction_10m": 214
+            },
+            {
+                "period_end": "2026-08-31T15:55:00+00:00",
+                "air_temp": 18,
+                "dni": 360,
+                "ghi": 91,
+                "wind_speed_10m": 3.7,
+                "wind_direction_10m": 213
+            },
+            {
+                "period_end": "2026-08-31T16:00:00+00:00",
+                "air_temp": 18,
+                "dni": 317,
+                "ghi": 75,
+                "wind_speed_10m": 3.5,
+                "wind_direction_10m": 212
+            },
+            {
+                "period_end": "2026-08-31T16:05:00+00:00",
+                "air_temp": 18,
+                "dni": 271,
+                "ghi": 60,
+                "wind_speed_10m": 3.3,
+                "wind_direction_10m": 212
             }
         ]
     }
