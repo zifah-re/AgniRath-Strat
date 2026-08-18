@@ -47,10 +47,10 @@ def _get_day_plan(day_index: int) -> _DayPlan:
     return _DayPlan(stage1_km, stage2_km, loops)
 
 def _regen_cap_w(car: CarState) -> float:
-    explicit = getattr(car, "p_regen_max_w", None)
-    if explicit is not None:
-        return float(explicit)
-    return float(car.p_max_continuous_w * car.p_max_derating)
+    # Single source of truth: core.physics.regen_cap_w. forward_sim
+    # (Tier 2 / L2) uses the same helper, so Tier 1's coarse diagnostic and
+    # the high-fidelity integrator agree on the regen clamp.
+    return physics.regen_cap_w(car)
 
 def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
                            loops_completed: dict | None = None) -> _DayPlan:

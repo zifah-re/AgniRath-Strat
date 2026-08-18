@@ -20,6 +20,20 @@ SOLAR UNDERUTILIZATION TRACKING (13/08 addition):
   solar_underutil_j tracks wasted solar capacity — energy the panel could
   produce but the battery can't absorb (SOC ceiling, or motor draw < solar
   output). This feeds into singleday.py's enriched cost function.
+
+PERF — HOT-LOOP VECTORIZATION (15/08): the integrator previously called
+route.slope_pct_at / red_flag_at / control_stop_at / seg_type_at and
+solar_provider.ghi_wm2 once PER SUBSTEP, each issuing its own searchsorted,
+pandas row-boxing, or cKDTree query. At ENERGY_GRID_M=100 on 280-355 km
+routes that is ~3,500 substeps per day per candidate, and SLSQP's
+finite-difference gradient estimation multiplied that across every solve.
+All route lookups are now resolved ONCE PER SEGMENT as vectorized arrays
+(route.slope_pct_array etc. — core/route.py) and the weather node index is
+resolved once per segment (solar.node_index_array), so the substep loop only
+pays one scalar spline evaluation (ghi_wm2_at_node) — no per-substep
+searchsorted / KDTree. Positions are built with the same float-addition
+chain the old loop used, so results are bit-identical to the pre-vectorized
+integrator.
 """
 
 from __future__ import annotations
@@ -104,34 +118,42 @@ class DriverSwapScheduler:
         return added_s
 
 
-def _is_mandatory_stop_zone(route: Route, x_m: float) -> bool:
-    """Checks if the car is currently in a CS or loop stop zone to piggyback swaps."""
-    if not route:
-        return False
-    # Cached-array indexing instead of .iloc[idx] — .iloc boxes the whole
-    # (mixed-dtype) row into a new Series on every call. This runs once per
-    # physics substep (~100/segment), so across a full solve that's a large
-    # number of avoidable row-boxing allocations.
-    return route.control_stop_at(x_m) or route.seg_type_at(x_m).startswith("loop_")
-
-
 def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                             solar_provider, wind_provider, t0_s: float,
                             start_soc_pct: float, seg_start_m: np.ndarray,
                             seg_len_m: float, energy_grid_m: float,
-                            rng: _t.Optional[random.Random] = None) -> DayEvalResult:
+                            rng: _t.Optional[random.Random] = None, *,
+                            regen_cap_w: float | None = None,
+                            cs_taken: bool = False,
+                            loop_stop_duration_s: float | None = None,
+                            unplanned_stop_budget_s: float | None = None
+                            ) -> DayEvalResult:
     """
     The centralized real integrator (reuses core.physics.net_power + core.battery.Battery).
     Velocity is held per control segment; physics integrates on the finer
     energy grid within each control segment.
 
-    rng: None (default) -> breakdown stall time is the deterministic expected
+        rng: None (default) -> breakdown stall time is the deterministic expected
          value (BreakdownModel.expected_stop_s), so calling this twice with the
          same v_kmh gives the exact same result — required for DE/GA/SLSQP,
          which needs a stable objective to converge on, and for DayEvaluator's
          cache to stay valid. Pass a seeded random.Random() only for scenario/
          Monte-Carlo runs (simulator/scenarios.py) where you explicitly want a
          sampled outcome, not the average.
+
+    Keyword-only Tier 1 parity knobs (defaults replicate Tier 1's model):
+      regen_cap_w             : hard regen charge-back clamp (W). None ->
+                                core.physics.regen_cap_w(car), the SAME cap
+                                Tier 1 has always applied (forward_sim used to
+                                leave regen uncapped — Tier 2/L2 was optimistic
+                                vs Tier 1 on downhill-heavy days).
+      cs_taken                : control stop already done today -> the parked
+                                control-stop solar credit covers only the
+                                unplanned-stop budget, exactly like Tier 1.
+      loop_stop_duration_s    : override parked time per loop turnaround
+                                (default LOOP_STOP_DURATION_S + LOOP_TURNAROUND_S).
+      unplanned_stop_budget_s : override parked time added at the control stop
+                                (default race_config.UNPLANNED_STOP_BUDGET_S).
     """
     battery = Battery(car, start_soc_pct)
     swap_scheduler = DriverSwapScheduler()
@@ -162,8 +184,45 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             min(float(seg_len_m), float(route.total_m) - float(seg_start_m[-1])),
         )
 
+    # Audit fix: t_array/x_array must be function-scope — the original had
+    # them nested under the `if route is not None` block, so any route-less
+    # call (route=None flat fallback) hit a NameError here.
     t_array = []
     x_array = []
+
+    # --- Model-parity knobs (keyword-only; defaults replicate Tier 1) ---
+    # Regen clamp: None -> core.physics.regen_cap_w(car), the exact cap Tier 1
+    # applies. forward_sim previously left regen charge-back uncapped, making
+    # Tier 2 / L2 systematically more optimistic than Tier 1 on downhill-heavy
+    # days (and letting Tier 3 reject plans Tier 1 proposed).
+    if regen_cap_w is None:
+        regen_cap_w = physics.regen_cap_w(car)
+
+    # Stop-time solar charging (Tier 1 parity — Tier 1's coarse evaluate_day
+    # credits parked solar at the control stop and at each loop turnaround;
+    # forward_sim previously credited NONE of it).
+    control_stop_dur_s = float(race_config.CONTROL_STOP_DURATION_S)
+    loop_stop_dur_s = float(race_config.LOOP_STOP_DURATION_S
+                            + getattr(race_config, "LOOP_TURNAROUND_S", 0.0))
+    unplanned_budget_s = float(race_config.UNPLANNED_STOP_BUDGET_S)
+    if loop_stop_duration_s is not None:
+        loop_stop_dur_s = float(loop_stop_duration_s)
+    if unplanned_stop_budget_s is not None:
+        unplanned_budget_s = float(unplanned_stop_budget_s)
+
+    # One-shot credits: the control-stop solar credit fires at the first
+    # substep inside the control-stop zone (once per day); the loop-zone
+    # credit fires once per contiguous loop zone (once per loop attempt).
+    cs_credit_done = False
+    in_loop_zone = False
+
+    # Audit hot-loop fix (15/08): resolve weather-node indexing support ONCE.
+    # Providers with the array API (HourlyJSONSolarProvider) expose
+    # node_index_array + ghi_wm2_at_node; legacy/fallback providers only have
+    # the scalar ghi_wm2 and fall back to a per-substep call here.
+    use_route = route is not None
+    node_index_fn = getattr(solar_provider, "node_index_array", None)
+    ghi_at_node_fn = getattr(solar_provider, "ghi_wm2_at_node", None)
 
     for seg_i, v in enumerate(v_kmh):
         v_ms = float(v) / 3.6
@@ -172,13 +231,56 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             continue
         n_substeps = max(1, round(seg_len_i / energy_grid_m))
         substep_len_km = (seg_len_i / n_substeps) / 1000.0
-        for _ in range(n_substeps):
-            slope = route.slope_pct_at(x_m) if route else 0.0
-            ghi = solar_provider.ghi_wm2(t_s, x_m)
+
+        # ── Resolve every route + weather lookup for this whole segment ONCE,
+        # as vectorized arrays, instead of per-substep Python-API calls
+        # (route.slope_pct_at / red_flag_at / control_stop_at / seg_type_at /
+        # provider.ghi_wm2 each did their own searchsorted, row-boxing, or
+        # cKDTree query). GHI is still evaluated per substep via the cheap
+        # ghi_wm2_at_node spline call because t_s is data-dependent inside
+        # the segment (breakdown stalls shift subsequent substep times).
+        if use_route:
+            step_m = substep_len_km * 1000.0
+            # Positions are built with the SAME repeated float-addition chain
+            # the loop below performs (cumsum of [x_m, step, step, ...]), so
+            # array lookups land on bit-identical grid points to the old
+            # per-substep `x_m += step_m` walk.
+            chain = np.cumsum(np.concatenate(
+                (np.array([x_m]), np.full(n_substeps, step_m))))
+            x_pre = chain[:-1]    # positions where slope/ghi/red are read
+            x_post = chain[1:]    # positions where the stop-zone test runs
+            seg_slopes = route.slope_pct_array(x_pre)
+            seg_reds = route.red_flag_array(x_pre)
+            seg_cs_stops = route.control_stop_array(x_post)
+            seg_loop_stops = np.char.startswith(
+                route.seg_type_array(x_post).astype(str), "loop_")
+            seg_stops = seg_cs_stops | seg_loop_stops
+            seg_nodes = (node_index_fn(x_pre)
+                         if node_index_fn is not None else None)
+        else:
+            seg_slopes = seg_reds = seg_stops = None
+            seg_nodes = None
+
+        for k in range(n_substeps):
+            if use_route:
+                slope = float(seg_slopes[k])
+                is_trailered = bool(seg_reds[k])
+                stop_here = bool(seg_stops[k])
+                cs_stop_here = bool(seg_cs_stops[k])
+                loop_stop_here = bool(seg_loop_stops[k])
+            else:
+                slope = 0.0
+                is_trailered = False
+                stop_here = False
+                cs_stop_here = False
+                loop_stop_here = False
+
+            if seg_nodes is not None and ghi_at_node_fn is not None:
+                ghi = float(ghi_at_node_fn(t_s, int(seg_nodes[k])))
+            else:
+                ghi = solar_provider.ghi_wm2(t_s, x_m)
 
             # --- Check if this grid point is on a trailered segment ---
-            is_trailered = route.red_flag_at(x_m) if route else False
-
             if is_trailered:
                 # Car is on the trailer: NO power input, NO power drain, NO
                 # charging whatsoever (explicit requirement — trailered
@@ -191,8 +293,39 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                 trailered_km_accum += substep_len_km
             else:
                 p_net, dt_s_step = physics.net_power(
-                    car, v_ms, v_ms, slope, ghi, substep_len_km)
+                    car, v_ms, v_ms, slope, ghi, substep_len_km,
+                    regen_cap_w=regen_cap_w)
                 driven_km_accum += substep_len_km
+
+            # --- Stop-time solar charging (Tier 1 parity) ---
+            # Tier 1's coarse evaluate_day credits parked solar at the control
+            # stop (CONTROL_STOP_DURATION_S + UNPLANNED_STOP_BUDGET_S, the
+            # control-stop term dropping to 0 when cs_taken) and at each loop
+            # turnaround (LOOP_STOP_DURATION_S + LOOP_TURNAROUND_S).
+            # forward_sim previously credited NO parked solar, so Tier 2 / L2
+            # candidates were systematically more pessimistic than Tier 1 on
+            # sunny days and Tier 3 could reject the very plan Tier 1 proposed.
+            # Credit exactly once per day (control stop) and once per
+            # contiguous loop zone (each loop attempt). Skipped on trailered
+            # segments (car is inert cargo — no energy flow, same as Tier 1's
+            # trailered-mask zeroing).
+            if not is_trailered:
+                if cs_stop_here and not cs_credit_done:
+                    cs_credit_done = True
+                    _parked_s = ((0.0 if cs_taken else control_stop_dur_s)
+                                 + unplanned_budget_s)
+                    _parked_w = (car.array_area_m2 * car.array_efficiency * ghi
+                                 - car.p_idle_w)
+                    battery.apply_energy_wh(_parked_w * _parked_s / 3600.0)
+                if loop_stop_here:
+                    if not in_loop_zone:
+                        in_loop_zone = True
+                        _parked_w = (car.array_area_m2 * car.array_efficiency * ghi
+                                     - car.p_idle_w)
+                        battery.apply_energy_wh(
+                            _parked_w * loop_stop_dur_s / 3600.0)
+                else:
+                    in_loop_zone = False
 
             # --- Solar underutilization tracking ---
             # Skip entirely for trailered segments (no energy flow).
@@ -210,7 +343,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                 solar_excess_w = max(0.0, p_solar_w - p_consumed_w)
                 # Check if battery can absorb the excess (SOC headroom)
                 soc_headroom_wh = (car.soc_max_pct - battery.soc_pct) / 100.0 * car.battery_nominal_wh
-                absorbable_wh = soc_headroom_wh  # how much the battery can still take
+                absorbable_wh = soc_headroom_wh / car.charge_eff  # absorbable PANEL-Wh: battery stores delta*charge_eff (apply_energy_wh)
                 excess_wh_this_step = solar_excess_w * float(dt_s_step) / 3600.0
                 if excess_wh_this_step > absorbable_wh and absorbable_wh >= 0:
                     wasted_wh = excess_wh_this_step - absorbable_wh
@@ -223,9 +356,8 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             x_array.append(x_m)
 
             t_s += float(dt_s_step)
-            x_m += substep_len_km * 1000.0
+            x_m += step_m if use_route else substep_len_km * 1000.0
 
-            stop_here = _is_mandatory_stop_zone(route, x_m)
             t_s += swap_scheduler.advance(
                 float(dt_s_step), t_s, x_m, coincides_with_stop=stop_here)
 
