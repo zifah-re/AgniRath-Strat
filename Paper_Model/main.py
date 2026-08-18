@@ -110,49 +110,43 @@ import constants as const
 def plot_day_performance(day_label, dx, opt_v, v_cap, ghi, gradients, v_wind):
     """Generates a minimalist stacked dashboard of the day's performance."""
     
-    # 1. Calculate cumulative distance (X-axis) in kilometers
     cumulative_dist_m = np.cumsum(dx)
     dist_km = cumulative_dist_m / 1000.0
 
-    # 2. Reconstruct instantaneous Motor Power (Watts)
-    # P = F_total * v = (F_aero + F_roll + F_grav) * v
-    f_aero = 0.5 * const.AIR_DENSITY * const.CDA_M2 * (opt_v + v_wind)**2
-    f_roll = const.CRR * const.MASS_KG * const.G_MS2 * np.cos(gradients)
-    f_grav = const.MASS_KG * const.G_MS2 * np.sin(gradients)
+    # 1. Convert gradients to radians for the plot's physics calculation!
+    theta_rad = np.arctan(gradients / 100.0)
+    
+    # 2. Reconstruct instantaneous Motor Power correctly
+    f_aero = 0.5 * const.AIR_DENSITY * const.CDA_M2 * (opt_v + v_wind)*np.abs(opt_v + v_wind)
+    f_roll = const.CRR * const.MASS_KG * const.G_MS2 * np.cos(theta_rad)
+    f_grav = const.MASS_KG * const.G_MS2 * np.sin(theta_rad)
     power_motor_w = (f_aero + f_roll + f_grav) * opt_v
 
-    # Convert speeds to km/h for readability
     opt_v_kmh = opt_v * 3.6
     v_cap_kmh = v_cap * 3.6
 
-    # 3. Setup the minimalist figure
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
     fig.suptitle(f'Optimization Results: {day_label}', fontsize=16, fontweight='bold')
     
-    # Global formatting to keep it clean and stripped down
     for ax in (ax1, ax2, ax3):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(axis='y', linestyle='--', alpha=0.4)
 
-    # --- Subplot 1: Velocity Profile ---
     ax1.plot(dist_km, v_cap_kmh, color='#d3d3d3', linewidth=2, label='Speed Limit (km/h)')
     ax1.plot(dist_km, opt_v_kmh, color='#2c3e50', linewidth=2.5, label='Target Speed (km/h)')
     ax1.set_ylabel('Speed (km/h)', fontsize=11)
     ax1.legend(frameon=False, loc='upper right')
 
-    # --- Subplot 2: Solar Energy ---
     ax2.plot(dist_km, ghi, color='#f39c12', linewidth=2)
     ax2.fill_between(dist_km, ghi, color='#f39c12', alpha=0.15)
     ax2.set_ylabel('Solar GHI (W/m²)', fontsize=11)
 
-    # --- Subplot 3: Power & Gradient (Dual Y-Axis) ---
-    # Left Y-Axis: Gradient
-    ax3.fill_between(dist_km, gradients * 100, color='#bdc3c7', alpha=0.4, label='Gradient (%)')
+    # 3. Do not multiply gradients by 100 here, they are already percentages
+    ax3.fill_between(dist_km, gradients, color='#bdc3c7', alpha=0.4, label='Gradient (%)')
     ax3.set_ylabel('Gradient (%)', color='#7f8c8d', fontsize=11)
     ax3.tick_params(axis='y', labelcolor='#7f8c8d')
     
-    # Right Y-Axis: Motor Power
     ax3_twin = ax3.twinx()
     ax3_twin.spines['top'].set_visible(False)
     ax3_twin.plot(dist_km, power_motor_w / 1000.0, color='#e74c3c', linewidth=2, label='Motor Power (kW)')

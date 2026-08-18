@@ -7,7 +7,7 @@ class SingleDayOptimizer:
     def __init__(self, route_distances, route_gradients, speed_caps, wind_speeds, expected_ghi, allowed_time,desc="SLSQP Iterations"):
         self.N = len(route_distances)
         self.dx = np.array(route_distances)       
-        self.theta = np.array(route_gradients)    
+        self.theta = np.arctan(np.array(route_gradients) / 100.0)   
         self.v_cap = np.array(speed_caps)         
         self.v_wind = np.array(wind_speeds)       
         self.ghi = np.array(expected_ghi)         
@@ -33,7 +33,7 @@ class SingleDayOptimizer:
         dt[valid_dt] = self.dx[valid_dt] / v[valid_dt]
         
         # Mechanical forces
-        f_drag = 0.5 * const.AIR_DENSITY * const.ARRAY_AREA_M2 * const.CDA_M2 * (v + self.v_wind)**2
+        f_drag = 0.5 * const.AIR_DENSITY * const.CDA_M2 * (v + self.v_wind)*abs((v + self.v_wind))
         f_total = f_drag + self.f_roll + self.f_grav
         
         # Acceleration power mapping without runtime warnings
@@ -79,6 +79,12 @@ class SingleDayOptimizer:
         _, p_loss, _ = self._calculate_arrays(v)
         return const.P_MAX - np.max(p_loss)
 
+    def constraint_energy_max(self, v):
+        p_net, _, dt = self._calculate_arrays(v)
+        cum_energy = self.initial_soc * const.BATTERY_JOULES + np.cumsum(p_net * dt)
+        max_energy_j = (const.SOC_MAX_PCT / 100.0) * const.BATTERY_JOULES
+        return max_energy_j - np.max(cum_energy)
+
     def run_optimization(self):
         v0 = np.full(self.N, const.V_MAX_MS * 0.7)
         bounds = []
@@ -90,6 +96,7 @@ class SingleDayOptimizer:
         constraints = [
             {'type': 'ineq', 'fun': self.constraint_time},
             {'type': 'ineq', 'fun': self.constraint_energy_min},
+            {'type': 'ineq', 'fun': self.constraint_energy_max},
             {'type': 'ineq', 'fun': self.constraint_motor_power}
         ]
 
