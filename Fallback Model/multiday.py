@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime, time, date
 from zoneinfo import ZoneInfo
 import matplotlib.pyplot as plt
+from math import ceil,floor
 
 
 #______CAR CONSTANTS_______#
@@ -54,6 +55,16 @@ LOOP_CRUISE_SPEED_MS = 55/3.6
 
 SA_TZ=ZoneInfo("Africa/Johannesburg")
 HALF_BLIND_LOOP_PLACEHOLDER_KM = 14.0 #Change later somehow
+DAY_DISTANCES={
+    "Day 1": {"s1": 172.7, "l":22.6, "s2":65.6},
+    "Day 2": {"s1": 71.5, "l":22.6, "s2":231.0},
+    "Day 3": {"s1": 8.0, "l":39.9, "s2":208.0},
+    "Day 4": {"s1": 197.0, "l":21.0, "s2":63.3},
+    "Day 5": {"s1": 178.0, "l":60.7, "s2":114.0},
+    "Day 6": {"s1": 310.0, "l":18.2, "s2":0.0},
+    "Day 7": {"s1": 261.0, "l":16.5, "s2":80.9},
+    "Day 8": {"s1": 180.0, "l":21.8, "s2":98.3}
+}
 DAY_ROUTE_NOTES = [
     # day 1
     dict(stage1_km=172.7, loops=[("rustenburg_loop", 22.6)], stage2_km=65.6,
@@ -216,3 +227,19 @@ def solve():
     plt.show()
 
     
+def loops_range(d1,d2,dl,day_1=False):
+    if day_1:
+        return (floor((8-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((8-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
+    return (floor((9-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((9-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
+
+def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings):
+    loop_start=t_start+30*60
+    loop_soc_start=soc_start + (solar([loop_start],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))*100*30*60
+    
+
+def main():
+    loop_bounds=[]
+    for day in DAY_DISTANCES:
+        s1,l,s2=DAY_DISTANCES[day]['s1'],DAY_DISTANCES[day]['l'],DAY_DISTANCES[day]['s2']
+        loop_bounds.append(np.arange(*loops_range(s1,s2,l,False if day!="Day 1" else True)))
+    print(loop_bounds)
