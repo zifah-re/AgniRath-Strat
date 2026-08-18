@@ -248,4 +248,6 @@ def main():
     for day in DAY_DISTANCES:
         s1,l,s2=DAY_DISTANCES[day]['s1'],DAY_DISTANCES[day]['l'],DAY_DISTANCES[day]['s2']
         loop_bounds.append(np.arange(*loops_range(s1,s2,l,False if day!="Day 1" else True)))
+
+        end_soc,power = solve(v1,s1,day,start_time=START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S)
     print(loop_bounds)
