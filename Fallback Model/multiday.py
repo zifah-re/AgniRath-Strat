@@ -5,6 +5,9 @@ import datetime as _dt
 from solar_table import SolarIrradiance,SolarResultProxy
 import pvlib
 import pandas as pd
+from datetime import datetime, time, date
+from zoneinfo import ZoneInfo
+import matplotlib.pyplot as plt
 
 
 #______CAR CONSTANTS_______#
@@ -49,6 +52,7 @@ LOOP_STOP_DURATION_S = 5 * 60
 CONSTANT_VELOCITY_MS = 60/3.6
 LOOP_CRUISE_SPEED_MS = 55/3.6
 
+SA_TZ=ZoneInfo("Africa/Johannesburg")
 HALF_BLIND_LOOP_PLACEHOLDER_KM = 14.0 #Change later somehow
 DAY_ROUTE_NOTES = [
     # day 1
@@ -92,9 +96,20 @@ DAY_ROUTE_NOTES = [
          control_stop="Charlie Hofmeyer Highschool (Ceres)",
          finish="Suid Agter Paarl Road (Paarl)"),
 ]
+DAYWISE_FILES={
+    "Day 1": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _Rustenburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 2 Rustenburg to Swartruggens"},
+    "Day 2": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust","l":None,"s2":"2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
+    "Day 3": [{"s1": None,"l":"Day 3 probables_Probable Aryaman Day 3_Day 3 Loop","s2":"Day 3 probables_Probable Aryaman Day 3_Stage 2"},
+              {"s1":"Day 3 probables_Probable Prahlad Route_Stage 1", "l":"Day 3 probables_Probable Prahlad Route_Day 3 Loop","s2":"Day 3 probables_Probable Prahlad Route_Stage 2" }],
+    "Day 4": {"s1":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek"},
+    "Day 5": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 1 Olifantshoek to Upington","l":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _Upington Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 2 Upington to Augrabies"},
+    "Day 6": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 6 _15 Sept Stage 1 Augrabies to Springbok","l":"2026 Sasol Solar Challenge Route (Publish)_Day 6 _Springbok Loop","s2":None},
+    "Day 7": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 1 Springbok to Van Rhynsdorp","l":"2026 Sasol Solar Challenge Route (Publish)_Day 7_Van Rhynsdorp Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 2 Van Rhynsdorp to Clanwilliam"},
+    "Day 8": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 1 Clanwilliam to Ceres","l":"2026 Sasol Solar Challenge Route (Publish)_Day 8_Ceres Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 2 Ceres to Paarl"}
+}
 
 #____ Solar and Wind_____#
-weather_folder = Path(r'Fallback Model\Solar_Processed')
+weather_folder = Path(r'Solar_Processed')
 
 def extractSolarData(json_file):
     with open(json_file, 'r') as f:
@@ -104,7 +119,7 @@ def extractSolarData(json_file):
 weather_logs = {} # Dictionary of keys: stage names, values: dict of keys: (lat, long), values: dict of lists with solar data
 stage_names = []
 
-for json_file in weather_folder.glob('*.json'):
+for json_file in weather_folder.glob('*.jsonl'):
     stage_names.append(json_file.stem)
     stage_data_raw = extractSolarData(json_file)
     stage_data = {}
@@ -126,7 +141,7 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
     lats = coords_arr[:, 0]
     lons = coords_arr[:, 1]
     
-    tz_times = pd.to_datetime(time_base, unit='s',utc=True).dt.tz_convert('Africa/Johannesburg')
+    tz_times = pd.to_datetime(time_base, unit='s',utc=True).tz_convert('Africa/Johannesburg')
     
     solpos = pvlib.solarposition.get_solarposition(
         tz_times, 
@@ -141,7 +156,7 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
     
     aoi = pvlib.irradiance.aoi(
         PANEL_TILT, 
-        np.array(heading_profile), 
+        np.concatenate((np.array(heading_profile),[0])), 
         apparent_zenith, 
         azimuth
     )
@@ -158,12 +173,13 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
 
 def solar(time_base,coords,headings,altitude,solar_obj):
     a,b=precompute_solar_gti_factors(time_base,coords,headings,altitude)
-    dni,ghi=solar_obj[(0,0)][time_base].data(["dni","ghi"])
+    dni,ghi=solar_obj[((0,0),time_base)].data(["dni","ghi"])
     gti=a*dni + b*ghi
     solar_irr=gti*ARRAY_EFFICIENCY*ARRAY_AREA_M2
     return solar_irr
 
 def net_power(v,grad,solar):
+    grad=grad/100
     f_drag = 0.5 * AIR_DENSITY * CDA_M2 * (v)**2  #Get v_wind from solar/wind above
     f_roll = MASS_KG * G_MS2 * CRR * (1.0 - (grad ** 2) / 2.0) #Implement a def gradient fn
     f_grav = MASS_KG * G_MS2 * grad
@@ -171,9 +187,32 @@ def net_power(v,grad,solar):
     f_total = f_drag + f_roll + f_grav
     p_mech = f_total * v
 
-    p_electric = solar - p_mech
-    p_electric = np.where(p_mech < 0, p_mech * REGEN_EFF,  p_mech / MOTOR_EFF)
+    p_mech = np.where(p_mech < 0, p_mech * REGEN_EFF,  p_mech / MOTOR_EFF)
+    p_electric = solar - p_mech - 50
     return p_electric
 
 def solve():
-    pass
+    v=55/3.6
+    solar_obj=weather_logs['mean_2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg']
+    route=extractSolarData('Saves/2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg.kml.save')['profile']
+    coords,headings,altitude,distances,grad=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
+    distances=distances*1000
+    dx=np.diff(distances)
+    dt=dx/v
+    dt=np.concatenate(([0],dt))
+    time_base=datetime.combine(date(2026,9,10),datetime.strptime(f"09:00:00", "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp() + dt.cumsum()
+    solar_irr=solar(time_base,coords,headings,altitude,solar_obj)
+    v_array=np.full(len(time_base),v)
+    power=net_power(v_array,grad,solar_irr)
+    energy=power*np.concatenate((dx/v,[0]))
+    soc=(1 + np.cumsum(energy/(BATTERY_WH*3600)))*100
+    fig,ax=plt.subplots(1,3,figsize=(10,5))
+    ax[0].plot(distances,power,color="steelblue")
+    ax[0].set_title("Power")
+    ax[1].plot(distances,soc,color="tomato")
+    ax[1].set_title("SoC")
+    ax[2].plot(distances,solar_irr,color="seagreen")
+    ax[2].set_title("Solar")
+    plt.show()
+
+    
