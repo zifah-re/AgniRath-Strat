@@ -21,6 +21,7 @@ from core.battery import Battery
 logger = logging.getLogger(__name__)
 
 TIER1_SAMPLE_M = 500.0
+_DEFAULT_REGEN_CAP_W = None
 
 # Energy diagnostic: fires once per day at high SOC to avoid log spam
 _energy_diag_logged: set = set()
@@ -31,7 +32,6 @@ class _DayPlan:
     stage1_km: float
     stage2_km: float
     loops: tuple[tuple[str, float], ...]
-
 
 def _get_day_plan(day_index: int) -> _DayPlan:
     """Nominal (not-yet-driven) route plan for a day, from route notes."""
@@ -46,6 +46,11 @@ def _get_day_plan(day_index: int) -> _DayPlan:
     )
     return _DayPlan(stage1_km, stage2_km, loops)
 
+def _regen_cap_w(car: CarState) -> float:
+    explicit = getattr(car, "p_regen_max_w", None)
+    if explicit is not None:
+        return float(explicit)
+    return float(car.p_max_continuous_w * car.p_max_derating)
 
 def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
                            loops_completed: dict | None = None) -> _DayPlan:
@@ -57,38 +62,65 @@ def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
         return _DayPlan(0.0, max(0.0, plan.stage2_km - stage2_done_km), ())
     return _DayPlan(0.0, plan.stage2_km, ())
 
+# Explicit ground-truth trailering override (0-indexed day -> seg_type).
+# The KML-derived mask below depends on manually-drawn (False) zones in a
+# routeshader KML that may be missing or incomplete for a given day (e.g.
+# Day 7 previously showed trailered=0 because no KML zone existed for it,
+# not because the day isn't actually trailered). These two are confirmed
+# ground truth regardless of what the KML contains.
+HARDCODED_TRAILER_STAGES: dict[int, str] = {
+    6: "stage2",  # Day 7 (0-indexed 6): Stage 2 is trailered
+    7: "stage1",  # Day 8 (0-indexed 7): Stage 1 is trailered
+}
 
-def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, day_index: int) -> np.ndarray:
-    """Parses routeshader KML and maps (False) blocks via KDTree to the 500m Tier 1 distance array."""
-    if not kml_paths or day_index not in kml_paths or route is None:
-        return np.zeros(len(x_m_array), dtype=bool)
 
-    kml_path = kml_paths[day_index]
-    tree = ET.parse(kml_path)
-    root = tree.getroot()
-    for el in root.iter():
-        if "}" in el.tag: el.tag = el.tag.split("}", 1)[1]
+def compute_trailered_mask_full(route, kml_paths: dict | None, day_index: int) -> np.ndarray:
+    """Parses routeshader KML and maps (False) blocks via KDTree onto EVERY
+    point of route.df, at full route resolution (not Tier 1's coarse grid),
+    OR'd with HARDCODED_TRAILER_STAGES ground truth for days with confirmed
+    trailering that the KML source data may not capture.
 
-    trailered_coords = []
-    for pm in root.findall(".//Placemark"):
-        name = pm.find("name")
-        if name is not None and "(False)" in name.text:
-            ls = pm.find("LineString")
-            if ls is not None:
-                for c in ls.find("coordinates").text.strip().split():
-                    lon, lat, _ = map(float, c.split(","))
-                    trailered_coords.append([lat, lon])
-
-    if not trailered_coords:
-        return np.zeros(len(x_m_array), dtype=bool)
-
-    # Use KDTree to find nearest points on the route dataframe
+    This is the single source of truth for trailering. Callers that only need
+    Tier 1's coarser sample grid should use _get_trailered_mask() below, which
+    re-indexes this result. Callers that need the REAL fine-grained optimizer
+    (Tier 2 / singleday.solve / forward_sim.route.red_flag_at) to be
+    trailering-aware must write this result onto route.df["red_flag_trailer"]
+    directly — see trust_region.py's route-loading step.
+    """
+    if route is None:
+        return np.zeros(0, dtype=bool)
     route_df = route.df
-    latlons = route_df[["lat", "lon"]].to_numpy()
-    tree_kd = cKDTree(np.array(trailered_coords))
-    dists, _ = tree_kd.query(latlons, distance_upper_bound=0.001)
+    n = len(route_df)
+    is_trailered = np.zeros(n, dtype=bool)
 
-    is_trailered = dists != float('inf')
+    if kml_paths and day_index in kml_paths and kml_paths[day_index]:
+        kml_path = kml_paths[day_index]
+        tree = ET.parse(kml_path)
+        root = tree.getroot()
+        for el in root.iter():
+            if "}" in el.tag: el.tag = el.tag.split("}", 1)[1]
+
+        trailered_coords = []
+        for pm in root.findall(".//Placemark"):
+            name = pm.find("name")
+            if name is not None and "(False)" in name.text:
+                ls = pm.find("LineString")
+                if ls is not None:
+                    for c in ls.find("coordinates").text.strip().split():
+                        lon, lat, _ = map(float, c.split(","))
+                        trailered_coords.append([lat, lon])
+
+        if trailered_coords:
+            latlons = route_df[["lat", "lon"]].to_numpy()
+            tree_kd = cKDTree(np.array(trailered_coords))
+            dists, _ = tree_kd.query(latlons, distance_upper_bound=0.001)
+            is_trailered = dists != float('inf')
+
+    # Ground-truth override: force the whole named stage trailered regardless
+    # of whether the KML flagged any point in it.
+    forced_stage = HARDCODED_TRAILER_STAGES.get(day_index)
+    if forced_stage is not None:
+        is_trailered = is_trailered | (route_df["seg_type"].to_numpy() == forced_stage)
 
     # Enforce the whole stage rule: if any segment in stage is trailered, entire stage is trailered
     for seg in route_df["seg_type"].unique():
@@ -96,9 +128,19 @@ def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, da
         if is_trailered[mask].any():
             is_trailered[mask] = True
 
+    return is_trailered
+
+
+def _get_trailered_mask(route, x_m_array: np.ndarray, kml_paths: dict | None, day_index: int) -> np.ndarray:
+    """Trailered mask re-indexed onto Tier 1's coarser sample grid (x_m_array)."""
+    if route is None:
+        return np.zeros(len(x_m_array), dtype=bool)
+    is_trailered = compute_trailered_mask_full(route, kml_paths, day_index)
+    if not is_trailered.any():
+        return np.zeros(len(x_m_array), dtype=bool)
+    route_df = route.df
     idx = np.clip(np.searchsorted(route_df["distance_m"].to_numpy(), x_m_array), 0, len(route_df)-1)
     return is_trailered[idx]
-
 
 def _sample_portion(route, start_km: float, dist_km: float):
     if dist_km <= 0: return np.zeros(0), np.zeros(0), np.zeros(0)
@@ -110,7 +152,6 @@ def _sample_portion(route, start_km: float, dist_km: float):
     slope = np.asarray(route.slope_pct_at(mid), dtype=float)
     bearing = np.asarray(route.bearing_deg_at(mid), dtype=float)
     return slope, bearing, seg_len_m
-
 
 def _wind_arrays(wind_provider, t_s: np.ndarray, x_m: np.ndarray, bearing_deg: np.ndarray, v_ms: np.ndarray):
     if wind_provider is None or len(x_m) == 0:
@@ -180,7 +221,6 @@ def _net_power_vectorised(car: CarState, v_ms: np.ndarray, slope_pct: np.ndarray
     p_solar = car.array_area_m2 * car.array_efficiency * ghi * solar_geom
     return p_solar - p_electric - car.p_idle_w
 
-
 def _build_day_arrays(route, plan: _DayPlan, reps: tuple[int, ...],
                       route_offset_km: float, v_base_ms: float,
                       loop_speed_ms: float, pre_attempt_stop_s: float):
@@ -215,7 +255,6 @@ def _build_day_arrays(route, plan: _DayPlan, reps: tuple[int, ...],
     return (np.concatenate(slopes), np.concatenate(bearings),
             np.concatenate(seglens), np.concatenate(vels), np.concatenate(gaps))
 
-
 def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
                  route_offset_km: float, v_base_ms: float, loop_speed_ms: float,
                  pre_attempt_stop_s: float, solar_provider, wind_provider,
@@ -242,14 +281,14 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
     trailered_mask = _get_trailered_mask(route, x_m, kml_paths, day_index)
 
-    # Regen charge-back cap lives on CarState.p_regen_max_w (defaults to
-    # p_max_continuous_w * p_max_derating); forward_sim reads the same value.
-    regen_cap = float(car.p_regen_max_w)
+    regen_cap = _regen_cap_w(car)
     p_net = _net_power_vectorised(car, v_ms, slope, ghi, wind_along, yaw, geom, regen_cap)
 
     # Mask electrical drive drain if on trailer (keep solar gain)
-    solar_only_net = (car.array_area_m2 * car.array_efficiency * ghi * geom) - car.p_idle_w
-    p_net = np.where(trailered_mask, solar_only_net, p_net)
+    # Trailered: NO power flow at all — no motor consumption, no solar
+    # charging, no idle draw. The car is inert cargo on a tow truck; SOC
+    # must not move during trailered segments (explicit requirement).
+    p_net = np.where(trailered_mask, 0.0, p_net)
 
     energy_wh = p_net * dt_s / 3600.0
 
@@ -496,10 +535,8 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
 
     return dict(s0_pct=s0_traj, day_plans=plans, feasible=feasible)
 
-
 def _completion_margin() -> float:
     return getattr(rc, "DP_COMPLETION_MARGIN_PCT", 5.0)
-
 
 def _interp_value(v_row: np.ndarray, buckets: np.ndarray, soc: float) -> float:
     finite = np.isfinite(v_row)

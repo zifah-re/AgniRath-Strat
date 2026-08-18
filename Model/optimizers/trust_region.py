@@ -242,6 +242,9 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "total_time_s": res.get("total_time_s"),  # actual drive duration (not absolute)
             "trailered_km": res.get("trailered_km", 0.0),
             "trailered_substeps": res.get("trailered_substeps", 0),
+            "driven_km": res.get("driven_km", 0.0),
+            "motor_energy_wh": res.get("motor_energy_wh", 0.0),
+            "solar_energy_wh": res.get("solar_energy_wh", 0.0),
         }
         
     return final_race_plan
@@ -343,6 +346,23 @@ if __name__ == "__main__":
         bn = os.path.basename(filepath).lower()
         return "loop" in bn and "stage" not in bn
 
+    def _seg_type_for_file(filepath):
+        """Real per-file stage tag matching core/route.py's documented schema
+        ('stage1' | 'loop_<name>' | 'stage2'). Every row previously got the
+        literal string "stage" regardless of source file, which collapsed
+        the trailered-mask's "whole STAGE if any point flagged" rule into an
+        unintended "whole DAY" rule, and made it impossible to target the
+        Day 7 Stage 2 / Day 8 Stage 1 trailering override at just one stage."""
+        name = filepath.lower()
+        if "stage 1" in name:
+            return "stage1"
+        if "stage 2" in name:
+            return "stage2"
+        if "loop" in name:
+            base = os.path.splitext(os.path.basename(filepath))[0]
+            return f"loop_{base}"
+        return "stage1"  # single-file days (no explicit stage split)
+
     def _load_route(route_files, day_num):
         """Parse .save files into a single Route for one day.
 
@@ -384,12 +404,28 @@ if __name__ == "__main__":
                 "red_flag_trailer": False,
                 "control_stop":    False,
                 "day":             day_num,
-                "seg_type":        "stage",
+                "seg_type":        _seg_type_for_file(filepath),
             })
             part_df["distance_m"] += offset
             offset = part_df["distance_m"].max()
             day_dfs.append(part_df)
         return Route(pd.concat(day_dfs, ignore_index=True))
+
+    def _apply_trailered_mask(route, kml_paths_for_day: dict | None, day_index: int):
+        """Compute the real trailered mask (KML + hardcoded Day7/Day8 ground
+        truth + whole-stage rounding) and write it onto route so the REAL
+        optimizer (singleday.solve -> forward_sim -> route.red_flag_at)
+        actually sees it. Previously this mask was only ever computed inside
+        tier1.py's own coarse energy diagnostic and printed to the log --
+        route.df["red_flag_trailer"] stayed False for every point on every
+        day, so the report's TRAILER column and forward_sim's trailering-aware
+        physics never fired, even on days confirmed fully trailered."""
+        if route is None:
+            return route
+        mask = tier1.compute_trailered_mask_full(route, kml_paths_for_day, day_index)
+        if mask.any():
+            route.set_red_flag_mask(mask)
+        return route
 
     # Minimum acceptable daytime-avg GHI for September in South Africa.
     # Historical data below this is almost certainly an anomalous cloudy day
@@ -484,6 +520,7 @@ if __name__ == "__main__":
         # --- KML trailering ---
         kml_files = glob.glob(os.path.join(kml_dir, f"*Day {day_num}*.kml"))
         kml_paths[d] = kml_files[0] if kml_files else None
+        _apply_trailered_mask(routes.get(d), kml_paths, d)
 
     # ------------------------------------------------------------------ #
     # 4.  Day 3 multi-variant discovery
@@ -532,6 +569,7 @@ if __name__ == "__main__":
     solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
     kml_files_d3 = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
     kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
+    _apply_trailered_mask(routes.get(2), kml_paths, 2)
 
     logger.info("Computing shared Tier 1 baseline (using Day 3 = %s)...", first_vname)
     shared_baseline = tier1.guess_baseline(
@@ -558,6 +596,7 @@ if __name__ == "__main__":
 
         # KML for Day 3
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
+        _apply_trailered_mask(routes.get(2), kml_paths, 2)
 
         # --- Run trust-region optimizer (reuse Tier 1 baseline) ---
         result = optimize(
@@ -606,10 +645,42 @@ if __name__ == "__main__":
         """Absolute seconds from midnight → HH:MM clock string."""
         return _hms(abs_s)
 
-    # Car constants for output calculations (DASHBOARD values)
-    _SOLAR_AREA  = getattr(car, 'solar_area',  5.95)
-    _SOLAR_EFF   = getattr(car, 'solar_eff',   0.18)
-    _BATT_CAP_WH = getattr(car, 'battery_capacity_wh', 3528.0)
+    # Car constants for output calculations.
+    # FIX: these getattr() calls previously used attribute names that don't
+    # exist on CarState ('solar_area', 'solar_eff', 'battery_capacity_wh'),
+    # so every call silently fell through to the hardcoded default. That
+    # made array_area_m2/battery figures coincidentally correct (they matched
+    # their fallback defaults) but array_efficiency is really 0.22, not the
+    # fallback 0.18 -- every "Solar input" figure was ~18% understated.
+    _SOLAR_AREA  = car.array_area_m2
+    _SOLAR_EFF   = car.array_efficiency
+    _BATT_CAP_WH = car.battery_nominal_wh
+
+    def _real_day_km(d_idx, plan, lp, profiles) -> float:
+        """Distance that actually counts toward the race total: DRIVEN km
+        only, excluding any trailered km (SR's asterisk rule ranks trailered
+        teams below all non-trailered teams regardless of distance, so
+        trailered km must never be added to the reported total). Prefers the
+        real optimizer output (profiles[d_idx]["driven_km"]) when available;
+        falls back to the static route-notes plan estimate otherwise (e.g.
+        infeasible days with no profile).
+
+        Note this also fixes a separate bug: _get_day_plan() returns a
+        STATIC config-table estimate (rc.DAY_ROUTE_NOTES) that, for Day 3
+        (full-blind day), is a fixed 230.0/0.0 fallback regardless of which
+        Day-3 route variant was actually loaded and driven -- this made
+        Day 3's printed Distance identical across variants even when
+        genuinely different route files were used. profiles[d_idx] comes
+        from a real singleday.solve()/forward_sim run on the actual loaded
+        Route for that variant, so it doesn't have this problem.
+        """
+        if profiles and d_idx in profiles:
+            driven_km = profiles[d_idx].get("driven_km")
+            if driven_km is not None and driven_km > 0:
+                return float(driven_km)
+        loop_km = sum(cnt * km for (name, km) in plan.loops
+                      for cnt in [lp.get(name, 0)]) if lp else 0.0
+        return plan.stage1_km + plan.stage2_km + loop_km
 
     def _estimate_solar_input_wh(solar_prov, day_index: int) -> float:
         """Rough total solar energy over the race window (Wh)."""
@@ -659,7 +730,12 @@ if __name__ == "__main__":
         print(f"  Converged:  {result.get('converged')}")
         print(f"  Feasible:   {result.get('feasible')}")
         print(f"  Iterations: {result.get('iterations')}")
-        print(f"  Total Expected Distance: {result.get('total_distance_km', 0):.1f} km")
+        # NOTE: real total (driven km only, trailered days excluded) is
+        # printed after the per-day table below, once _real_day_km has run
+        # for each day — the DP-internal total_distance_km here is the
+        # allocator's own planning estimate (static plan tables, doesn't
+        # know about trailering) and is kept only as a cross-check.
+        print(f"  Total Expected Distance (DP planning estimate): {result.get('total_distance_km', 0):.1f} km")
 
         if not result.get("feasible"):
             print("  ⚠ Infeasible — no per-day plan available")
@@ -672,13 +748,15 @@ if __name__ == "__main__":
         print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5} │ {'TRAILER':>8}")
         print(f"  {'─' * 80}")
 
+        _real_total_km = 0.0
+        _total_trailered_km = 0.0
         for d_idx in range(8):
             plan = plans[d_idx]
             lp = loop_plan.get(d_idx, {})
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
-            day_km = plan.stage1_km + plan.stage2_km + loop_km
+            day_km = _real_day_km(d_idx, plan, lp, profiles)
             route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
 
             # SOC
@@ -710,8 +788,15 @@ if __name__ == "__main__":
             if profiles and d_idx in profiles:
                 trailer_km = profiles[d_idx].get("trailered_km", 0.0) or 0.0
             trailer_str = f"{trailer_km:.1f}km" if trailer_km > 0 else "—"
+            _real_total_km += day_km
+            _total_trailered_km += trailer_km
             print(f"  {d_idx+1:>5} │ {route_name:<30} │ {day_km:>6.1f} │ {n_loops:>5} │ "
                   f"{soc_start:>5.1f}% → {soc_end:>5.1f}% │ {eta_str:>5} │ {trailer_str:>8}")
+
+        print(f"  {'─' * 80}")
+        print(f"  Total Expected Distance (driven, trailered km excluded): {_real_total_km:.1f} km")
+        if _total_trailered_km > 0:
+            print(f"  Total trailered (NOT counted toward distance above): {_total_trailered_km:.1f} km")
 
         # ── Detailed per-day strategy ──
         print(f"\n  {'═' * 66}")
@@ -724,7 +809,7 @@ if __name__ == "__main__":
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
-            day_km = plan.stage1_km + plan.stage2_km + loop_km
+            day_km = _real_day_km(d_idx, plan, lp, profiles)
             route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
             soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
 
@@ -757,7 +842,16 @@ if __name__ == "__main__":
             soc_drain_pct = soc_start - soc_end
             solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
             drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
-            motor_wh = drain_wh + solar_wh
+            # Prefer the REAL simulated motor energy (integrated directly
+            # from physics every substep in forward_sim.py) over the old
+            # circular back-out (motor_wh = drain_wh + solar_wh), which was
+            # mathematically forced to equal solar_wh whenever drain_wh
+            # happened to be 0 -- exactly what happens on every day that
+            # clips at the SOC ceiling (100% -> 100%), making the printed
+            # figure meaningless on precisely those days.
+            _real_motor_wh = (profiles.get(d_idx, {}).get("motor_energy_wh")
+                               if profiles else None)
+            motor_wh = _real_motor_wh if _real_motor_wh else (drain_wh + solar_wh)
             # Approximate hourly SOC (linear interpolation)
             t_window = rc.day_finish_time_s(d_idx) - rc.day_start_time_s(d_idx)
             n_hours = max(1, int(t_window / 3600))
@@ -837,6 +931,8 @@ if __name__ == "__main__":
         if result.get("feasible"):
             loop_plan = result.get("loop_plan", {})
             s_start = result.get("s_start_pct")
+            _json_real_total_km = 0.0
+            _json_total_trailered_km = 0.0
 
             for d_idx in range(8):
                 plan = plans[d_idx]
@@ -844,7 +940,7 @@ if __name__ == "__main__":
                 n_loops = sum(lp.values()) if lp else 0
                 loop_km = sum(cnt * km for (name, km) in plan.loops
                               for cnt in [lp.get(name, 0)])
-                day_km = plan.stage1_km + plan.stage2_km + loop_km
+                day_km = _real_day_km(d_idx, plan, lp, profiles)
                 soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
 
                 day_data = {
@@ -890,9 +986,23 @@ if __name__ == "__main__":
                 drain_wh = soc_drain / 100.0 * _BATT_CAP_WH
                 day_data["battery_drain_wh"] = round(drain_wh, 0)
                 day_data["battery_drain_pct"] = round(soc_drain, 1)
-                day_data["motor_energy_wh"] = round(drain_wh + solar_wh, 0)
+                # Prefer real simulated motor energy over the circular
+                # back-out (see the print-loop fix above for why).
+                _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
+                                        if profiles else None)
+                day_data["motor_energy_wh"] = round(
+                    _real_motor_wh_json if _real_motor_wh_json else (drain_wh + solar_wh), 0)
+
+                _json_real_total_km += day_km
+                _json_total_trailered_km += day_data.get("trailered_km", 0.0)
 
                 json_out["days"][str(d_idx + 1)] = day_data
+
+            # Real total: driven km only, trailered km excluded (SR asterisk
+            # rule). Overwrite the DP planning estimate that was set above.
+            json_out["total_distance_km"] = round(_json_real_total_km, 1)
+            json_out["total_trailered_km"] = round(_json_total_trailered_km, 1)
+            json_out["total_distance_km_dp_estimate"] = result.get("total_distance_km", 0)
 
         out_path = os.path.join(output_dir, f"strategy_{variant_name}.json")
         with open(out_path, "w", encoding="utf-8") as f:

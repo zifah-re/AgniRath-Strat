@@ -76,23 +76,18 @@ class CarState:
     # ---- drivetrain -----------------------------------------------------
     motor_eff: float = 0.95              # source: DASHBOARD MOTOR_EFF.
     regen_eff: float = 0.70              # source: DASHBOARD REGEN_EFF.
-    p_idle_w: float = 5.0              # source: DASHBOARD POWER_LOSS (constant
-                                         # electronics/parasitic draw). Plan v3
-                                         # §6.1 P_idle: also subtracted during
-                                         # stationary charging intervals.
-                                         # TODO-VERIFY split driving/stopped.
+    p_idle_w: float = 10.0             # source: user directive (18/08) — set
+                                         # equal to PARC_FERME_IDLE_W per team
+                                         # decision, superseding the previous
+                                         # DASHBOARD POWER_LOSS placeholder.
+                                         # Plan v3 §6.1 P_idle: also subtracted
+                                         # during stationary charging intervals.
     p_max_continuous_w: float = 3000.0   # TODO-VERIFY: continuous motor power
                                          # limit for trailering red-flag
                                          # (Plan v3 §5.1). PLACEHOLDER — need
                                          # the 2026 motor spec from car team.
     p_max_derating: float = 0.85         # TODO-VERIFY: thermal margin factor on
                                          # sustained climbs (Plan v3 §5.1).
-    p_regen_max_w: float | None = None   # Regen charge-back cap into the pack
-                                         # (W). None -> defaults to
-                                         # p_max_continuous_w * p_max_derating
-                                         # (the old Tier 1 _regen_cap_w
-                                         # fallback), so behaviour is
-                                         # unchanged. Car team can override.
 
     # ---- battery --------------------------------------------------------
     n_packs: int = 6                     # source: user (senior), 24 Jul 2026.
@@ -110,12 +105,6 @@ class CarState:
                                          # TODO-VERIFY 2026 car max.
     a_max_ms2: float = 2.0               # Paper 1 field finding: <=0.5 m/s^2 is
                                          # safe & driver-followable (Plan v3 §8).
-
-        # ---- derived defaults -----------------------------------------------
-    def __post_init__(self) -> None:
-        """Resolve defaults that depend on sibling fields."""
-        if self.p_regen_max_w is None:
-            self.p_regen_max_w = self.p_max_continuous_w * self.p_max_derating
 
     # ---- convenience ----------------------------------------------------
     @property

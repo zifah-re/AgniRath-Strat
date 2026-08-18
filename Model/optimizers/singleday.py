@@ -2,10 +2,8 @@
 optimizers/singleday.py — L2 single-day velocity optimizer
 
 Mode-specific loss functions (charging/cruising/traffic) are intentionally
-NOT included in this pass, per instruction — objective is end-of-day SOC
-maximisation (matching Plan v3 §8's stated L2 objective), optionally enriched
-with a solar-underutilization penalty (SolarArb, Plan v3 §8.4) so the
-optimizer shaves peaks instead of riding the SOC ceiling.
+NOT included in this pass, per instruction — objective is plain end-of-day
+SOC maximisation, matching Plan v3 §8's stated L2 objective.
 
 Requires scipy>=1.14 (pinned in Model/requirements.txt) for NonlinearConstraint
 objects to work directly with method="SLSQP" in `minimize`.
@@ -87,19 +85,8 @@ class DayEvaluator:
     """Runs one candidate speed vector through physics + timing via forward_sim."""
     def __init__(self, route: Route, car: CarState, solar_provider,
                  wind_provider, t0_s: float, start_soc_pct: float,
-                 seg_start_m: np.ndarray,
-                 seg_len_m: float | np.ndarray = CONTROL_SEGMENT_M,
-                 energy_grid_m: float = SCFG.ENERGY_GRID_M, *,
-                 loops_committed=(), cs_taken: bool = False,
-                 unplanned_stop_s: float = 0.0):
-        """Runs one candidate speed vector through physics + timing via forward_sim.
-
-        seg_len_m may be a scalar (uniform control segments) or an array with
-        one entry per segment (truncated final segment — never overshoots
-        route.total_m). loops_committed / cs_taken / unplanned_stop_s are
-        forwarded to forward_sim so stationary solar at mandatory stops is
-        credited exactly like Tier 1's evaluate_day.
-        """
+                 seg_start_m: np.ndarray, seg_len_m: float = CONTROL_SEGMENT_M,
+                 energy_grid_m: float = SCFG.ENERGY_GRID_M):
         self.route = route
         self.car = car
         self.solar_provider = solar_provider
@@ -109,9 +96,6 @@ class DayEvaluator:
         self.seg_start_m = seg_start_m
         self.seg_len_m = seg_len_m
         self.energy_grid_m = energy_grid_m
-        self.loops_committed = loops_committed
-        self.cs_taken = cs_taken
-        self.unplanned_stop_s = unplanned_stop_s
         self._cache: dict[bytes, forward_sim.DayEvalResult] = {}
 
     def __call__(self, v_kmh: np.ndarray) -> forward_sim.DayEvalResult:
@@ -129,9 +113,7 @@ class DayEvaluator:
             solar_provider=self.solar_provider, wind_provider=self.wind_provider,
             t0_s=self.t0_s, start_soc_pct=self.start_soc_pct,
             seg_start_m=self.seg_start_m, seg_len_m=self.seg_len_m,
-            energy_grid_m=self.energy_grid_m,
-            loops_committed=self.loops_committed, cs_taken=self.cs_taken,
-            unplanned_stop_s=self.unplanned_stop_s,
+            energy_grid_m=self.energy_grid_m
         )
 
 
@@ -140,23 +122,8 @@ class DayEvaluator:
 # ===============================================================================
 
 def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
-    # SolarArb (Plan v3 §8.4): nudge the optimizer to shave peaks rather than
-    # riding the SOC ceiling while the array is still producing — the battery
-    # can't absorb the excess, and that wasted capacity is gone for the day.
-    # solar_underutil_j (J) is converted to SOC-% on the nominal pack, then
-    # scaled by SOLAR_UNDERUTIL_WEIGHT (solver_config). Weight <= 0 disables.
-    weight = float(SCFG.SOLAR_UNDERUTIL_WEIGHT)
-    if weight <= 0.0:
-        def _objective(v_kmh: np.ndarray) -> float:
-            return -evaluator(v_kmh).final_soc_pct
-        return _objective
-
-    soc_pct_per_wh = 100.0 / evaluator.car.battery_nominal_wh
-
     def _objective(v_kmh: np.ndarray) -> float:
-        res = evaluator(v_kmh)
-        wasted_soc_pct = res.solar_underutil_j / 3600.0 * soc_pct_per_wh
-        return -(res.final_soc_pct - weight * wasted_soc_pct)
+        return -evaluator(v_kmh).final_soc_pct
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
@@ -286,32 +253,23 @@ def get_global_search(method: str, **kwargs) -> GlobalSearchStrategy:
 def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
                             v_max_kmh: np.ndarray, v_min_kmh: float = 5.0,
                             constraints: _t.Sequence[NonlinearConstraint] = (),
-                            objective: _t.Optional[_t.Callable[[np.ndarray], float]] = None,
                             ) -> np.ndarray:
     v_int = np.clip(np.round(v_kmh), v_min_kmh, np.floor(v_max_kmh))
 
     def _feasible(v: np.ndarray) -> bool:
         return all(np.all(np.atleast_1d(c.fun(v)) >= -1e-6) for c in constraints)
 
-    # Candidate score: plain final SOC by default, or the enriched objective
-    # (solar-underutil penalty) when supplied, so the integer refinement stays
-    # consistent with the GA/SLSQP search.
-    def _score(v: np.ndarray) -> float:
-        if objective is not None:
-            return -float(objective(v))
-        return float(evaluator(v).final_soc_pct)
-
     best = v_int.copy()
-    best_score = _score(best)
+    best_obj = evaluator(best).final_soc_pct
     for i in range(len(best)):
         for step in (+1.0, -1.0):
             cand = best.copy()
             cand[i] = np.clip(cand[i] + step, v_min_kmh, np.floor(v_max_kmh[i]))
             if cand[i] == best[i] or not _feasible(cand):
                 continue
-            cand_score = _score(cand)
-            if cand_score > best_score:
-                best, best_score = cand, cand_score
+            obj = evaluator(cand).final_soc_pct
+            if obj > best_obj:
+                best, best_obj = cand, obj
     return best
 
 
@@ -330,12 +288,6 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     
     seg_start_m = (dist_done_km * 1000.0) + np.arange(n_segments) * CONTROL_SEGMENT_M
 
-    # Per-segment lengths: full control segments, with the final one truncated
-    # to the remaining route length so integration never overshoots total_m.
-    seg_lens_m = np.full(n_segments, CONTROL_SEGMENT_M, dtype=float)
-    if route is not None and n_segments > 0:
-        seg_lens_m[-1] = max(0.0, rem_m - CONTROL_SEGMENT_M * (n_segments - 1))
-
     v_max_kmh = route.v_max_ms_at(seg_start_m) * 3.6 if route else np.full(n_segments, car.v_max_ms * 3.6)
     if route:
         v_max_kmh = apply_turn_speed_caps(route, v_max_kmh, seg_start_m)
@@ -348,11 +300,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     evaluator = DayEvaluator(route, car, solar_provider, wind_provider,
                               t0_s=t0_s,
                               start_soc_pct=start_soc_pct,
-                              seg_start_m=seg_start_m,
-                              seg_len_m=seg_lens_m,
-                              loops_committed=loops_committed,
-                              cs_taken=cs_taken,
-                              unplanned_stop_s=race_config.UNPLANNED_STOP_BUDGET_S)
+                              seg_start_m=seg_start_m)
 
     objective = _build_objective(evaluator)
 
@@ -393,8 +341,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     )
 
     v_final_kmh = project_to_integer_kmh(
-        evaluator, slsqp_result.x, v_max_kmh, constraints=constraints,
-        objective=objective)
+        evaluator, slsqp_result.x, v_max_kmh, constraints=constraints)
     final_eval = evaluator(v_final_kmh)
 
     return dict(
@@ -408,6 +355,9 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         global_method=global_result.method,
         trailered_km=getattr(final_eval, 'trailered_km', 0.0),
         trailered_substeps=getattr(final_eval, 'trailered_substeps', 0),
+        driven_km=getattr(final_eval, 'driven_km', 0.0),
+        motor_energy_wh=getattr(final_eval, 'motor_energy_wh', 0.0),
+        solar_energy_wh=getattr(final_eval, 'solar_energy_wh', 0.0),
         diagnostics=dict(
             global_fun=global_result.fun,
             slsqp_fun=slsqp_result.fun,

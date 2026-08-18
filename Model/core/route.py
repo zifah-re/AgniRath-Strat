@@ -43,6 +43,20 @@ class Route:
             raise ValueError(f"route file missing columns: {missing}")
         self.df = df.sort_values("distance_m").reset_index(drop=True)
         self._x = self.df["distance_m"].to_numpy()
+        # Cache columns once. forward_sim calls these per PHYSICS SUBSTEP
+        # (ENERGY_GRID_M-spaced -> up to ~100 calls per 10km control segment,
+        # times every GA/SLSQP candidate evaluation). Re-pulling .to_numpy()/
+        # .iloc[] from the DataFrame on every call was a measurable per-call
+        # cost multiplied by hundreds of thousands of calls per solve.
+        self._slope = self.df["slope_pct"].to_numpy()
+        self._bearing = self.df["bearing_deg"].to_numpy()
+        self._v_max = self.df["v_max_ms"].to_numpy()
+        self._circle_id = self.df["circle_id"].to_numpy()
+        self._lat = self.df["lat"].to_numpy()
+        self._lon = self.df["lon"].to_numpy()
+        self._red_flag = self.df["red_flag_trailer"].to_numpy()
+        self._control_stop = self.df["control_stop"].to_numpy()
+        self._seg_type = self.df["seg_type"].to_numpy()
 
     # -- factory ----------------------------------------------------------
     @classmethod
@@ -55,27 +69,40 @@ class Route:
         return np.clip(np.searchsorted(self._x, x_m), 0, len(self._x) - 1)
 
     def slope_pct_at(self, x_m):
-        return self.df["slope_pct"].to_numpy()[self._idx(x_m)]
+        return self._slope[self._idx(x_m)]
 
     def bearing_deg_at(self, x_m):
-        return self.df["bearing_deg"].to_numpy()[self._idx(x_m)]
+        return self._bearing[self._idx(x_m)]
 
     def v_max_ms_at(self, x_m):
-        return self.df["v_max_ms"].to_numpy()[self._idx(x_m)]
+        return self._v_max[self._idx(x_m)]
 
     def circle_id_at(self, x_m) -> int:
-        return int(self.df["circle_id"].to_numpy()[self._idx(x_m)])
+        return int(self._circle_id[self._idx(x_m)])
 
     def latlon_at(self, x_m):
         i = self._idx(x_m)
-        return (self.df["lat"].to_numpy()[i], self.df["lon"].to_numpy()[i])
+        return (self._lat[i], self._lon[i])
 
     def red_flag_at(self, x_m) -> bool:
-        """True if the nearest grid point to x_m is in a trailered (red-flag)
-        block. Single definition — the duplicate KML-era override is removed;
-        the red_flag_trailer column (Plan v3 §5.1) is the one source of truth.
-        The constructor already enforces the column, so no runtime guard."""
-        return bool(self.df["red_flag_trailer"].to_numpy()[self._idx(x_m)])
+        return bool(self._red_flag[self._idx(x_m)])
+
+    def control_stop_at(self, x_m) -> bool:
+        return bool(self._control_stop[self._idx(x_m)])
+
+    def seg_type_at(self, x_m) -> str:
+        return str(self._seg_type[self._idx(x_m)])
+
+    def set_red_flag_mask(self, mask: np.ndarray) -> None:
+        """Overwrite the trailered-segment mask in place (both the cached
+        array red_flag_at() reads, and self.df, so anything reading the
+        DataFrame directly stays consistent). See
+        tier1.compute_trailered_mask_full / trust_region.py's route loading."""
+        mask = np.asarray(mask, dtype=bool)
+        if len(mask) != len(self.df):
+            raise ValueError(f"trailered mask length {len(mask)} != route length {len(self.df)}")
+        self._red_flag = mask
+        self.df["red_flag_trailer"] = mask
 
     @property
     def total_m(self) -> float:

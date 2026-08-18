@@ -233,4 +233,4 @@ BLIND_LOOP_PLACEHOLDER_KM = sum(_released_loop_lengths) / len(_released_loop_len
 # three unplanned brief stops — traffic, driver changes — absent from the
 # forecast). TODO-VERIFY: tune from our own test-run logs.
 UNPLANNED_STOP_BUDGET_S = 8 * 60
-PARC_FERME_IDLE_W = 5.0
+PARC_FERME_IDLE_W = 10.0  # source: user directive (18/08) — matches p_idle_w

@@ -52,7 +52,15 @@ def _ordered_combos(plan: _DayPlan, day_index: int, car: CarState, is_today: boo
             n * ((plan.loops[i][1] * 1000.0) / loop_speed_ms + pre_attempt_stop_s)
             for i, n in enumerate(reps)) if reps else 0.0
 
-    return sorted(combos, key=_loop_time)[:MAX_COMBOS]
+    combos_sorted = sorted(combos, key=_loop_time)
+    if len(combos_sorted) <= MAX_COMBOS:
+        return combos_sorted
+    # Evenly-spaced sample across [0, len-1] -- guarantees the cheapest AND
+    # the most-distance combo are both included, plus spread in between,
+    # instead of always keeping only the MAX_COMBOS cheapest ones.
+    idxs = sorted(set(int(round(i)) for i in
+                       np.linspace(0, len(combos_sorted) - 1, MAX_COMBOS)))
+    return [combos_sorted[i] for i in idxs]
 
 def _l2_result_feasible(res: dict, car: CarState, day_index: int) -> bool:
     if res is None: return False
