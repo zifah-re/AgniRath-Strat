@@ -224,7 +224,7 @@ def stage_soc_profile(v,fname,start_date,start_time,soc_start):
     ax[2].plot(distances,solar_irr,color="seagreen")
     ax[2].set_title("Solar")
     plt.show()'''
-    return soc,power
+    return soc,power,time_base[-1]
 
     
 def loops_range(d1,d2,dl,day_1=False):
@@ -237,35 +237,45 @@ def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distance
     loop_soc_start=soc_start + (solar([t_start+15*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*30*60
     soc_profile=[]
     for i in range(n):
-        soc,_=stage_soc_profile(55/3.6,fname,start_date,loop_start,loop_soc_start)
-        loop_start=t_start+5*60
-        loop_soc_start=soc[-1] + (solar([t_start+2.5*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
+        soc,_,end_time=stage_soc_profile(55/3.6,fname,start_date,loop_start,loop_soc_start)
+        loop_start=end_time+5*60
+        loop_soc_start=soc[-1] + (solar([end_time+2.5*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
         soc_profile.append(soc)
-    return np.concatenate(soc_profile)
+    return np.concatenate(soc_profile),end_time
 
 def main():
     v1 = 55/3.6
     v2 = 75/3.6
+    soc_start=100
+    start_date=date(2026,9,10)
+    day_no=1
     loop_bounds=[]
-    for day in DAY_DISTANCES:
+    for day in ["Day 1"]:
         s1,l,s2=DAY_DISTANCES[day]['s1'],DAY_DISTANCES[day]['l'],DAY_DISTANCES[day]['s2']
         loop_bounds.append(np.arange(*loops_range(s1,s2,l,False if day!="Day 1" else True)))
 
-        end_soc_s1,power_s1 = stage_soc_profile(v1,DAYWISE_FILES[day]['s1'],start_date,start_time=START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S,soc_start)
+        end_soc_s1,power_s1,end_time = stage_soc_profile(v1,DAYWISE_FILES[day]['s1'],start_date,datetime.combine(start_date,datetime.strptime("09:00:00", "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp() if day=="Day 1" else datetime.combine(start_date,datetime.strptime("08:00:00", "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp(),soc_start)
 
         fig,axes = plt.subplots(1,1,figsize=(10,5))
 
-        
+        solar_obj=weather_logs[f'mean_{DAYWISE_FILES[day]['l']}']
+        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['l']}.kml.save')['profile']
+        coords,headings,altitude,distances_loop,grad=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
+        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['s1']}.kml.save')['profile']
+        _,_,_,distances_s1,_=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
+        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['s2']}.kml.save')['profile']
+        _,_,_,distances_s2,_=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
         for i in range(len(loop_bounds[-1])):
-            loop_soc,loop_power=stitch_loops(loop_bounds[-1][i],end_soc_s1,solar_obj,coords,altitude,headings,l,DAYWISE_FILES[day]['l'],start_date)
+            loop_soc,end_time=stitch_loops(loop_bounds[day_no-1][i],end_time,end_soc_s1[-1],solar_obj,coords,altitude,headings,l,DAYWISE_FILES[day]['l'],start_date)
 
             if not loop_soc[-1]<SOC_MIN_PCT:
-                end_soc_s2,power_s2 = stage_soc_profile(v2,DAYWISE_FILES[day]['s2'],start_date,start_time=loop_bounds[-1][i]*60*60 + CONTROL_STOP_DURATION_S + START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S,soc_start=loop_soc[-1])
+                end_soc_s2,power_s2,end_time = stage_soc_profile(v2,DAYWISE_FILES[day]['s2'],start_date,end_time,soc_start=loop_soc[-1])
                 if not end_soc_s2[-1]<SOC_MIN_PCT:
                     loop_length = l
                     for k in range(loop_bounds[-1][i]):
-                        loop_length = np.concatenate((loop_length,loop_length[-1]+l))
-                    axes.plot(np.concatenate((s1,s1[-1]+loop_length,s1[-1]+loop_length[-1]+s2)),np.concatenate((end_soc_s1,loop_soc,end_soc_s2)),label=f"Loop {loop_bounds[-1][i]}")
+                        distances_loop = np.concatenate((distances_loop,distances_loop+l))
+                    axes.plot(np.concatenate((distances_s1,distances_s1[-1]+distances_loop,distances_s1[-1]+distances_loop[-1]+distances_s2)),np.concatenate((end_soc_s1,loop_soc,end_soc_s2)),label=f"Loop {loop_bounds[-1][i]}")
+                    plt.show()
                 else: print(f"{loop_bounds[-1][i]} loops failed on stage 2 with final SoC {end_soc_s2[-1]:.2f}%")
             else: print(f"{loop_bounds[-1][i]} loops failed on loops with final SoC {loop_soc[-1]:.2f}%")
 
