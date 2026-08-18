@@ -202,7 +202,7 @@ def net_power(v,grad,solar):
     p_electric = solar - p_mech - 50
     return p_electric
 
-def stage_soc_profile(v,fname,start_date,start_time):
+def stage_soc_profile(v,fname,start_date,start_time,soc_start):
     solar_obj=weather_logs[f'mean_{fname}']
     route=extractSolarData(f'Saves/{fname}.kml.save')['profile']
     coords,headings,altitude,distances,grad=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
@@ -210,12 +210,12 @@ def stage_soc_profile(v,fname,start_date,start_time):
     dx=np.diff(distances)
     dt=dx/v
     dt=np.concatenate(([0],dt))
-    time_base=datetime.combine(start_date,datetime.strptime(start_time, "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp() + dt.cumsum()
+    time_base=start_time + dt.cumsum()
     solar_irr=solar(time_base,coords,headings,altitude,solar_obj)
     v_array=np.full(len(time_base),v)
     power=net_power(v_array,grad,solar_irr)
     energy=power*np.concatenate((dx/v,[0]))
-    soc=(1 + np.cumsum(energy/(BATTERY_WH*3600)))*100
+    soc=soc_start+(np.cumsum(energy/(BATTERY_WH*3600)))*100
     '''fig,ax=plt.subplots(1,3,figsize=(10,5))
     ax[0].plot(distances,power,color="steelblue")
     ax[0].set_title("Power")
@@ -232,14 +232,16 @@ def loops_range(d1,d2,dl,day_1=False):
         return (floor((8-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((8-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
     return (floor((9-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((9-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
 
-def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distances):
+def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distances,fname,start_date):
     loop_start=t_start+30*60
-    loop_soc_start=soc_start + (solar([t_start+15*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))*100*30*60
-    dx=np.diff(distances)
-    dt=dx/LOOP_CRUISE_SPEED_MS
-    dt=np.concatenate(([0],dt))
-    time_base=loop_start + dt.cumsum()
-    
+    loop_soc_start=soc_start + (solar([t_start+15*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*30*60
+    soc_profile=[]
+    for i in range(n):
+        soc,_=stage_soc_profile(55/3.6,fname,start_date,loop_start,loop_soc_start)
+        loop_start=t_start+5*60
+        loop_soc_start=soc[-1] + (solar([t_start+2.5*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
+        soc_profile.append(soc)
+    return np.concatenate(soc_profile)
 
 def main():
     v1 = 55/3.6
