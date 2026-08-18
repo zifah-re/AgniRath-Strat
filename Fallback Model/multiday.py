@@ -242,10 +242,29 @@ def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distance
     
 
 def main():
+    v1 = 55/3.6
+    v2 = 75/3.6
     loop_bounds=[]
     for day in DAY_DISTANCES:
         s1,l,s2=DAY_DISTANCES[day]['s1'],DAY_DISTANCES[day]['l'],DAY_DISTANCES[day]['s2']
         loop_bounds.append(np.arange(*loops_range(s1,s2,l,False if day!="Day 1" else True)))
 
-        end_soc,power = solve(v1,s1,day,start_time=START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S)
-    print(loop_bounds)
+        end_soc_s1,power_s1 = stage_soc_profile(v1,DAYWISE_FILES[day]['s1'],start_date,start_time=START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S,soc_start)
+
+        fig,axes = plt.subplots(1,1,figsize=(10,5))
+
+        
+        for i in range(len(loop_bounds[-1])):
+            loop_soc,loop_power=stitch_loops(loop_bounds[-1][i],end_soc_s1,solar_obj,coords,altitude,headings,l,DAYWISE_FILES[day]['l'],start_date)
+
+            if not loop_soc[-1]<SOC_MIN_PCT:
+                end_soc_s2,power_s2 = stage_soc_profile(v2,DAYWISE_FILES[day]['s2'],start_date,start_time=loop_bounds[-1][i]*60*60 + CONTROL_STOP_DURATION_S + START_TIME_DAY1_S if day=="Day 1" else START_TIME_OTHER_S,soc_start=loop_soc[-1])
+                if not end_soc_s2[-1]<SOC_MIN_PCT:
+                    loop_length = l
+                    for k in range(loop_bounds[-1][i]):
+                        loop_length = np.concatenate((loop_length,loop_length[-1]+l))
+                    axes.plot(np.concatenate((s1,s1[-1]+loop_length,s1[-1]+loop_length[-1]+s2)),np.concatenate((end_soc_s1,loop_soc,end_soc_s2)),label=f"Loop {loop_bounds[-1][i]}")
+                else: print(f"{loop_bounds[-1][i]} loops failed on stage 2 with final SoC {end_soc_s2[-1]:.2f}%")
+            else: print(f"{loop_bounds[-1][i]} loops failed on loops with final SoC {loop_soc[-1]:.2f}%")
+
+    
