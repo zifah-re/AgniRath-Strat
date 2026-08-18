@@ -4,6 +4,19 @@ optimizers/hierarchical/trust_region.py — coarse-to-fine driver loop.
 
 from __future__ import annotations
 
+# ── BLAS thread pinning (must run before numpy/scipy import) ──────────────
+# scipy.optimize.minimize / differential_evolution call BLAS (LAPACK)
+# routines that default to OMP's auto thread count. Under Tier 2's
+# thread-per-day parallelism that oversubscribes cores and stalls every
+# solve. Pin each process to one BLAS thread so worker threads actually
+# parallelize instead of thrashing. Keep this BEFORE any numpy/scipy
+# import in this module (and ideally in the entrypoint too).
+import os as _os
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    _os.environ.setdefault(_v, "1")
+del _os, _v
+
 import logging
 import numpy as np
 import dataclasses
@@ -14,7 +27,7 @@ from configs import race_config as rc
 from configs.car_config import CarState
 from optimizers import singleday
 from .tier1 import _get_day_plan
-from . import tier1, tier2, tier3
+from . import tier1, tier2, tier3, _threads
 from .tier1 import _adjust_plan_for_today
 
 logger = logging.getLogger(__name__)
@@ -66,6 +79,14 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
              seed: int | None = None, max_iters: int = MAX_ITERS,
              window_pct: float = CONVERGENCE_WINDOW_PCT,
              tier1_baseline: dict | None = None) -> dict:
+
+        # Audit fix: normalize the worker count exactly once, in one place.
+    # tier2.sample_all_days re-clamps through the same worker_cap, so an
+    # explicit n_workers is honored end-to-end (previously it was passed to
+    # sample_all_days and silently swallowed by its **kwargs, so every run
+    # used a hardcoded min(n_days, os.cpu_count()) instead of the caller's
+    # parallel= setting).
+    n_workers = _threads.worker_cap(n_workers)
 
     if tier1_baseline is not None:
         base = tier1_baseline
@@ -451,6 +472,19 @@ if __name__ == "__main__":
             g = self._gauss.ghi_wm2(t_s, x_m)
             return max(j, self._blend * g)
 
+        # Audit hot-loop fix: forward_sim now resolves weather-node indices
+        # per segment (node_index_array) and evaluates GHI per substep via
+        # ghi_wm2_at_node. Re-expose both so this wrapper does NOT silently
+        # degrade the vectorized path back to one KDTree query per substep.
+        def node_index_array(self, x_m):
+            return self._json.node_index_array(x_m)
+
+        def ghi_wm2_at_node(self, t_s: float, node_index: int) -> float:
+            j = self._json.ghi_wm2_at_node(t_s, node_index)
+            # Gaussian floor is position-independent (x_m ignored upstream).
+            g = self._gauss.ghi_wm2(t_s, 0.0)
+            return max(j, self._blend * g)
+
     def _check_daytime_avg_ghi(weather_files):
         """Quick scan: average GHI during race hours (8-17h) across all nodes."""
         all_ghi = []
@@ -555,26 +589,19 @@ if __name__ == "__main__":
         day3_variant_weather[vname] = matched
 
     # ------------------------------------------------------------------ #
-    # 5.  Compute Tier 1 once, then run optimizer for each variant
+    # 5.  Run optimizer once per Day-3 variant, each with its OWN Tier 1
+    #     baseline
     # ------------------------------------------------------------------ #
-    # Tier 1 is expensive (~10 min) and only Day 3 changes between variants.
-    # Compute it once with the first variant's Day 3 and reuse for all.
-    first_vname = list(day3_variants.keys())[0]
-    first_vfiles = day3_variants[first_vname]
-    if first_vfiles:
-        routes[2] = _load_route(first_vfiles, 3)
-    else:
-        routes[2] = None
-    weather_files = day3_variant_weather.get(first_vname, [])
-    solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
+    # Tier 1's guess_baseline bakes in the full day-0..7 route + weather set
+    # (the Day-3 variant is swapped into routes[2] before it runs), and the
+    # resulting day_plans / s0_pct / feasible flag are all Day-3-dependent.
+    # Reusing one shared baseline computed from the FIRST variant for every
+    # other variant is wrong: different Day 3 route -> different energy
+    # balance -> different s_center -> Tier 2 samples the wrong SOC window
+    # and Tier 3 chains days around a Day-3-specific policy. Recompute per
+    # variant so each result is self-consistent (cost: one ~10-min Tier 1
+    # pass per variant).
     kml_files_d3 = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
-    kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
-    _apply_trailered_mask(routes.get(2), kml_paths, 2)
-
-    logger.info("Computing shared Tier 1 baseline (using Day 3 = %s)...", first_vname)
-    shared_baseline = tier1.guess_baseline(
-        routes, car, solar_providers, wind_providers, 100.0,
-        start_day=0, kml_paths=kml_paths)
 
     all_results = {}
 
@@ -594,11 +621,17 @@ if __name__ == "__main__":
         weather_files = day3_variant_weather.get(variant_name, [])
         solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
 
-        # KML for Day 3
+                # KML for Day 3
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
         _apply_trailered_mask(routes.get(2), kml_paths, 2)
 
-        # --- Run trust-region optimizer (reuse Tier 1 baseline) ---
+        # --- Tier 1 baseline for THIS variant (Day 3 already swapped in) ---
+        logger.info("Computing Tier 1 baseline for variant '%s'...", variant_name)
+        baseline = tier1.guess_baseline(
+            routes, car, solar_providers, wind_providers, 100.0,
+            start_day=0, kml_paths=kml_paths)
+
+        # --- Run trust-region optimizer (per-variant Tier 1 baseline) ---
         result = optimize(
             routes=routes,
             car=car,
@@ -609,7 +642,7 @@ if __name__ == "__main__":
             start_day=0,
             parallel=True,
             max_iters=4,
-            tier1_baseline=shared_baseline,
+            tier1_baseline=baseline,
         )
 
         # --- Extract final speed profiles if feasible ---

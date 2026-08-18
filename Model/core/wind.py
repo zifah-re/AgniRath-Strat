@@ -24,6 +24,20 @@ class WindProvider:
         """Return (speed_ms, dir_deg_from)."""  # pragma: no cover
         raise NotImplementedError
 
+    def wind_array(self, t_s, x_m) -> tuple[np.ndarray, np.ndarray]:
+        """Vectorized wind for parallel (t_s, x_m) arrays -> (speed_ms,
+        dir_deg_from) arrays. Same exact-per-point default-loop contract as
+        SolarProvider.ghi_wm2_array; numpy providers override it."""
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        spd = np.empty(t_s.shape, dtype=float)
+        d = np.empty(t_s.shape, dtype=float)
+        for i, (a, b) in enumerate(zip(t_s.ravel(), x_m.ravel())):
+            spd.ravel()[i], d.ravel()[i] = self.wind(float(a), float(b))
+        return spd, d
+
 class ConstantWindProvider(WindProvider):
     def __init__(self, speed_ms: float = 0.0, dir_deg_from: float = 0.0):
         self._s = float(speed_ms)
@@ -31,6 +45,12 @@ class ConstantWindProvider(WindProvider):
 
     def wind(self, t_s: float, x_m: float) -> tuple[float, float]:
         return self._s, self._d
+
+    def wind_array(self, t_s, x_m) -> tuple[np.ndarray, np.ndarray]:
+        shape = np.broadcast(np.asarray(t_s, dtype=float),
+                             np.asarray(x_m, dtype=float)).shape
+        return (np.full(shape, self._s, dtype=float),
+                np.full(shape, self._d, dtype=float))
 
 class HourlyJSONWindProvider(WindProvider):
     """
@@ -76,6 +96,41 @@ class HourlyJSONWindProvider(WindProvider):
         speed_ms = float(np.interp(t_s, self.t_s_array, speed_array))
         dir_deg = float(np.interp(t_s, self.t_s_array, dir_array))
         return speed_ms, dir_deg
+
+    def node_index_array(self, x_m: np.ndarray) -> np.ndarray:
+        """Weather-node index per position, one batched KDTree query."""
+        x_m = np.asarray(x_m, dtype=float)
+        if self.route is None:
+            return np.full(np.shape(x_m), len(self.speed_matrix) // 2,
+                           dtype=np.intp)
+        lats, lons = self.route.latlon_array(x_m)
+        _, idx = self.tree.query(
+            np.column_stack([lats.ravel(), lons.ravel()]))
+        return idx.reshape(np.shape(x_m)).astype(np.intp)
+
+    def wind_at_node(self, t_s: float, node_index: int) -> tuple[float, float]:
+        """Scalar wind at a pre-resolved weather node (no KDTree query)."""
+        speed_ms = float(np.interp(t_s, self.t_s_array,
+                                   self.speed_matrix[int(node_index)]))
+        dir_deg = float(np.interp(t_s, self.t_s_array,
+                                  self.dir_matrix[int(node_index)]))
+        return speed_ms, dir_deg
+
+    def wind_array(self, t_s, x_m) -> tuple[np.ndarray, np.ndarray]:
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        node_idx = self.node_index_array(x_m)
+        spd = np.empty(t_s.shape, dtype=float)
+        d = np.empty(t_s.shape, dtype=float)
+        for n in np.unique(node_idx):
+            mask = node_idx == n
+            spd[mask] = np.interp(t_s[mask], self.t_s_array,
+                                  self.speed_matrix[int(n)])
+            d[mask] = np.interp(t_s[mask], self.t_s_array,
+                                self.dir_matrix[int(n)])
+        return spd, d
 
 # ---------------------------------------------------------------------------
 # Decomposition helpers

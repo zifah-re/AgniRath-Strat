@@ -131,6 +131,22 @@ def net_power(
     return p_solar - p_electric - car.p_idle_w, dt_s
 
 
+def regen_cap_w(car: CarState) -> float:
+    """Max regenerative charge-back power (W) the pack can accept.
+
+    Single source of truth shared by Tier 1's coarse energy diagnostic
+    (optimizers/tier1.py _regen_cap_w now delegates here) and forward_sim's
+    high-fidelity integrator (Tier 2 / L2). Explicit car.p_regen_max_w wins;
+    otherwise fall back to the thermal-derated continuous limit. This is the
+    exact cap Tier 1 has always applied, so Tier 2 / L2 physics now match
+    Tier 1's model instead of letting regen charge back uncapped.
+    """
+    explicit = getattr(car, "p_regen_max_w", None)
+    if explicit is not None:
+        return float(explicit)
+    return float(car.p_max_continuous_w * car.p_max_derating)
+
+
 def power_required_at_speed(
     car: CarState,
     v_ms: float,

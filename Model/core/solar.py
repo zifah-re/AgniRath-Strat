@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 import math
 import pathlib
+import pandas as pd
+import pvlib
 import typing as _t
 import numpy as np
 from scipy.spatial import cKDTree
@@ -56,6 +58,24 @@ class SolarProvider:
     def ghi_wm2(self, t_s: float, x_m: float) -> float:  # pragma: no cover
         raise NotImplementedError
 
+    def ghi_wm2_array(self, t_s, x_m) -> np.ndarray:
+        """Vectorized GHI for parallel (t_s, x_m) arrays.
+
+        Audit fix 1: callers that can batch positions+times (forward_sim
+        segment precomputation, Tier 1 coarse scans, scenarios) should use
+        this instead of per-point ghi_wm2() calls through the Python API.
+        The default implementation is an exact per-point loop so any
+        third-party/legacy provider without its own vectorized path still
+        works — it is just slower than the numpy overrides below.
+        """
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        return np.array([self.ghi_wm2(float(a), float(b))
+                         for a, b in zip(t_s.ravel(), x_m.ravel())],
+                        dtype=float).reshape(t_s.shape)
+
 class GaussianProvider(SolarProvider):
     PEAK_WM2 = 1073.099
     NOON_S = 43_200.0
@@ -65,11 +85,14 @@ class GaussianProvider(SolarProvider):
         return float(self.PEAK_WM2
                      * math.exp(-0.5 * ((t_s - self.NOON_S) / self.SIGMA_S) ** 2))
 
+    def ghi_wm2_array(self, t_s, x_m=0.0) -> np.ndarray:
+        t_s = np.asarray(t_s, dtype=float)
+        return self.PEAK_WM2 * np.exp(-0.5 * ((t_s - self.NOON_S)
+                                              / self.SIGMA_S) ** 2)
+
 class PVLibClearSkyProvider(SolarProvider):
     def __init__(self, lat: float, lon: float, date_iso: str,
-                 tz: str = "Africa/Johannesburg"):
-        import pandas as pd
-        import pvlib  
+                 tz: str = "Africa/Johannesburg"): 
         self._pvlib = pvlib
         self._times = pd.date_range(f"{date_iso} 00:00", f"{date_iso} 23:59",
                                     freq="1min", tz=tz)
@@ -79,6 +102,11 @@ class PVLibClearSkyProvider(SolarProvider):
     def ghi_wm2(self, t_s: float, x_m: float = 0.0) -> float:
         idx = int(np.clip(t_s // 60, 0, len(self._ghi) - 1))
         return float(self._ghi[idx])
+
+    def ghi_wm2_array(self, t_s, x_m=0.0) -> np.ndarray:
+        t_s = np.asarray(t_s, dtype=float)
+        idx = np.clip(t_s // 60, 0, len(self._ghi) - 1).astype(np.intp)
+        return self._ghi[idx]
 
 class HourlyJSONSolarProvider(SolarProvider):
     """
@@ -119,6 +147,39 @@ class HourlyJSONSolarProvider(SolarProvider):
             
         ghi_fitted = float(self.spline_models[idx](t_s))
         return max(0.0, ghi_fitted)
+
+    def node_index_array(self, x_m: np.ndarray) -> np.ndarray:
+        """Weather-node index for every position in x_m, in one batched
+        lat/lon KDTree query (vectorized route lookup). This is the
+        pre-resolved lookup forward_sim uses so the integrator never re-runs
+        a KDTree query inside the substep loop."""
+        x_m = np.asarray(x_m, dtype=float)
+        if self.route is None:
+            return np.full(np.shape(x_m), len(self.spline_models) // 2,
+                           dtype=np.intp)
+        lats, lons = self.route.latlon_array(x_m)
+        _, idx = self.tree.query(
+            np.column_stack([lats.ravel(), lons.ravel()]))
+        return idx.reshape(np.shape(x_m)).astype(np.intp)
+
+    def ghi_wm2_at_node(self, t_s: float, node_index: int) -> float:
+        """Scalar GHI at a pre-resolved weather node — the hot path after
+        node_index_array() removed the lat/lon + KDTree lookup."""
+        return max(0.0, float(self.spline_models[int(node_index)](t_s)))
+
+    def ghi_wm2_array(self, t_s, x_m) -> np.ndarray:
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        node_idx = self.node_index_array(x_m)
+        out = np.empty(np.shape(x_m), dtype=float)
+        # One spline evaluation per weather node (vectorized over the
+        # positions assigned to that node) instead of one per position.
+        for n in np.unique(node_idx):
+            mask = node_idx == n
+            out[mask] = self.spline_models[int(n)](t_s[mask])
+        return np.clip(out, 0.0, None)
 
 def best_available_provider(**pvlib_kwargs) -> SolarProvider:
     try:

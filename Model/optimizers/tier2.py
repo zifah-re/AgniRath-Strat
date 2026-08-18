@@ -3,6 +3,20 @@ optimizers/hierarchical/tier2.py — Tier 2 high-fidelity local sampler.
 """
 
 from __future__ import annotations
+
+# ── BLAS thread pinning (must run before numpy/scipy import) ──────────────
+# scipy.optimize.minimize / differential_evolution call BLAS (LAPACK)
+# routines that default to OMP's auto thread count. Under Tier 2's
+# thread-per-day parallelism that oversubscribes cores and stalls every
+# solve. Pin each process to one BLAS thread so worker threads actually
+# parallelize instead of thrashing. Keep this BEFORE any numpy/scipy
+# import in this module (and ideally in the entrypoint too).
+import os as _os
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    _os.environ.setdefault(_v, "1")
+del _os, _v
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
@@ -14,14 +28,15 @@ import time
 
 from configs import race_config as rc
 from configs.car_config import CarState
+
+
 from optimizers import singleday
+from . import _threads
 from .tier1 import _DayPlan
 from .tier1 import relaxed_loop_combos
 
 logger = logging.getLogger(__name__)
 
-# ── Tuning knobs ──────────────────────────────────────────────────────
-# Full-range sampling: test at soc_min+5 and soc_max so the linear
 # surrogate covers every start SOC Tier 3 might need.  Tier 1's
 # s_center can be far from what singleday.solve actually produces,
 # so narrow offsets around s_center leave the surrogate window too
@@ -209,13 +224,25 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
             n_solves += 1
 
     surrogates = _fit_surrogates(points_by_combo, s0_pct, plan)
+    if n_solves == 0:
+        # Diagnostic for the empty-surrogate failure mode: every combo at
+        # every sampled SOC offset came back infeasible. That leaves Tier 3
+        # with nothing to allocate and trust_region falls back to the Tier 1
+        # linear surrogate — log exactly how this happened so the fallback is
+        # visible instead of silently hiding an optimizer-level problem.
+        logger.warning(
+            "Tier2 Day %d: 0 L2 solves succeeded at sampled SOCs %s — all "
+            "combos infeasible (time/SOC). Surrogates empty; trust_region "
+            "will fall back to the Tier 1 linear surrogate.",
+            day_index, [round(float(s), 1) for s in start_socs])
     return dict(surrogates=surrogates, s0_pct=s0_pct, n_l2_solves=n_solves)
+
 
 def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
                     s0_traj: np.ndarray, plans: list, alpha_next_pct: dict,
                     start_day: int = 0, dist_done_km: float = 0.0, elapsed_s: float = 0.0,
                     cs_taken: bool = False, loops_done: dict | None = None,
-                    **kwargs) -> dict:
+                    n_workers: int | None = None, **kwargs) -> dict:
     """Sample all days.  Uses ThreadPoolExecutor to parallelize across days.
 
     NOTE on threading: forward_sim's integrator is a Python for-loop (holds
@@ -268,8 +295,13 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
     day_indices = list(range(start_day, len(plans)))
     n_days = len(day_indices)
     # Use threads: share memory (no pickling), scipy SLSQP releases GIL.
-    # Cap workers at number of days to avoid idle threads.
-    n_workers = min(n_days, os.cpu_count() or 4)
+    # Cap workers at number of days to avoid idle threads. Worker count is
+    # normalized through optimizers._threads.worker_cap (the single source
+    # of truth), so an explicit n_workers from the caller (trust_region's
+    # parallel= setting) is honored and clamped to os.cpu_count() — before
+    # this fix the caller's n_workers landed in **kwargs and was silently
+    # dropped, so every run used the same hardcoded default.
+    n_workers = min(n_days, _threads.worker_cap(n_workers) or os.cpu_count() or 4)
 
     per_day = {}
     if n_days <= 1 or n_workers <= 1:

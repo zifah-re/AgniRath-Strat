@@ -86,7 +86,11 @@ class DayEvaluator:
     def __init__(self, route: Route, car: CarState, solar_provider,
                  wind_provider, t0_s: float, start_soc_pct: float,
                  seg_start_m: np.ndarray, seg_len_m: float = CONTROL_SEGMENT_M,
-                 energy_grid_m: float = SCFG.ENERGY_GRID_M):
+                 energy_grid_m: float = SCFG.ENERGY_GRID_M, *,
+                 regen_cap_w: float | None = None,
+                 cs_taken: bool = False,
+                 loop_stop_duration_s: float | None = None,
+                 unplanned_stop_budget_s: float | None = None):
         self.route = route
         self.car = car
         self.solar_provider = solar_provider
@@ -96,6 +100,10 @@ class DayEvaluator:
         self.seg_start_m = seg_start_m
         self.seg_len_m = seg_len_m
         self.energy_grid_m = energy_grid_m
+        self.regen_cap_w = regen_cap_w
+        self.cs_taken = cs_taken
+        self.loop_stop_duration_s = loop_stop_duration_s
+        self.unplanned_stop_budget_s = unplanned_stop_budget_s
         self._cache: dict[bytes, forward_sim.DayEvalResult] = {}
 
     def __call__(self, v_kmh: np.ndarray) -> forward_sim.DayEvalResult:
@@ -113,7 +121,10 @@ class DayEvaluator:
             solar_provider=self.solar_provider, wind_provider=self.wind_provider,
             t0_s=self.t0_s, start_soc_pct=self.start_soc_pct,
             seg_start_m=self.seg_start_m, seg_len_m=self.seg_len_m,
-            energy_grid_m=self.energy_grid_m
+            energy_grid_m=self.energy_grid_m,
+            regen_cap_w=self.regen_cap_w, cs_taken=self.cs_taken,
+            loop_stop_duration_s=self.loop_stop_duration_s,
+            unplanned_stop_budget_s=self.unplanned_stop_budget_s,
         )
 
 
@@ -122,8 +133,20 @@ class DayEvaluator:
 # ===============================================================================
 
 def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
+    # Enriched objective (solar underutilization): add a penalty for solar
+    # energy the panel could produce but the battery couldn't absorb
+    # (SOC-ceiling clipping / excess solar during low draw). The penalty is
+    # in Wh (solar_underutil_j / 3600) scaled by SOLAR_UNDERUTIL_WEIGHT
+    # (solver_config). Weight 0.0 disables the enrichment (plain SOC
+    # objective); the default 1.0 makes each wasted Wh add +1 to the
+    # minimization objective, steering the search away from plans that waste
+    # cheap midday sun just to shave drive time.
+    _w = float(SCFG.SOLAR_UNDERUTIL_WEIGHT)
+
     def _objective(v_kmh: np.ndarray) -> float:
-        return -evaluator(v_kmh).final_soc_pct
+        res = evaluator(v_kmh)
+        solar_penalty_wh = _w * res.solar_underutil_j / 3600.0
+        return -res.final_soc_pct + solar_penalty_wh
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
@@ -300,17 +323,26 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     evaluator = DayEvaluator(route, car, solar_provider, wind_provider,
                               t0_s=t0_s,
                               start_soc_pct=start_soc_pct,
-                              seg_start_m=seg_start_m)
+                              seg_start_m=seg_start_m,
+                              cs_taken=cs_taken)
 
     objective = _build_objective(evaluator)
 
     n_loops = len(loops_committed) if loops_committed else 0
+        # Tier 1 parity on the stop-time budget: the control stop, the unplanned
+    # stop budget, and each loop turnaround are all parked time the car is NOT
+    # driving — subtract them all from the allowed drive window exactly like
+    # tier1.guess_baseline's t_stops_base / pre_attempt_stop_s. forward_sim
+    # credits the parked solar for the same windows (see its stop-time
+    # charging block), so time budget and energy credit stay symmetric.
     allowed_time_s = (
         (race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index))
         - elapsed_s
         - (0.0 if cs_taken else race_config.CONTROL_STOP_DURATION_S)
-        - n_loops * race_config.LOOP_STOP_DURATION_S
-    ) 
+        - race_config.UNPLANNED_STOP_BUDGET_S
+        - n_loops * (race_config.LOOP_STOP_DURATION_S
+                     + getattr(race_config, "LOOP_TURNAROUND_S", 0.0))
+    )  
 
     constraints = [
         _terminal_soc_constraint(evaluator, alpha_next_day_pct),

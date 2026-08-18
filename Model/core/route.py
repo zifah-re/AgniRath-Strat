@@ -93,6 +93,33 @@ class Route:
     def seg_type_at(self, x_m) -> str:
         return str(self._seg_type[self._idx(x_m)])
 
+    # -- array lookups (audit fix: forward_sim resolves whole control
+    #    segments in ONE vectorized searchsorted, not one per substep) -----
+    def slope_pct_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._slope[self._idx(x_m)]
+
+    def bearing_deg_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._bearing[self._idx(x_m)]
+
+    def v_max_ms_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._v_max[self._idx(x_m)]
+
+    def red_flag_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._red_flag[self._idx(x_m)]
+
+    def control_stop_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._control_stop[self._idx(x_m)]
+
+    def seg_type_array(self, x_m: np.ndarray) -> np.ndarray:
+        return self._seg_type[self._idx(x_m)]
+
+    def latlon_array(self, x_m: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """(lat, lon) arrays for every position in x_m — one vectorized
+        searchsorted instead of per-point row indexing. Used by the weather
+        providers' node-index batching (solar/wind KDTree lookup)."""
+        i = self._idx(x_m)
+        return self._lat[i], self._lon[i]
+
     def set_red_flag_mask(self, mask: np.ndarray) -> None:
         """Overwrite the trailered-segment mask in place (both the cached
         array red_flag_at() reads, and self.df, so anything reading the
