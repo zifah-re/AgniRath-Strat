@@ -34,17 +34,50 @@ class _DayPlan:
     loops: tuple[tuple[str, float], ...]
 
 def _get_day_plan(day_index: int) -> _DayPlan:
-    """Nominal (not-yet-driven) route plan for a day, from route notes."""
-    note = rc.DAY_ROUTE_NOTES[day_index]
-    if note["stage1_km"] is None:
-        stage1_km, stage2_km = 230.0, 0.0  # Fallback for full-blind days
-    else:
-        stage1_km, stage2_km = note["stage1_km"], note["stage2_km"]
+    """
+    Return the nominal route plan for a known race day.
 
-    loops = tuple(note["loops"]) if note["loops"] else (
-        ("blind_loop_placeholder", rc.BLIND_LOOP_PLACEHOLDER_KM),
+    Day 3 is intentionally handled by trust_region.py because it has
+    variant-specific released route files:
+
+        Aryaman:
+            Stage 1: DOES NOT EXIST
+            Stage 2: exists
+            Loop: exists
+
+        Prahlad:
+            Stage 1: exists
+            Stage 2: exists
+            Loop: exists
+
+    Therefore Day 3 must never fabricate a 230 km Stage 1 or a generic
+    blind-loop placeholder here.
+    """
+    note = rc.DAY_ROUTE_NOTES[day_index]
+
+    if day_index == rc.FULL_BLIND_DAY_INDEX:
+        raise ValueError(
+            "Day 3 requires a variant-specific route plan. "
+            "Build it from the Aryaman/Prahlad route files before "
+            "calling _get_day_plan(2)."
+        )
+
+    stage1_km = note["stage1_km"]
+    stage2_km = note["stage2_km"]
+
+    if stage1_km is None or stage2_km is None:
+        raise ValueError(
+            f"Day {day_index + 1} has incomplete route configuration: "
+            f"stage1_km={stage1_km}, stage2_km={stage2_km}"
+        )
+
+    loops = tuple(note["loops"] or ())
+
+    return _DayPlan(
+        float(stage1_km),
+        float(stage2_km),
+        loops,
     )
-    return _DayPlan(stage1_km, stage2_km, loops)
 
 def _regen_cap_w(car: CarState) -> float:
     # Single source of truth: core.physics.regen_cap_w. forward_sim
