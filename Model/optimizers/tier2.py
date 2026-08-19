@@ -170,14 +170,17 @@ class LinearSurrogate:
         self.wu = None if wu is None else np.asarray(wu, dtype=float)
 
     def predict(self, start_soc: float) -> float:
-        if self.xs is not None and len(self.xs) >= 2:
-            return float(np.interp(start_soc, self.xs, self.ys))
-        return self.a + self.b * (start_soc - self.s0)
+        # Never extrapolate a single successful L2 sample with a fabricated
+        # SOC slope.  A one-point surrogate is valid only at that sampled SOC
+        # (in_window() enforces this); two or more samples use interpolation.
+        if self.xs is None or self.ys is None:
+            raise RuntimeError("surrogate has no successful L2 sample")
+        return float(np.interp(start_soc, self.xs, self.ys))
 
     def predict_underutil(self, start_soc: float) -> float:
-        if self.xs is not None and self.wu is not None and len(self.xs) >= 2:
-            return max(0.0, float(np.interp(start_soc, self.xs, self.wu)))
-        return 0.0
+        if self.xs is None or self.wu is None:
+            raise RuntimeError("surrogate has no successful L2 sample")
+        return max(0.0, float(np.interp(start_soc, self.xs, self.wu)))
 
     def in_window(self, start_soc: float) -> bool:
         return self.soc_lo - 1e-9 <= start_soc <= self.soc_hi + 1e-9
@@ -200,9 +203,9 @@ def _fit_surrogates(points_by_combo: dict, s0: float, plan: _DayPlan):
         surro[tuple(reps)] = LinearSurrogate(
             a=float(a), b=float(b), s0=s0, loop_km=loop_km, reps=tuple(reps),
             soc_lo=float(xs.min()), soc_hi=float(xs.max()),
-            xs=xs if len(xs) >= 2 else None,
-            ys=ys if len(ys) >= 2 else None,
-            wu=wu if len(wu) >= 2 else None)
+            # Keep even a one-point sample.  It becomes a degenerate, exact-SOC
+            # surrogate rather than silently falling back to a linear model.
+            xs=xs, ys=ys, wu=wu)
     return surro
 
 

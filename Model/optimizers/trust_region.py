@@ -1024,7 +1024,12 @@ if __name__ == "__main__":
 
             # 3. SOC curve (key checkpoints)
             soc_drain_pct = soc_start - soc_end
-            solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+            # Use the solar energy integrated by forward_sim over the actual
+            # simulated trajectory.  The old _estimate_solar_input_wh()
+            # integrates the entire race window and therefore cannot be
+            # reconciled with motor_energy_wh when the car finishes early.
+            solar_wh = float((profiles.get(d_idx, {}).get("solar_energy_wh", 0.0)
+                              if profiles else 0.0) or 0.0)
             drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
             # Prefer the REAL simulated motor energy (integrated directly
             # from physics every substep in forward_sim.py) over the old
@@ -1154,8 +1159,14 @@ if __name__ == "__main__":
                     "soc_start_pct": round(soc_start, 1),
                 }
 
-                solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+                # Persist the same actual simulated PV quantity shown in the
+                # human-readable report.  Keep the old key for dashboard
+                # compatibility, but change its meaning to actual simulated PV.
+                solar_wh = float((profiles.get(d_idx, {}).get("solar_energy_wh", 0.0)
+                                  if profiles else 0.0) or 0.0)
                 day_data["solar_input_wh"] = round(solar_wh, 0)
+                day_data["solar_input_window_estimate_wh"] = round(
+                    _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx), 0)
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]
@@ -1194,7 +1205,7 @@ if __name__ == "__main__":
                 _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
                                         if profiles else None)
                 day_data["motor_energy_wh"] = round(
-                    _real_motor_wh_json if _real_motor_wh_json else (drain_wh + solar_wh), 0)
+                    _real_motor_wh_json if _real_motor_wh_json else 0.0, 0)
                 day_data["solar_energy_simulated_wh"] = round(
                     profiles.get(d_idx, {}).get("solar_energy_wh", 0.0) or 0.0, 0)
                 day_data["solar_underutil_wh"] = round(
