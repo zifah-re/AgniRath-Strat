@@ -70,31 +70,13 @@ def replan(routes: list, base_car: CarState, solar_providers: dict, wind_provide
                     elapsed_s=elapsed_s, cs_taken=cs_taken, 
                     loops_done=loops_done, kml_paths=kml_paths, **kwargs)
 
-def _trailered_km_by_day(routes) -> dict[int, float]:
-    """Use the route's already-applied trailering mask to compute credited km.
-
-    This deliberately reads the same mask consumed by forward_sim, so Tier 3
-    cannot accidentally use the nominal stage distance for Day 7/8 while L2
-    uses the actual trailered physics.
-    """
-    out = {}
-    for d in range(len(routes) if routes is not None else 0):
-        route = routes[d]
-        if route is None or not hasattr(route, "df") or len(route.df) < 2:
-            out[d] = 0.0
-            continue
-        dist = route.df["distance_m"].to_numpy(dtype=float)
-        mask = route.df["red_flag_trailer"].to_numpy(dtype=bool)
-        out[d] = float(np.sum(np.diff(dist)[mask[:-1]])) / 1000.0
-    return out
-
-
 def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
              start_soc_pct: float = 100.0, *, start_day: int = 0,
              dist_done_km: float = 0.0, elapsed_s: float = 0.0,
                           cs_taken: bool = False, loops_done: dict | None = None,
              kml_paths: dict | None = None,
-             loop_geoms_by_day: dict | None = None, parallel: bool = True,
+             loop_geoms_by_day: dict | None = None,
+             plans_override: list | None = None, parallel: bool = True,
              n_workers: int | None = None, global_method: str = "ga",
              seed: int | None = None, max_iters: int = MAX_ITERS,
              window_pct: float = CONVERGENCE_WINDOW_PCT,
@@ -116,11 +98,9 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                                     start_soc_pct, start_day=start_day,
                                     dist_done_km=dist_done_km, elapsed_s=elapsed_s,
                                     cs_taken=cs_taken, loops_done=loops_done,
-                                    kml_paths=kml_paths)
-    plans = base["day_plans"]
-    trailered_km_by_day = _trailered_km_by_day(routes)
-    logger.info("Tier3 credited trailered km by day: %s",
-                {d + 1: round(km, 1) for d, km in trailered_km_by_day.items() if km > 0})
+                                    kml_paths=kml_paths,
+                                    plans_override=plans_override)
+    plans = plans_override if plans_override is not None else base["day_plans"]
     s_center = base["s0_pct"].copy()
     if not base["feasible"]:
         logger.warning("Tier 1 baseline infeasible from start_soc=%.1f%%", start_soc_pct)
@@ -192,9 +172,7 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                 logger.info("Tier2 Day %d: fallback a=%.1f b=%.2f s0=%.1f",
                             d + 1, end_est, 1.0, s0)
 
-        result = tier3.allocate(
-            car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day,
-            trailered_km_by_day=trailered_km_by_day)
+        result = tier3.allocate(car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day)
         s_refined = result["s1_pct"]
 
         drift = np.nanmax(np.abs(s_refined[start_day:] - s_center[start_day:]))
@@ -239,7 +217,8 @@ def _package(result: dict, plans: list, car: CarState, *, converged: bool,
 def extract_final_profiles(routes: list, base_car: CarState, solar_providers: dict, 
                            wind_providers: dict, optimize_result: dict, 
                            overrides: dict | None = None,
-                           loop_geoms_by_day: dict | None = None) -> dict:
+                           loop_geoms_by_day: dict | None = None,
+                           plans_override: list | None = None) -> dict:
                            
     if not optimize_result.get("feasible"):
         logger.error("Cannot extract profiles from an infeasible result.")
@@ -261,7 +240,12 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
         
-        nom_plan = _get_day_plan(d)
+        if plans_override is not None:
+            if d >= len(plans_override):
+                raise ValueError(f"plans_override has no plan for day index {d}")
+            nom_plan = plans_override[d]
+        else:
+            nom_plan = _get_day_plan(d)
         loops_committed = []
         for name, km in nom_plan.loops:
             count = d_loops.get(name, 0)
@@ -298,8 +282,6 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "driven_km": res.get("driven_km", 0.0),
             "motor_energy_wh": res.get("motor_energy_wh", 0.0),
             "solar_energy_wh": res.get("solar_energy_wh", 0.0),
-            "solar_underutil_wh": res.get("solar_underutil_wh", 0.0),
-            "battery_delta_wh": res.get("battery_delta_wh", 0.0),
         }
         
     return final_race_plan
@@ -700,6 +682,82 @@ if __name__ == "__main__":
         _apply_trailered_mask(routes.get(d), kml_paths, d)
 
     # ------------------------------------------------------------------ #
+    def _build_day3_variant_plan(variant_route_files, variant_name, day_num=3):
+        """Build Day 3 strictly from the released variant route files.
+
+        Aryaman: Stage 2 + Loop, with NO Stage 1.
+        Prahlad: Stage 1 + Stage 2 + Loop.
+        """
+        stage1_files, stage2_files, loop_files = [], [], []
+
+        for fp in variant_route_files:
+            bn = os.path.basename(fp).lower()
+            if _is_loop_file(fp):
+                loop_files.append(fp)
+            elif "stage 1" in bn:
+                stage1_files.append(fp)
+            elif "stage 2" in bn:
+                stage2_files.append(fp)
+
+        variant = variant_name.lower()
+
+        if variant == "aryaman":
+            if stage1_files:
+                raise ValueError(
+                    "Day 3 Aryaman unexpectedly contains a Stage 1 file: "
+                    f"{stage1_files}"
+                )
+            if len(stage2_files) != 1:
+                raise ValueError(
+                    "Day 3 Aryaman must contain exactly one Stage 2 file; "
+                    f"found {len(stage2_files)}: {stage2_files}"
+                )
+            if len(loop_files) != 1:
+                raise ValueError(
+                    "Day 3 Aryaman must contain exactly one loop file; "
+                    f"found {len(loop_files)}: {loop_files}"
+                )
+            stage1_km = 0.0
+        elif variant == "prahlad":
+            if len(stage1_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one Stage 1 file; "
+                    f"found {len(stage1_files)}: {stage1_files}"
+                )
+            if len(stage2_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one Stage 2 file; "
+                    f"found {len(stage2_files)}: {stage2_files}"
+                )
+            if len(loop_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one loop file; "
+                    f"found {len(loop_files)}: {loop_files}"
+                )
+            stage1_km = _parse_route_file(
+                stage1_files[0], day_num
+            )["distance_m"].max() / 1000.0
+        else:
+            raise ValueError(f"Unknown Day 3 variant '{variant_name}'")
+
+        stage2_km = _parse_route_file(
+            stage2_files[0], day_num
+        )["distance_m"].max() / 1000.0
+        loop_km = _parse_route_file(
+            loop_files[0], day_num
+        )["distance_m"].max() / 1000.0
+
+        plan = tier1._DayPlan(
+            stage1_km=float(stage1_km),
+            stage2_km=float(stage2_km),
+            loops=(("day3_loop", float(loop_km)),),
+        )
+        logger.info(
+            "Day 3 [%s] plan: Stage1=%.1f km, Stage2=%.1f km, Loop=%.1f km",
+            variant_name, plan.stage1_km, plan.stage2_km, loop_km
+        )
+        return plan
+
     # 4.  Day 3 multi-variant discovery
     # ------------------------------------------------------------------ #
     day3_route_files = glob.glob(os.path.join(save_dir, "*Day 3*probables*.save")) or \
@@ -763,8 +821,17 @@ if __name__ == "__main__":
         # Day 3 is variant-specific: load ITS OWN dedicated loop geometry so
         # committed 'blind_loop_placeholder' reps simulate the real variant
         # loop terrain instead of a flat synthetic leg.
+        day3_plan = _build_day3_variant_plan(
+            variant_route_files, variant_name, day_num=3
+        )
         loop_geoms_by_day[2] = _load_loop_geometries(
-            variant_route_files, _get_day_plan(2), 3)
+            variant_route_files, day3_plan, 3
+        )
+
+        # Same variant-specific plans are used by Tier 1, Tier 2/Tier 3,
+        # final profile extraction and reporting.
+        variant_plans = [_get_day_plan(d) for d in range(8) if d != 2]
+        variant_plans.insert(2, day3_plan)
 
         # Build Day 3 weather for this variant
         weather_files = day3_variant_weather.get(variant_name, [])
@@ -778,7 +845,8 @@ if __name__ == "__main__":
         logger.info("Computing Tier 1 baseline for variant '%s'...", variant_name)
         baseline = tier1.guess_baseline(
             routes, car, solar_providers, wind_providers, 100.0,
-            start_day=0, kml_paths=kml_paths)
+            start_day=0, kml_paths=kml_paths,
+            plans_override=variant_plans)
 
         # --- Run trust-region optimizer (per-variant Tier 1 baseline) ---
         result = optimize(
@@ -788,6 +856,7 @@ if __name__ == "__main__":
             wind_providers=wind_providers,
             kml_paths=kml_paths,
             loop_geoms_by_day=loop_geoms_by_day,
+            plans_override=variant_plans,
             start_soc_pct=100.0,
             start_day=0,
             parallel=True,
@@ -800,9 +869,10 @@ if __name__ == "__main__":
         if result.get("feasible"):
             profiles = extract_final_profiles(
                 routes, car, solar_providers, wind_providers, result,
-                loop_geoms_by_day=loop_geoms_by_day)
+                loop_geoms_by_day=loop_geoms_by_day,
+                plans_override=variant_plans)
 
-        all_results[variant_name] = {"result": result, "profiles": profiles}
+        all_results[variant_name] = {"result": result, "profiles": profiles, "plans": variant_plans}
 
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
@@ -907,6 +977,7 @@ if __name__ == "__main__":
     for variant_name, data in all_results.items():
         result   = data["result"]
         profiles = data["profiles"]
+        plans    = data["plans"]
 
         print(f"\n{'━' * 70}")
         print(f"  Day 3 variant: {variant_name.upper()}")
@@ -1024,12 +1095,7 @@ if __name__ == "__main__":
 
             # 3. SOC curve (key checkpoints)
             soc_drain_pct = soc_start - soc_end
-            # Use the solar energy integrated by forward_sim over the actual
-            # simulated trajectory.  The old _estimate_solar_input_wh()
-            # integrates the entire race window and therefore cannot be
-            # reconciled with motor_energy_wh when the car finishes early.
-            solar_wh = float((profiles.get(d_idx, {}).get("solar_energy_wh", 0.0)
-                              if profiles else 0.0) or 0.0)
+            solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
             drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
             # Prefer the REAL simulated motor energy (integrated directly
             # from physics every substep in forward_sim.py) over the old
@@ -1049,28 +1115,14 @@ if __name__ == "__main__":
             soc_str = " → ".join(f"{s:.0f}%" for s in hourly_soc[::max(1, len(hourly_soc)//5)])
             print(f"  3) SOC curve (approx): {soc_str}")
 
-            # 4. Solar input — use the same interval actually simulated by
-            # forward_sim for the energy comparison. The old report integrated
-            # the entire race window independently of ETA, so it was not an
-            # apples-to-apples number against motor_energy_wh.
-            simulated_solar_wh = (profiles.get(d_idx, {}).get("solar_energy_wh", 0.0)
-                                  if profiles else 0.0) or 0.0
-            curtailed_wh = (profiles.get(d_idx, {}).get("solar_underutil_wh", 0.0)
-                            if profiles else 0.0) or 0.0
-            print(f"  4) Solar PV during simulated drive: {simulated_solar_wh:.0f} Wh")
-            print(f"      Full race-window theoretical PV: {solar_wh:.0f} Wh")
-            print(f"      Solar curtailed at battery ceiling: {curtailed_wh:.0f} Wh")
+            # 4. Solar input
+            print(f"  4) Solar input: {solar_wh:.0f} Wh total")
 
-            # 5. Energy consumption / battery state change
-            net_battery_wh = (profiles.get(d_idx, {}).get("battery_delta_wh", 0.0)
-                              if profiles else 0.0) or 0.0
-            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery net change: {net_battery_wh:+.0f} Wh")
-            print(f"      Battery drain: {max(0.0, -net_battery_wh):.0f} Wh | Battery charge: {max(0.0, net_battery_wh):.0f} Wh")
+            # 5. Energy consumption
+            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery drain: {drain_wh:.0f} Wh ({soc_drain_pct:.1f}%)")
 
-            # 6. Stall risk — use the same solar interval actually simulated
-            # by forward_sim, not the independent full-day estimate.
-            stall_solar_wh = simulated_solar_wh if simulated_solar_wh > 0 else solar_wh
-            stall = _estimate_stall_points(soc_start, soc_end, day_km, stall_solar_wh)
+            # 6. Stall risk
+            stall = _estimate_stall_points(soc_start, soc_end, day_km, solar_wh)
             print(f"  6) Stall risk: {stall}")
 
             # 7. Early start strategy (6-8 AM solar charging)
@@ -1104,9 +1156,7 @@ if __name__ == "__main__":
             # Speed summary
             if v_arr is not None:
                 v_np = np.asarray(v_arr)
-                driven_km = float(profiles.get(d_idx, {}).get("driven_km", day_km) or day_km) if profiles else day_km
-                avg_race_speed = driven_km / (total_time / 3600.0) if total_time > 0 else 0.0
-                print(f"      Speed: race avg {avg_race_speed:.1f} km/h, control-profile mean {v_np.mean():.1f}, min {v_np.min():.1f}, max {v_np.max():.1f}")
+                print(f"      Speed: avg {v_np.mean():.1f} km/h, min {v_np.min():.1f}, max {v_np.max():.1f}")
 
     print("\n" + "=" * 70)
 
@@ -1159,14 +1209,8 @@ if __name__ == "__main__":
                     "soc_start_pct": round(soc_start, 1),
                 }
 
-                # Persist the same actual simulated PV quantity shown in the
-                # human-readable report.  Keep the old key for dashboard
-                # compatibility, but change its meaning to actual simulated PV.
-                solar_wh = float((profiles.get(d_idx, {}).get("solar_energy_wh", 0.0)
-                                  if profiles else 0.0) or 0.0)
+                solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
                 day_data["solar_input_wh"] = round(solar_wh, 0)
-                day_data["solar_input_window_estimate_wh"] = round(
-                    _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx), 0)
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]
@@ -1184,10 +1228,7 @@ if __name__ == "__main__":
                     day_data["eta"] = _clock(rc.day_start_time_s(d_idx) + drive_t)
                     if v_arr is not None:
                         v_np = np.asarray(v_arr)
-                        driven_for_speed = float(p.get("driven_km", day_km) or day_km)
-                        day_data["speed_avg_kmh"] = round(
-                            driven_for_speed / (drive_t / 3600.0) if drive_t and drive_t > 0 else 0.0, 1)
-                        day_data["speed_profile_mean_kmh"] = round(float(v_np.mean()), 1)
+                        day_data["speed_avg_kmh"] = round(float(v_np.mean()), 1)
                         day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
                         day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
                         day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
@@ -1205,13 +1246,7 @@ if __name__ == "__main__":
                 _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
                                         if profiles else None)
                 day_data["motor_energy_wh"] = round(
-                    _real_motor_wh_json if _real_motor_wh_json else 0.0, 0)
-                day_data["solar_energy_simulated_wh"] = round(
-                    profiles.get(d_idx, {}).get("solar_energy_wh", 0.0) or 0.0, 0)
-                day_data["solar_underutil_wh"] = round(
-                    profiles.get(d_idx, {}).get("solar_underutil_wh", 0.0) or 0.0, 0)
-                day_data["battery_delta_wh"] = round(
-                    profiles.get(d_idx, {}).get("battery_delta_wh", 0.0) or 0.0, 0)
+                    _real_motor_wh_json if _real_motor_wh_json else (drain_wh + solar_wh), 0)
 
                 _json_real_total_km += day_km
                 _json_total_trailered_km += day_data.get("trailered_km", 0.0)

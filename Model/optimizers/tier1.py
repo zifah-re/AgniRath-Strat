@@ -437,7 +437,8 @@ def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float
 def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
                    start_soc_pct: float, start_day: int = 0, dist_done_km: float = 0.0,
                    elapsed_s: float = 0.0, cs_taken: bool = False, loops_done: dict | None = None,
-                   kml_paths: dict | None = None) -> dict:
+                   kml_paths: dict | None = None,
+                   plans_override: list | None = None) -> dict:
 
     _energy_diag_logged.clear()  # reset for fresh run
 
@@ -450,7 +451,15 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
     turnaround_s = getattr(rc, "LOOP_TURNAROUND_S", 0.0)
     pre_attempt_stop_s = rc.LOOP_STOP_DURATION_S + turnaround_s
 
-    plans = [_get_day_plan(d) for d in range(n_days)]
+    if plans_override is not None:
+        if len(plans_override) != n_days:
+            raise ValueError(
+                f"plans_override must contain exactly {n_days} day plans; "
+                f"got {len(plans_override)}"
+            )
+        plans = list(plans_override)
+    else:
+        plans = [_get_day_plan(d) for d in range(n_days)]
 
     V = np.full((n_days + 1, nb), -np.inf)
     V[n_days, :] = 0.0
