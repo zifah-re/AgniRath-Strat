@@ -108,15 +108,15 @@ DAY_ROUTE_NOTES = [
          finish="Suid Agter Paarl Road (Paarl)"),
 ]
 DAYWISE_FILES={
-    "Day 1": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _Rustenburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 2 Rustenburg to Swartruggens"},
-    "Day 2": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust","l":None,"s2":"2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
-    "Day 3": [{"s1": None,"l":"Day 3 probables_Probable Aryaman Day 3_Day 3 Loop","s2":"Day 3 probables_Probable Aryaman Day 3_Stage 2"},
-              {"s1":"Day 3 probables_Probable Prahlad Route_Stage 1", "l":"Day 3 probables_Probable Prahlad Route_Day 3 Loop","s2":"Day 3 probables_Probable Prahlad Route_Stage 2" }],
-    "Day 4": {"s1":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek"},
-    "Day 5": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 1 Olifantshoek to Upington","l":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _Upington Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 2 Upington to Augrabies"},
-    "Day 6": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 6 _15 Sept Stage 1 Augrabies to Springbok","l":"2026 Sasol Solar Challenge Route (Publish)_Day 6 _Springbok Loop","s2":None},
-    "Day 7": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 1 Springbok to Van Rhynsdorp","l":"2026 Sasol Solar Challenge Route (Publish)_Day 7_Van Rhynsdorp Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 2 Van Rhynsdorp to Clanwilliam"},
-    "Day 8": {"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 1 Clanwilliam to Ceres","l":"2026 Sasol Solar Challenge Route (Publish)_Day 8_Ceres Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 2 Ceres to Paarl"}
+    "Day 1": {"date":date(2026,9,10),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _Rustenburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 2 Rustenburg to Swartruggens"},
+    "Day 2": {"date":date(2026,9,11),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust","l":None,"s2":"2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
+    "Day 3": [{"date":date(2026,9,12),"s1": None,"l":"Day 3 probables_Probable Aryaman Day 3_Day 3 Loop","s2":"Day 3 probables_Probable Aryaman Day 3_Stage 2"},
+              {"date":date(2026,9,12),"s1":"Day 3 probables_Probable Prahlad Route_Stage 1", "l":"Day 3 probables_Probable Prahlad Route_Day 3 Loop","s2":"Day 3 probables_Probable Prahlad Route_Stage 2" }],
+    "Day 4": {"date":date(2026,9,13),"s1":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek"},
+    "Day 5": {"date":date(2026,9,14),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 1 Olifantshoek to Upington","l":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _Upington Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 2 Upington to Augrabies"},
+    "Day 6": {"date":date(2026,9,15),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 6 _15 Sept Stage 1 Augrabies to Springbok","l":"2026 Sasol Solar Challenge Route (Publish)_Day 6 _Springbok Loop","s2":None},
+    "Day 7": {"date":date(2026,9,16),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 1 Springbok to Van Rhynsdorp","l":"2026 Sasol Solar Challenge Route (Publish)_Day 7_Van Rhynsdorp Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 2 Van Rhynsdorp to Clanwilliam"},
+    "Day 8": {"date":date(2026,9,17),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 1 Clanwilliam to Ceres","l":"2026 Sasol Solar Challenge Route (Publish)_Day 8_Ceres Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 2 Ceres to Paarl"}
 }
 
 #____ Solar and Wind_____#
@@ -229,141 +229,174 @@ def stage_soc_profile(v,fname,start_date,start_time,soc_start):
     
 def loops_range(d1,d2,dl,day_1=False):
     if day_1:
-        return (floor((8-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((8-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
-    return (floor((9-(d1+d2)/55 - 30/60)/((dl/55)+5/60)),ceil((9-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
+        return (0,ceil((8-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
+    return (0,ceil((9-(d1+d2)/75 - 30/60)/((dl/55)+5/60)))
+
+def no_of_loops(v1,v2,d1,d2,dl,day_1=False):
+    if day_1:
+        return floor((8-(d1)/v1-(d2)/v2 - 30/60)/((dl/55)+5/60))
+    return floor((9 -d1/v1 - d2/v2 - 30/60)/((dl/55)+5/60))
 
 def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distances,fname,start_date):
     loop_start=t_start+30*60
     loop_soc_start=soc_start + (solar([t_start+15*60],[coords[0]],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*30*60
     soc_profile=[]
+    end_time=loop_start
     for i in range(n):
         soc,_,end_time=stage_soc_profile(55/3.6,fname,start_date,loop_start,loop_soc_start)
         loop_start=end_time+5*60
         loop_soc_start=soc[-1] + (solar([end_time+2.5*60],[coords[0]],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
         soc_profile.append(soc)
-    return np.concatenate(soc_profile),end_time
+    if len(soc_profile)>0:
+        return np.concatenate(soc_profile),end_time
+    else:
+       return np.array([loop_soc_start]),end_time
 
 def main():
-  v1 = 60 / 3.6
-  v2 = 60 / 3.6
-  soc_start = 100
-  day_no = 7
-  start_date = date(2026, 9, 9+day_no)
-  loop_bounds = []
+    v1 = 55 / 3.6
+    v2 = 55 / 3.6
+    day_no = 7
+    soc_start = 95 - ((day_no-1)/(7))*70
+    loop_bounds = []
 
-  for day in [f"Day {day_no}"]:
-    s1, l, s2 = (
-        DAY_DISTANCES[day]["s1"],
-        DAY_DISTANCES[day]["l"],
-        DAY_DISTANCES[day]["s2"],
-    )
-    loop_bounds.append(
-        np.arange(
-            *loops_range(s1, s2, l, False if day != "Day 1" else True)
+    for day in [f"Day {day_no}"]:
+        s1, l, s2,start_date = (
+            DAY_DISTANCES[day]["s1"],
+            DAY_DISTANCES[day]["l"],
+            DAY_DISTANCES[day]["s2"],
+            DAYWISE_FILES[day]["date"]
         )
-    )
-
-    end_soc_s1, power_s1, end_time = stage_soc_profile(
-        v1,
-        DAYWISE_FILES[day]["s1"],
-        start_date,
-        datetime.combine(
-            start_date,
-            datetime.strptime("09:00:00", "%H:%M:%S").time(),
-            tzinfo=SA_TZ,
-        ).timestamp()
-        if day == "Day 1"
-        else datetime.combine(
-            start_date,
-            datetime.strptime("08:00:00", "%H:%M:%S").time(),
-            tzinfo=SA_TZ,
-        ).timestamp(),
-        soc_start,
-    )
-
-    fig, axes = plt.subplots(1, 1, figsize=(10, 5))
-
-    solar_obj = weather_logs[f"mean_{DAYWISE_FILES[day]['l']}"]
-
-    # Extract base route profiles once
-    route_loop = extractSolarData(f"Saves/{DAYWISE_FILES[day]['l']}.kml.save")[
-        "profile"
-    ]
-    coords, headings, altitude = (
-        np.array(route_loop["Coordinates"]),
-        np.array(route_loop["Headings"]),
-        np.array(route_loop["Altitude"]),
-    )
-    single_loop_dist = np.array(route_loop["Distance"])
-
-    route_s1 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s1']}.kml.save")[
-        "profile"
-    ]
-    distances_s1 = np.array(route_s1["Distance"])
-
-    route_s2 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s2']}.kml.save")[
-        "profile"
-    ]
-    distances_s2 = np.array(route_s2["Distance"])
-
-    for i in range(len(loop_bounds[-1])):
-      n_loops = loop_bounds[-1][i]
-
-      loop_soc, end_loop_time = stitch_loops(
-          n_loops,
-          end_time,
-          end_soc_s1[-1],
-          solar_obj,
-          coords,
-          altitude,
-          headings,
-          l,
-          DAYWISE_FILES[day]["l"],
-          start_date,
-      )
-
-      if not loop_soc[-1] < SOC_MIN_PCT:
-        end_soc_s2, power_s2, _ = stage_soc_profile(
-            v2,
-            DAYWISE_FILES[day]["s2"],
-            start_date,
-            end_loop_time,
-            soc_start=loop_soc[-1],
-        )
-
-        if not end_soc_s2[-1] < SOC_MIN_PCT:
-          # --- CORRECT DISTANCE CONCATENATION ---
-          if n_loops > 0:
-            # Concatenate n copies of loop distance shifted by k * loop_length
-            distances_loops_stacked = np.concatenate(
-                [single_loop_dist + k * l for k in range(n_loops)]
+        loop_bounds.append(
+            np.arange(
+                *loops_range(s1, s2, l, False if day != "Day 1" else True)
             )
-            x_loops = distances_s1[-1] + distances_loops_stacked
-            x_s2 = x_loops[-1] + distances_s2
-            x_total = np.concatenate((distances_s1, x_loops, x_s2))
-          else:
-            x_s2 = distances_s1[-1] + distances_s2
-            x_total = np.concatenate((distances_s1, x_s2))
-
-          y_total = np.concatenate((end_soc_s1, loop_soc, end_soc_s2))
-
-          axes.plot(x_total, y_total, label=f"Loop {n_loops}")
-        else:
-          print(
-              f"{n_loops} loops failed on stage 2 with final SoC"
-              f" {end_soc_s2[-1]:.2f}%"
-          )
-      else:
-        print(
-            f"{n_loops} loops failed on loops with final SoC"
-            f" {loop_soc[-1]:.2f}%"
+        )
+        print(f"At this speed {no_of_loops(v1*3.6,v2*3.6,s1,s2,l, False if day != "Day 1" else True)} loops are possible")
+        end_soc_s1, power_s1, end_time = stage_soc_profile(
+            v1,
+            DAYWISE_FILES[day]["s1"],
+            start_date,
+            datetime.combine(
+                start_date,
+                datetime.strptime("09:00:00", "%H:%M:%S").time(),
+                tzinfo=SA_TZ,
+            ).timestamp()
+            if day == "Day 1"
+            else datetime.combine(
+                start_date,
+                datetime.strptime("08:00:00", "%H:%M:%S").time(),
+                tzinfo=SA_TZ,
+            ).timestamp(),
+            soc_start,
         )
 
-    axes.set_xlabel("Distance (km)")
-    axes.set_ylabel("State of Charge (%)")
-    axes.set_title(f"SoC Profile - {day}")
-    axes.legend()
-    axes.grid(True)
-    plt.show()
+        fig, axes = plt.subplots(1, 1, figsize=(10, 5))
+
+        solar_obj = weather_logs[f"mean_{DAYWISE_FILES[day]['l']}"]
+
+        # Extract base route profiles once
+        route_loop = extractSolarData(f"Saves/{DAYWISE_FILES[day]['l']}.kml.save")[
+            "profile"
+        ]
+        coords, headings, altitude = (
+            np.array(route_loop["Coordinates"]),
+            np.array(route_loop["Headings"]),
+            np.array(route_loop["Altitude"]),
+        )
+        single_loop_dist = np.array(route_loop["Distance"])
+
+        route_s1 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s1']}.kml.save")[
+            "profile"
+        ]
+        distances_s1 = np.array(route_s1["Distance"])
+
+        route_s2 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s2']}.kml.save")[
+            "profile"
+        ]
+        distances_s2 = np.array(route_s2["Distance"])
+
+        for i in range(len(loop_bounds[-1])):
+            n_loops = loop_bounds[-1][i]
+
+            loop_soc, end_loop_time = stitch_loops(
+            n_loops,
+            end_time,
+            end_soc_s1[-1],
+            solar_obj,
+            coords,
+            altitude,
+            headings,
+            l,
+            DAYWISE_FILES[day]["l"],
+            start_date,
+            )
+
+            if len(loop_soc)>1 and not loop_soc[-1] < SOC_MIN_PCT:
+                end_soc_s2, power_s2, day_end_time = stage_soc_profile(
+                    v2,
+                    DAYWISE_FILES[day]["s2"],
+                    start_date,
+                    end_loop_time,
+                    soc_start=loop_soc[-1],
+                )
+
+                if not end_soc_s2[-1] < SOC_MIN_PCT:
+                # --- CORRECT DISTANCE CONCATENATION ---
+                    if n_loops > 0:
+                        # Concatenate n copies of loop distance shifted by k * loop_length
+                        distances_loops_stacked = np.concatenate(
+                            [single_loop_dist + k * l for k in range(n_loops)]
+                        )
+                        x_loops = distances_s1[-1] + distances_loops_stacked
+                        x_s2 = x_loops[-1] + distances_s2
+                        x_total = np.concatenate((distances_s1, x_loops, x_s2))
+                    else:
+                        x_s2 = distances_s1[-1] + distances_s2
+                        x_total = np.concatenate((distances_s1, x_s2))
+
+                    y_total = np.concatenate((end_soc_s1, loop_soc, end_soc_s2))
+
+                    axes.plot(x_total, y_total, label=f"{n_loops} Loops")
+                else:
+                    print(
+                        f"{n_loops} loops failed on stage 2 with final SoC"
+                        f" {end_soc_s2[-1]:.2f}%"
+                    )
+            elif len(loop_soc)==1:
+                end_soc_s2, power_s2, day_end_time = stage_soc_profile(
+                v2,
+                DAYWISE_FILES[day]["s2"],
+                start_date,
+                end_loop_time,
+                soc_start=loop_soc[-1],
+                )
+            
+                if not end_soc_s2[-1] < SOC_MIN_PCT:
+                    # --- CORRECT DISTANCE CONCATENATION ---
+                    
+                    x_s2 = distances_s1[-1] + distances_s2
+                    x_total = np.concatenate((distances_s1, x_s2))
+                    
+                    y_total = np.concatenate((end_soc_s1, end_soc_s2))
+                    
+                    axes.plot(x_total, y_total, label=f"{n_loops} Loops")
+                else:
+                    print(
+                        f"{n_loops} loops failed on stage 2 with final SoC"
+                        f" {end_soc_s2[-1]:.2f}%"
+                    )
+            
+            else:
+                print(
+                    f"{n_loops} loops failed on loops with final SoC"
+                    f" {loop_soc[-1]:.2f}%"
+                )
+
+        axes.set_xlabel("Distance (km)")
+        axes.set_ylabel("State of Charge (%)")
+        axes.set_title(f"SoC Profile - {day}")
+        axes.legend()
+        axes.grid(True)
+        plt.show()
     
 main()
