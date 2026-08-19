@@ -139,7 +139,7 @@ for json_file in weather_folder.glob('*.jsonl'):
         long = point['lon']
         dump = point['data']
         stage_data[(lat, long)] = dump
-    weather_logs[json_file.stem] = SolarIrradiance(stage_data,"period_end","PT5M")
+    weather_logs[json_file.stem] = SolarIrradiance(stage_data,"period_end","PT5M",6)
 
 
 #____ Power ____ #
@@ -184,7 +184,7 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
 
 def solar(time_base,coords,headings,altitude,solar_obj):
     a,b=precompute_solar_gti_factors(time_base,coords,headings,altitude)
-    dni,ghi=solar_obj[((0,0),time_base)].data(["dni","ghi"])
+    dni,ghi=solar_obj[(coords,time_base)].data(["dni","ghi"])
     gti=a*dni + b*ghi
     solar_irr=gti*ARRAY_EFFICIENCY*ARRAY_AREA_M2
     return solar_irr
@@ -234,49 +234,136 @@ def loops_range(d1,d2,dl,day_1=False):
 
 def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distances,fname,start_date):
     loop_start=t_start+30*60
-    loop_soc_start=soc_start + (solar([t_start+15*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*30*60
+    loop_soc_start=soc_start + (solar([t_start+15*60],[coords[0]],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*30*60
     soc_profile=[]
     for i in range(n):
         soc,_,end_time=stage_soc_profile(55/3.6,fname,start_date,loop_start,loop_soc_start)
         loop_start=end_time+5*60
-        loop_soc_start=soc[-1] + (solar([end_time+2.5*60],[(0,0)],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
+        loop_soc_start=soc[-1] + (solar([end_time+2.5*60],[coords[0]],[headings[0]],[altitude[0]],solar_obj)/(BATTERY_WH*3600))[-1]*100*5*60
         soc_profile.append(soc)
     return np.concatenate(soc_profile),end_time
 
 def main():
-    v1 = 55/3.6
-    v2 = 75/3.6
-    soc_start=100
-    start_date=date(2026,9,10)
-    day_no=1
-    loop_bounds=[]
-    for day in ["Day 1"]:
-        s1,l,s2=DAY_DISTANCES[day]['s1'],DAY_DISTANCES[day]['l'],DAY_DISTANCES[day]['s2']
-        loop_bounds.append(np.arange(*loops_range(s1,s2,l,False if day!="Day 1" else True)))
+  v1 = 60 / 3.6
+  v2 = 60 / 3.6
+  soc_start = 100
+  day_no = 7
+  start_date = date(2026, 9, 9+day_no)
+  loop_bounds = []
 
-        end_soc_s1,power_s1,end_time = stage_soc_profile(v1,DAYWISE_FILES[day]['s1'],start_date,datetime.combine(start_date,datetime.strptime("09:00:00", "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp() if day=="Day 1" else datetime.combine(start_date,datetime.strptime("08:00:00", "%H:%M:%S").time(), tzinfo=SA_TZ).timestamp(),soc_start)
+  for day in [f"Day {day_no}"]:
+    s1, l, s2 = (
+        DAY_DISTANCES[day]["s1"],
+        DAY_DISTANCES[day]["l"],
+        DAY_DISTANCES[day]["s2"],
+    )
+    loop_bounds.append(
+        np.arange(
+            *loops_range(s1, s2, l, False if day != "Day 1" else True)
+        )
+    )
 
-        fig,axes = plt.subplots(1,1,figsize=(10,5))
+    end_soc_s1, power_s1, end_time = stage_soc_profile(
+        v1,
+        DAYWISE_FILES[day]["s1"],
+        start_date,
+        datetime.combine(
+            start_date,
+            datetime.strptime("09:00:00", "%H:%M:%S").time(),
+            tzinfo=SA_TZ,
+        ).timestamp()
+        if day == "Day 1"
+        else datetime.combine(
+            start_date,
+            datetime.strptime("08:00:00", "%H:%M:%S").time(),
+            tzinfo=SA_TZ,
+        ).timestamp(),
+        soc_start,
+    )
 
-        solar_obj=weather_logs[f'mean_{DAYWISE_FILES[day]['l']}']
-        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['l']}.kml.save')['profile']
-        coords,headings,altitude,distances_loop,grad=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
-        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['s1']}.kml.save')['profile']
-        _,_,_,distances_s1,_=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
-        route=extractSolarData(f'Saves/{DAYWISE_FILES[day]['s2']}.kml.save')['profile']
-        _,_,_,distances_s2,_=np.array(route['Coordinates']),np.array(route['Headings']),np.array(route['Altitude']),np.array(route['Distance']),np.array(route['Gradient'])
-        for i in range(len(loop_bounds[-1])):
-            loop_soc,end_time=stitch_loops(loop_bounds[day_no-1][i],end_time,end_soc_s1[-1],solar_obj,coords,altitude,headings,l,DAYWISE_FILES[day]['l'],start_date)
+    fig, axes = plt.subplots(1, 1, figsize=(10, 5))
 
-            if not loop_soc[-1]<SOC_MIN_PCT:
-                end_soc_s2,power_s2,end_time = stage_soc_profile(v2,DAYWISE_FILES[day]['s2'],start_date,end_time,soc_start=loop_soc[-1])
-                if not end_soc_s2[-1]<SOC_MIN_PCT:
-                    loop_length = l
-                    for k in range(loop_bounds[-1][i]):
-                        distances_loop = np.concatenate((distances_loop,distances_loop+l))
-                    axes.plot(np.concatenate((distances_s1,distances_s1[-1]+distances_loop,distances_s1[-1]+distances_loop[-1]+distances_s2)),np.concatenate((end_soc_s1,loop_soc,end_soc_s2)),label=f"Loop {loop_bounds[-1][i]}")
-                    plt.show()
-                else: print(f"{loop_bounds[-1][i]} loops failed on stage 2 with final SoC {end_soc_s2[-1]:.2f}%")
-            else: print(f"{loop_bounds[-1][i]} loops failed on loops with final SoC {loop_soc[-1]:.2f}%")
+    solar_obj = weather_logs[f"mean_{DAYWISE_FILES[day]['l']}"]
 
+    # Extract base route profiles once
+    route_loop = extractSolarData(f"Saves/{DAYWISE_FILES[day]['l']}.kml.save")[
+        "profile"
+    ]
+    coords, headings, altitude = (
+        np.array(route_loop["Coordinates"]),
+        np.array(route_loop["Headings"]),
+        np.array(route_loop["Altitude"]),
+    )
+    single_loop_dist = np.array(route_loop["Distance"])
+
+    route_s1 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s1']}.kml.save")[
+        "profile"
+    ]
+    distances_s1 = np.array(route_s1["Distance"])
+
+    route_s2 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s2']}.kml.save")[
+        "profile"
+    ]
+    distances_s2 = np.array(route_s2["Distance"])
+
+    for i in range(len(loop_bounds[-1])):
+      n_loops = loop_bounds[-1][i]
+
+      loop_soc, end_loop_time = stitch_loops(
+          n_loops,
+          end_time,
+          end_soc_s1[-1],
+          solar_obj,
+          coords,
+          altitude,
+          headings,
+          l,
+          DAYWISE_FILES[day]["l"],
+          start_date,
+      )
+
+      if not loop_soc[-1] < SOC_MIN_PCT:
+        end_soc_s2, power_s2, _ = stage_soc_profile(
+            v2,
+            DAYWISE_FILES[day]["s2"],
+            start_date,
+            end_loop_time,
+            soc_start=loop_soc[-1],
+        )
+
+        if not end_soc_s2[-1] < SOC_MIN_PCT:
+          # --- CORRECT DISTANCE CONCATENATION ---
+          if n_loops > 0:
+            # Concatenate n copies of loop distance shifted by k * loop_length
+            distances_loops_stacked = np.concatenate(
+                [single_loop_dist + k * l for k in range(n_loops)]
+            )
+            x_loops = distances_s1[-1] + distances_loops_stacked
+            x_s2 = x_loops[-1] + distances_s2
+            x_total = np.concatenate((distances_s1, x_loops, x_s2))
+          else:
+            x_s2 = distances_s1[-1] + distances_s2
+            x_total = np.concatenate((distances_s1, x_s2))
+
+          y_total = np.concatenate((end_soc_s1, loop_soc, end_soc_s2))
+
+          axes.plot(x_total, y_total, label=f"Loop {n_loops}")
+        else:
+          print(
+              f"{n_loops} loops failed on stage 2 with final SoC"
+              f" {end_soc_s2[-1]:.2f}%"
+          )
+      else:
+        print(
+            f"{n_loops} loops failed on loops with final SoC"
+            f" {loop_soc[-1]:.2f}%"
+        )
+
+    axes.set_xlabel("Distance (km)")
+    axes.set_ylabel("State of Charge (%)")
+    axes.set_title(f"SoC Profile - {day}")
+    axes.legend()
+    axes.grid(True)
+    plt.show()
     
+main()
