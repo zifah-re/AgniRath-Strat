@@ -43,14 +43,13 @@ SLSQP_FTOL = 1e-4               # Was 1e-6. Looser tol saves ~30-40% of SLSQP
                                  # (~0.1% SOC difference).
 INTEGER_PROJECT = True           # round to integer km/h + local search
 L2_SOLVE_BUDGET_S = 120          # re-plan must complete < 2 min (Plan v3)
-# L2 objective: equivalent race seconds per Wh of solar curtailed at the
-# battery ceiling. The primary objective is now minimum feasible drive time.
-SOLAR_UNDERUTIL_WEIGHT = 0.50
-
-# L3 objective: distance penalty per Wh of solar curtailed. This makes solar
-# waste an explicit multi-day trade-off rather than treating 100% SOC as
-# automatically valuable.
-DP_SOLAR_UNDERUTIL_KM_PER_WH = 0.01
+SOLAR_UNDERUTIL_WEIGHT = 1.0     # L2 objective penalty for wasted solar
+DP_SOLAR_UNDERUTIL_EQ_SPEED_KMH = 65.0  # Tier-3 equivalent race speed for solar penalty
+                                 # (solar_underutil_j from forward_sim), in
+                                 # end-of-day SOC-% per wasted Wh-equivalent.
+                                 # 1.0 == a wasted Wh is treated exactly like a
+                                 # lost stored Wh (physically consistent);
+                                 # 0.0 disables the enrichment (plain SOC obj).
 
 # ---- L3 MPC ----------------------------------------------------------------
 MPC_HORIZON_STEPS = 10           # source: Dashboard mpc.py N=10 baseline

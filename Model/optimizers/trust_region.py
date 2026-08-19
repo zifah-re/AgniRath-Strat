@@ -70,6 +70,19 @@ def replan(routes: list, base_car: CarState, solar_providers: dict, wind_provide
                     elapsed_s=elapsed_s, cs_taken=cs_taken, 
                     loops_done=loops_done, kml_paths=kml_paths, **kwargs)
 
+def _trailered_km_by_day(routes):
+    """Return trailered km from the exact mask consumed by forward_sim."""
+    out = {}
+    for d, route in enumerate(routes or []):
+        if route is None or not hasattr(route, "df") or len(route.df) < 2:
+            out[d] = 0.0
+            continue
+        dist = route.df["distance_m"].to_numpy(dtype=float)
+        mask = route.df["red_flag_trailer"].to_numpy(dtype=bool)
+        out[d] = float(np.sum(np.diff(dist)[mask[:-1]])) / 1000.0
+    return out
+
+
 def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
              start_soc_pct: float = 100.0, *, start_day: int = 0,
              dist_done_km: float = 0.0, elapsed_s: float = 0.0,
@@ -172,7 +185,13 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                 logger.info("Tier2 Day %d: fallback a=%.1f b=%.2f s0=%.1f",
                             d + 1, end_est, 1.0, s0)
 
-        result = tier3.allocate(car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day)
+        trailered_km_by_day = _trailered_km_by_day(routes)
+        if any(km > 0.0 for km in trailered_km_by_day.values()):
+            logger.info("Tier3 credited trailered km by day: %s",
+                        {d + 1: round(km, 1) for d, km in trailered_km_by_day.items() if km > 0.0})
+        result = tier3.allocate(
+            car, solar_providers, per_day, plans, start_soc_pct,
+            start_day=start_day, trailered_km_by_day=trailered_km_by_day)
         s_refined = result["s1_pct"]
 
         drift = np.nanmax(np.abs(s_refined[start_day:] - s_center[start_day:]))
@@ -832,6 +851,10 @@ if __name__ == "__main__":
         # final profile extraction and reporting.
         variant_plans = [_get_day_plan(d) for d in range(8) if d != 2]
         variant_plans.insert(2, day3_plan)
+        if len(variant_plans) != rc.N_RACE_DAYS:
+            raise RuntimeError(
+                f"Day 3 variant plan has {len(variant_plans)} days; expected {rc.N_RACE_DAYS}"
+            )
 
         # Build Day 3 weather for this variant
         weather_files = day3_variant_weather.get(variant_name, [])
@@ -877,8 +900,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-    plans = [_get_day_plan(d) for d in range(8)]
-    
+    # Day 3 is variant-dependent; reporting uses each variant's own plans.
     DAY_NAMES = {
         0: "Johannesburg → Rustenburg",
         1: "Rustenburg → Zeerust",
@@ -1095,7 +1117,7 @@ if __name__ == "__main__":
 
             # 3. SOC curve (key checkpoints)
             soc_drain_pct = soc_start - soc_end
-            solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+            solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
             drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
             # Prefer the REAL simulated motor energy (integrated directly
             # from physics every substep in forward_sim.py) over the old
@@ -1171,6 +1193,7 @@ if __name__ == "__main__":
     for variant_name, data in all_results.items():
         result   = data["result"]
         profiles = data["profiles"]
+        plans    = data["plans"]
 
         json_out = {
             "variant": variant_name,
@@ -1209,8 +1232,9 @@ if __name__ == "__main__":
                     "soc_start_pct": round(soc_start, 1),
                 }
 
-                solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+                solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
                 day_data["solar_input_wh"] = round(solar_wh, 0)
+                day_data["solar_underutil_wh"] = round(float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0), 0)
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]
@@ -1246,7 +1270,7 @@ if __name__ == "__main__":
                 _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
                                         if profiles else None)
                 day_data["motor_energy_wh"] = round(
-                    _real_motor_wh_json if _real_motor_wh_json else (drain_wh + solar_wh), 0)
+                    float(_real_motor_wh_json) if _real_motor_wh_json is not None else 0.0, 0)
 
                 _json_real_total_km += day_km
                 _json_total_trailered_km += day_data.get("trailered_km", 0.0)

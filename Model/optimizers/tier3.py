@@ -56,7 +56,12 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
 
                 dist = base_km + model.loop_km
                 waste_wh = model.predict_underutil(s_start)
-                waste_penalty_km = sc.DP_SOLAR_UNDERUTIL_KM_PER_WH * waste_wh
+                waste_penalty_km = (
+                    sc.SOLAR_UNDERUTIL_WEIGHT
+                    * sc.DP_SOLAR_UNDERUTIL_EQ_SPEED_KMH
+                    / 3600.0
+                    * waste_wh
+                )
                 # Completion mode means the base race must remain feasible; it
                 # must not turn the multi-day objective into "preserve SOC and
                 # ignore distance". The competition objective is still distance
