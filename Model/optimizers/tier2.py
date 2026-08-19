@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # so narrow offsets around s_center leave the surrogate window too
 # tight for Tier 3 to chain days together.
 SAMPLE_WINDOW_PCT = 5.0          # convergence drift threshold
-MAX_COMBOS = 3
+MAX_COMBOS = 7
 
 _L2_WARMSTART_KW = "warm_start_kmh"
 
@@ -55,11 +55,12 @@ def _ordered_combos(plan: _DayPlan, day_index: int, car: CarState, is_today: boo
         t_window -= elapsed_s
     t_stops_base = rc.UNPLANNED_STOP_BUDGET_S + rc.CONTROL_STOP_DURATION_S
 
-    if rc.RACE_MODE == "completion":
-        combos = [((0,) * len(plan.loops), 0.0)]
-    else:
-        combos = list(relaxed_loop_combos(
-            plan, max(0.0, t_window), t_stops_base, loop_speed_ms, pre_attempt_stop_s))
+    # Completion mode still has to optimize the actual race distance.
+    # "completion" is a feasibility/finish requirement, not permission to
+    # disable optional race loops. The old branch hard-coded zero loops, which
+    # made every completion-mode day incapable of choosing a loop.
+    combos = list(relaxed_loop_combos(
+        plan, max(0.0, t_window), t_stops_base, loop_speed_ms, pre_attempt_stop_s))
 
     def _loop_time(item):
         reps, _km = item
@@ -70,12 +71,19 @@ def _ordered_combos(plan: _DayPlan, day_index: int, car: CarState, is_today: boo
     combos_sorted = sorted(combos, key=_loop_time)
     if len(combos_sorted) <= MAX_COMBOS:
         return combos_sorted
-    # Evenly-spaced sample across [0, len-1] -- guarantees the cheapest AND
-    # the most-distance combo are both included, plus spread in between,
-    # instead of always keeping only the MAX_COMBOS cheapest ones.
-    idxs = sorted(set(int(round(i)) for i in
-                       np.linspace(0, len(combos_sorted) - 1, MAX_COMBOS)))
-    return [combos_sorted[i] for i in idxs]
+
+    positive = [i for i, item in enumerate(combos_sorted) if sum(item[0]) > 0]
+    required = [0, positive[0] if positive else 0, len(combos_sorted) - 1]
+    interior = np.linspace(0, len(combos_sorted) - 1, MAX_COMBOS, dtype=int).tolist()
+    idxs = sorted(set(required + interior))
+    if len(idxs) < MAX_COMBOS:
+        for i in range(len(combos_sorted)):
+            if i not in idxs:
+                idxs.append(i)
+                if len(idxs) == MAX_COMBOS:
+                    break
+    return [combos_sorted[i] for i in sorted(idxs[:MAX_COMBOS])]
+
 
 def _l2_result_feasible(res: dict, car: CarState, day_index: int) -> bool:
     if res is None: return False
@@ -95,12 +103,19 @@ def _sweep_one_offset(task: dict) -> dict:
     ordered = task["ordered_combos"]
     global_method = task["global_method"]
     seed = task["seed"]
+    # Real per-loop-name route geometry for this day (Root-cause fix: lets
+    # singleday.solve() actually simulate committed loop reps instead of
+    # only subtracting stop-time for them). May be None/missing entries —
+    # singleday._splice_loops() falls back to a flat synthetic leg per name
+    # that has no matching .save geometry.
+    loop_geoms = task.get("loop_geoms")
 
     d_dist = task.get("dist_done_km", 0.0)
     d_elap = task.get("elapsed_s", 0.0)
     d_cs = task.get("cs_taken", False)
 
     out: dict[tuple, tuple] = {}
+    underutil_by_combo: dict[tuple, float] = {}
     # Cross-offset warm-starting: accept an initial warm seed from a
     # previous offset's best result (avoids a full GA run on offset 2).
     warm = task.get("initial_warm_kmh")
@@ -117,10 +132,11 @@ def _sweep_one_offset(task: dict) -> dict:
                               day_index, start_soc, alpha_next,
                               loops_committed,
                               dist_done_km=d_dist, elapsed_s=d_elap, cs_taken=d_cs,
+                              loop_geoms=loop_geoms,
                               **kwargs)
         dt = time.perf_counter() - t0
 
-        used = "warm" if warm is not None else "ga"
+        used = str(res.get("global_method", "ga"))
         method_log.append(used)
         logger.info("  day %d  SOC=%.1f%%  reps=%s  method=%s  %.1fs",
                      day_index, start_soc, reps, used, dt)
@@ -128,7 +144,9 @@ def _sweep_one_offset(task: dict) -> dict:
         if not _l2_result_feasible(res, car, day_index):
             continue  # try other combos — don't assume monotonic infeasibility
 
-        out[tuple(reps)] = (start_soc, float(res["final_soc_pct"]))
+        key = tuple(reps)
+        out[key] = (start_soc, float(res["final_soc_pct"]))
+        underutil_by_combo[key] = float(res.get("solar_underutil_wh", 0.0) or 0.0)
         warm = res.get("v_kmh")
 
     return dict(offset_soc=start_soc, points=out,
@@ -141,37 +159,55 @@ def _reps_to_committed(plan: _DayPlan, reps: tuple[int, ...]):
     return committed
 
 class LinearSurrogate:
-    __slots__ = ("a", "b", "s0", "loop_km", "reps", "soc_lo", "soc_hi")
+    __slots__ = ("a", "b", "s0", "loop_km", "reps", "soc_lo", "soc_hi", "xs", "ys", "wu")
 
-    def __init__(self, a, b, s0, loop_km, reps, soc_lo, soc_hi):
+    def __init__(self, a, b, s0, loop_km, reps, soc_lo, soc_hi, xs=None, ys=None, wu=None):
         self.a = a; self.b = b; self.s0 = s0
         self.loop_km = loop_km; self.reps = reps
         self.soc_lo = soc_lo; self.soc_hi = soc_hi
+        self.xs = None if xs is None else np.asarray(xs, dtype=float)
+        self.ys = None if ys is None else np.asarray(ys, dtype=float)
+        self.wu = None if wu is None else np.asarray(wu, dtype=float)
 
     def predict(self, start_soc: float) -> float:
-        return self.a + self.b * (start_soc - self.s0)
+        # Never extrapolate a single successful L2 sample with a fabricated
+        # SOC slope.  A one-point surrogate is valid only at that sampled SOC
+        # (in_window() enforces this); two or more samples use interpolation.
+        if self.xs is None or self.ys is None:
+            raise RuntimeError("surrogate has no successful L2 sample")
+        return float(np.interp(start_soc, self.xs, self.ys))
+
+    def predict_underutil(self, start_soc: float) -> float:
+        if self.xs is None or self.wu is None:
+            raise RuntimeError("surrogate has no successful L2 sample")
+        return max(0.0, float(np.interp(start_soc, self.xs, self.wu)))
 
     def in_window(self, start_soc: float) -> bool:
         return self.soc_lo - 1e-9 <= start_soc <= self.soc_hi + 1e-9
+
 
 def _fit_surrogates(points_by_combo: dict, s0: float, plan: _DayPlan):
     surro = {}
     for reps, pts in points_by_combo.items():
         xs = np.array([p[0] for p in pts], dtype=float)
         ys = np.array([p[1] for p in pts], dtype=float)
+        wu = np.array([p[2] if len(p) >= 3 else 0.0 for p in pts], dtype=float)
+        order = np.argsort(xs)
+        xs, ys, wu = xs[order], ys[order], wu[order]
         if len(np.unique(xs)) >= 2:
             b, a_at_zero = np.polyfit(xs - s0, ys, 1)
             a = a_at_zero
         else:
             a, b = float(ys[0]), 0.0
         loop_km = sum((reps[i] if reps else 0) * km for i, (_n, km) in enumerate(plan.loops))
-        # Allow full-range extrapolation.  The linear model is valid across
-        # the entire SOC range; restricting to the sampled window caused
-        # Tier 3 to fail when Tier 1's s_center was far from reality.
         surro[tuple(reps)] = LinearSurrogate(
             a=float(a), b=float(b), s0=s0, loop_km=loop_km, reps=tuple(reps),
-            soc_lo=0.0, soc_hi=110.0)
+            soc_lo=float(xs.min()), soc_hi=float(xs.max()),
+            # Keep even a one-point sample.  It becomes a degenerate, exact-SOC
+            # surrogate rather than silently falling back to a linear model.
+            xs=xs, ys=ys, wu=wu)
     return surro
+
 
 def sample_day(route, car: CarState, solar_provider, wind_provider,
                day_index: int, plan: _DayPlan, s0_pct: float,
@@ -180,21 +216,24 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
                seed: int | None = None,
                offsets_pct=None,
                is_today: bool = False, dist_done_km: float = 0.0,
-               elapsed_s: float = 0.0, cs_taken: bool = False) -> dict:
+               elapsed_s: float = 0.0, cs_taken: bool = False,
+               loop_geoms: dict | None = None) -> dict:
 
     ordered = _ordered_combos(plan, day_index, car, is_today, elapsed_s)
 
-    # Full-range sampling: test at low and high SOC so the linear
-    # surrogate covers every start SOC Tier 3's DP might visit.
+    # Low/mid/high samples capture the battery ceiling curvature while keeping
+    # the L2 solve count manageable.
     lo = float(np.clip(car.soc_min_pct + 5.0, car.soc_min_pct, car.soc_max_pct))
     hi = float(car.soc_max_pct)
-    start_socs = sorted(set([lo, hi]))  # 2 levels (or 1 if lo==hi)
+    mid = 0.5 * (lo + hi)
+    start_socs = sorted(set([lo, mid, hi]))
 
     base_task = dict(route=route, car=car, solar_provider=solar_provider,
                      wind_provider=wind_provider, day_index=day_index, plan=plan,
                      alpha_next_day_pct=alpha_next_day_pct,
                      ordered_combos=ordered, global_method=global_method, seed=seed,
-                     dist_done_km=dist_done_km, elapsed_s=elapsed_s, cs_taken=cs_taken)
+                     dist_done_km=dist_done_km, elapsed_s=elapsed_s, cs_taken=cs_taken,
+                     loop_geoms=loop_geoms)
 
     # Cross-offset warm-starting: run first SOC offset, extract its best
     # velocity profile, then seed the second offset with it.  This lets
@@ -220,7 +259,7 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
             key = (day_index, reps, round(ss, 1))
             if key in seen_keys: continue
             seen_keys.add(key)
-            points_by_combo.setdefault(reps, []).append((ss, es))
+            points_by_combo.setdefault(reps, []).append((ss, es, sw.get("underutil_by_combo", {}).get(reps, 0.0)))
             n_solves += 1
 
     surrogates = _fit_surrogates(points_by_combo, s0_pct, plan)
@@ -242,8 +281,16 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
                     s0_traj: np.ndarray, plans: list, alpha_next_pct: dict,
                     start_day: int = 0, dist_done_km: float = 0.0, elapsed_s: float = 0.0,
                     cs_taken: bool = False, loops_done: dict | None = None,
-                    n_workers: int | None = None, **kwargs) -> dict:
+                    n_workers: int | None = None,
+                    loop_geoms_by_day: dict | None = None,
+                    **kwargs) -> dict:
     """Sample all days.  Uses ThreadPoolExecutor to parallelize across days.
+
+    loop_geoms_by_day: {day_index: {loop_name: DataFrame}} — real loop route
+    geometry per day, loaded once in trust_region.py and threaded down here
+    so every singleday.solve() call for that day can actually simulate
+    committed loop reps (root-cause fix for the "free loop reps" bug — see
+    singleday.py section 1b for the full explanation).
 
     NOTE on threading: forward_sim's integrator is a Python for-loop (holds
     the GIL), so threads give limited CPU parallelism.  The speedup comes
@@ -282,11 +329,13 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
             logger.warning("Day %d: s0_traj is NaN, falling back to 50%%", d)
             s0_d = 50.0
 
+        d_loop_geoms = (loop_geoms_by_day or {}).get(d)
+
         t0 = time.perf_counter()
         result = sample_day(
             route, car, solar_provider, wind_provider, d, plan_to_use,
             s0_d, alpha, is_today=is_today, dist_done_km=d_dist,
-            elapsed_s=d_elap, cs_taken=d_cs, **kwargs)
+            elapsed_s=d_elap, cs_taken=d_cs, loop_geoms=d_loop_geoms, **kwargs)
         dt = time.perf_counter() - t0
         logger.info("Tier2 day %d done in %.1fs  (%d solves)",
                      d, dt, result.get("n_l2_solves", 0))

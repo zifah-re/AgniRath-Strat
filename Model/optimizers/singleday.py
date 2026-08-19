@@ -1,9 +1,10 @@
 """
 optimizers/singleday.py — L2 single-day velocity optimizer
 
-Mode-specific loss functions (charging/cruising/traffic) are intentionally
-NOT included in this pass, per instruction — objective is plain end-of-day
-SOC maximisation, matching Plan v3 §8's stated L2 objective.
+L2 solves for the fastest feasible velocity profile for a committed route.
+SOC is a hard feasibility constraint; solar curtailment is penalized so the
+optimizer does not deliberately preserve a full battery while wasting useful
+solar energy.
 
 Requires scipy>=1.14 (pinned in Model/requirements.txt) for NonlinearConstraint
 objects to work directly with method="SLSQP" in `minimize`.
@@ -14,6 +15,7 @@ from __future__ import annotations
 from tqdm import tqdm
 import typing as _t
 import numpy as np
+import pandas as pd
 import logging
 from scipy.optimize import Bounds, NonlinearConstraint, differential_evolution, minimize
 
@@ -77,6 +79,154 @@ def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
     v_eff = 1.0 / (frac / turn_speed_limit_kmh + (1.0 - frac) / np.maximum(v_max_kmh, 1e-6))
     return v_eff
 
+
+# ===============================================================================
+# 1b. Loop splicing — ROOT-CAUSE FIX for the "free loop reps" bug
+# ===============================================================================
+#
+# Previously, loops_committed only ever subtracted mandatory stop-time from
+# the day's time budget (see solve()'s old allowed_time_s calc). The actual
+# simulated route (passed into forward_sim) ALWAYS integrated only the base
+# Stage1+Stage2 distance, regardless of how many loop reps were committed.
+# That made extra reps a pure "free win" for Tier 3's DP, which scores combos
+# as dist = base_km + reps*loop_km with no check against what singleday.solve
+# actually simulated — so the optimizer kept picking absurd rep counts
+# (14, 20, 22+), producing a "planning estimate" total distance (~5000km)
+# with no relation to anything physically driven (~2000km), artificially
+# depressed average speeds, and solar/motor/drain figures that couldn't
+# reconcile.
+#
+# Fix: splice each committed loop rep's REAL geometry (or a flat synthetic
+# fallback when no .save file exists for that loop) into the simulated route
+# between Stage 1 and Stage 2 — matching _DayPlan's documented driving order
+# (Stage 1 -> loop zone(s) -> Stage 2). Every rep now costs real integrated
+# time/energy and is bounded by the same feasibility constraints as the rest
+# of the day.
+
+def _synthetic_loop_leg(km: float, route: Route | None) -> pd.DataFrame:
+    """Flat-road fallback geometry for a loop with no matching .save file
+    (confirmed to happen for some days — e.g. a 2nd named loop variant with
+    no dedicated geometry file). 0% slope, full car-speed limit. Still costs
+    real distance/time/energy in the simulation, unlike the old silent-no-op
+    behaviour — it just can't reflect real terrain for that loop."""
+    n = max(4, int(round(km * 1000.0 / 500.0)))  # ~500m sampling
+    dist = np.linspace(0.0, km * 1000.0, n)
+    if route is not None:
+        try:
+            last_lat, last_lon = route.latlon_at(route.total_m)
+        except Exception:
+            last_lat, last_lon = -26.2, 27.0
+    else:
+        last_lat, last_lon = -26.2, 27.0
+    return pd.DataFrame({
+        "distance_m": dist,
+        "elevation_m": 0.0,
+        "slope_pct": 0.0,
+        "bearing_deg": 0.0,
+        "lat": last_lat,
+        "lon": last_lon,
+        "v_max_ms": 90.0 / 3.6,
+        "curvature_1pm": 0.0,
+        "circle_id": 0,
+        "red_flag_trailer": False,
+        "control_stop": False,
+        "seg_type": "loop_synthetic",
+    })
+
+
+def _splice_loops(route: Route, loop_geoms: dict | None,
+                   loops_committed: list[tuple[str, float]]) -> Route:
+    """Build the real simulated route for a day with committed loop reps.
+
+    KNOWN SIMPLIFICATION: assumes the day's loops haven't started yet (fine
+    for a full-day Tier 2 sample or the final extract_final_profiles pass,
+    which cover the overwhelming majority of solve() calls). A mid-day
+    replan that's already partway through a loop (dist_done_km landing
+    inside a loop rep, not just Stage 1/2) is not specially handled here —
+    it will treat any remaining committed reps as starting fresh from the
+    current position, which is an approximation, not exact.
+
+    Returns a NEW Route (does not mutate the input route). If
+    loops_committed is empty or route is None, returns route unchanged.
+    """
+    if not loops_committed or route is None:
+        return route
+
+    base_df = route.df
+    stage1 = base_df[base_df["seg_type"] == "stage1"].copy()
+    stage2 = base_df[base_df["seg_type"] == "stage2"].copy()
+
+    # CRASH FIX (Day 6): the old guard only handled "both stage1 and stage2
+    # empty". Some single-file days get tagged "stage2" instead of "stage1"
+    # depending on the source filename — Day 6's control-stop location ==
+    # finish location (race_config.py), so it's a single leg with no
+    # separate Stage 1 file to disambiguate the name against, and its file
+    # apparently reads as "Stage 2". That left stage1 empty / stage2
+    # populated, a case the old guard never caught, so the old code crashed
+    # on stage1.iloc[-1] (IndexError: single positional indexer is
+    # out-of-bounds) the moment a real combo (non-empty loops_committed) hit
+    # this day. Fix: treat whichever block is actually populated as the
+    # "pre-loop" content, instead of assuming stage1 specifically is always
+    # the non-empty one.
+    if len(stage1) == 0 and len(stage2) > 0:
+        pre, post = stage2, stage1
+    elif len(stage1) == 0 and len(stage2) == 0:
+        pre, post = base_df.copy(), base_df.iloc[0:0].copy()
+    else:
+        pre, post = stage1, stage2
+
+    blocks = [pre]
+    pre_end_m = float(pre["distance_m"].max()) if len(pre) else 0.0
+    offset = pre_end_m
+
+    _LOOP_SEPARATOR_M = 300.0  # small buffer so each rep gets its own stop-dwell cycle
+
+    def _separator_row(at_m: float) -> pd.DataFrame:
+        # Anchor to whatever block was most recently appended — never assume
+        # a specific named block ("stage1") is guaranteed non-empty (that
+        # assumption is exactly what crashed on Day 6).
+        row = blocks[-1].iloc[[-1]].copy()
+        row["distance_m"] = at_m
+        row["seg_type"] = "stage1"  # non-loop, resets the contiguous-zone flag
+        return row
+
+    for name, km in loops_committed:
+        geom = loop_geoms.get(name) if loop_geoms else None
+        if geom is not None and len(geom) > 0:
+            leg = geom.copy()
+            # Re-scale if the geometry file's own length differs materially
+            # from the plan's nominal km for this loop (>50m mismatch).
+            # Skip rescaling for the full-blind-day placeholder — its
+            # "nominal km" is only a crude average-of-released-loops
+            # estimate (race_config.BLIND_LOOP_PLACEHOLDER_KM), not a real
+            # target length, so a real geometry file's actual length should
+            # be trusted as-is rather than squeezed to match the estimate.
+            file_len_m = float(leg["distance_m"].max()) or (km * 1000.0)
+            is_placeholder_km = (name == "blind_loop_placeholder")
+            if not is_placeholder_km and file_len_m > 0 and abs(file_len_m - km * 1000.0) > 50.0:
+                scale = (km * 1000.0) / file_len_m
+                leg["distance_m"] = leg["distance_m"] * scale
+        else:
+            leg = _synthetic_loop_leg(km, route)
+        leg = leg.copy()
+        leg["seg_type"] = f"loop_{name}"
+        offset += _LOOP_SEPARATOR_M
+        blocks.append(_separator_row(offset))
+        leg["distance_m"] = leg["distance_m"] + offset
+        offset = float(leg["distance_m"].max())
+        blocks.append(leg)
+
+    if len(post):
+        s2 = post.copy()
+        s2["distance_m"] = (s2["distance_m"] - pre_end_m) + offset
+        blocks.append(s2)
+
+    spliced = pd.concat(blocks, ignore_index=True)
+    if "day" in base_df.columns and len(base_df):
+        spliced["day"] = base_df["day"].iloc[0]
+    return Route(spliced)
+
+
 # ===============================================================================
 # 2. Day-level evaluation
 # ===============================================================================
@@ -133,20 +283,22 @@ class DayEvaluator:
 # ===============================================================================
 
 def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float]:
-    # Enriched objective (solar underutilization): add a penalty for solar
-    # energy the panel could produce but the battery couldn't absorb
-    # (SOC-ceiling clipping / excess solar during low draw). The penalty is
-    # in Wh (solar_underutil_j / 3600) scaled by SOLAR_UNDERUTIL_WEIGHT
-    # (solver_config). Weight 0.0 disables the enrichment (plain SOC
-    # objective); the default 1.0 makes each wasted Wh add +1 to the
-    # minimization objective, steering the search away from plans that waste
-    # cheap midday sun just to shave drive time.
+    """Minimize time, with a secondary penalty for solar curtailment.
+
+    The old objective maximized end-of-day SOC, so a 100% SOC solution was
+    preferred even when it finished unnecessarily early. That is backwards
+    for the race: the SOC requirement is a constraint, while time/distance is
+    what the race strategy should optimize.
+
+    ``SOLAR_UNDERUTIL_WEIGHT`` is expressed as equivalent seconds per wasted
+    Wh, making the two terms dimensionally comparable.
+    """
     _w = float(SCFG.SOLAR_UNDERUTIL_WEIGHT)
 
     def _objective(v_kmh: np.ndarray) -> float:
         res = evaluator(v_kmh)
-        solar_penalty_wh = _w * res.solar_underutil_j / 3600.0
-        return -res.final_soc_pct + solar_penalty_wh
+        solar_penalty_s = _w * float(res.solar_underutil_j) / 3600.0
+        return float(res.total_time_s) + solar_penalty_s
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
@@ -276,22 +428,35 @@ def get_global_search(method: str, **kwargs) -> GlobalSearchStrategy:
 def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
                             v_max_kmh: np.ndarray, v_min_kmh: float = 5.0,
                             constraints: _t.Sequence[NonlinearConstraint] = (),
+                            objective: _t.Callable[[np.ndarray], float] | None = None,
                             ) -> np.ndarray:
+    """Project SLSQP's continuous solution to integer km/h without changing
+    the optimization objective.
+
+    The previous implementation silently re-optimized the rounded profile for
+    *maximum final SOC*, which partially undid the L2 objective change.
+    """
+    if objective is None:
+        objective = _build_objective(evaluator)
+
     v_int = np.clip(np.round(v_kmh), v_min_kmh, np.floor(v_max_kmh))
 
     def _feasible(v: np.ndarray) -> bool:
         return all(np.all(np.atleast_1d(c.fun(v)) >= -1e-6) for c in constraints)
 
+    if not _feasible(v_int):
+        v_int = np.clip(np.asarray(v_kmh, dtype=float), v_min_kmh, np.floor(v_max_kmh))
+
     best = v_int.copy()
-    best_obj = evaluator(best).final_soc_pct
+    best_obj = float(objective(best)) if _feasible(best) else float('inf')
     for i in range(len(best)):
         for step in (+1.0, -1.0):
             cand = best.copy()
             cand[i] = np.clip(cand[i] + step, v_min_kmh, np.floor(v_max_kmh[i]))
             if cand[i] == best[i] or not _feasible(cand):
                 continue
-            obj = evaluator(cand).final_soc_pct
-            if obj > best_obj:
+            obj = float(objective(cand))
+            if obj < best_obj:
                 best, best_obj = cand, obj
     return best
 
@@ -304,23 +469,36 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
           day_index: int, start_soc_pct: float, alpha_next_day_pct: float,
           loops_committed, global_method: str = "ga", seed: int | None = None,
           dist_done_km: float = 0.0, elapsed_s: float = 0.0, cs_taken: bool = False,
+          loop_geoms: dict | None = None,
           **kwargs):
-    
-    rem_m = (route.total_m - dist_done_km * 1000.0) if route else 0.0
+
+    # ROOT-CAUSE FIX: splice committed loop reps into the real simulated
+    # route (see section 1b above) instead of the old behaviour where
+    # loops_committed only subtracted stop-time and never touched the
+    # physics at all. loop_geoms is {loop_name: DataFrame} for this day,
+    # threaded down from trust_region.py -> tier2.py. If not provided
+    # (e.g. an old call site not yet updated), loops still get a flat
+    # synthetic geometry via _splice_loops rather than silently costing
+    # nothing — real distance/time/energy either way.
+    sim_route = route
+    if loops_committed and route is not None:
+        sim_route = _splice_loops(route, loop_geoms, loops_committed)
+
+    rem_m = (sim_route.total_m - dist_done_km * 1000.0) if sim_route else 0.0
     n_segments = max(1, int(np.ceil(rem_m / CONTROL_SEGMENT_M)))
     
     seg_start_m = (dist_done_km * 1000.0) + np.arange(n_segments) * CONTROL_SEGMENT_M
 
-    v_max_kmh = route.v_max_ms_at(seg_start_m) * 3.6 if route else np.full(n_segments, car.v_max_ms * 3.6)
-    if route:
-        v_max_kmh = apply_turn_speed_caps(route, v_max_kmh, seg_start_m)
+    v_max_kmh = sim_route.v_max_ms_at(seg_start_m) * 3.6 if sim_route else np.full(n_segments, car.v_max_ms * 3.6)
+    if sim_route:
+        v_max_kmh = apply_turn_speed_caps(sim_route, v_max_kmh, seg_start_m)
 
     v_max_kmh = np.maximum(v_max_kmh, 5.0)    
     bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh) 
 
     t0_s = race_config.day_start_time_s(day_index) + elapsed_s
     
-    evaluator = DayEvaluator(route, car, solar_provider, wind_provider,
+    evaluator = DayEvaluator(sim_route, car, solar_provider, wind_provider,
                               t0_s=t0_s,
                               start_soc_pct=start_soc_pct,
                               seg_start_m=seg_start_m,
@@ -329,12 +507,15 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     objective = _build_objective(evaluator)
 
     n_loops = len(loops_committed) if loops_committed else 0
-        # Tier 1 parity on the stop-time budget: the control stop, the unplanned
+    # Tier 1 parity on the stop-time budget: the control stop, the unplanned
     # stop budget, and each loop turnaround are all parked time the car is NOT
     # driving — subtract them all from the allowed drive window exactly like
     # tier1.guess_baseline's t_stops_base / pre_attempt_stop_s. forward_sim
     # credits the parked solar for the same windows (see its stop-time
     # charging block), so time budget and energy credit stay symmetric.
+    # NOTE: this is stop-time only — the loop's actual DRIVING time is now
+    # simulated for real via the sim_route splice above, so there's no
+    # double-counting between "stopped at the loop" and "driving the loop".
     allowed_time_s = (
         (race_config.day_finish_time_s(day_index) - race_config.day_start_time_s(day_index))
         - elapsed_s
@@ -350,9 +531,21 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     ]
 
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
-        warm_x = np.asarray(kwargs["warm_start_kmh"])
+        warm_x = np.asarray(kwargs["warm_start_kmh"], dtype=float).reshape(-1)
         if len(warm_x) == n_segments:
-            global_result = GlobalSearchResult(x=warm_x, fun=objective(warm_x), method="warm")
+            global_result = GlobalSearchResult(
+                x=np.clip(warm_x, bounds.lb, bounds.ub),
+                fun=objective(warm_x), method="warm")
+        elif len(warm_x) >= 2 and n_segments >= 1:
+            # Loop counts change the route length/control-vector dimension.
+            # Resample the previous profile instead of discarding it and
+            # launching another expensive GA.
+            old_u = np.linspace(0.0, 1.0, len(warm_x))
+            new_u = np.linspace(0.0, 1.0, n_segments)
+            seed_x = np.interp(new_u, old_u, warm_x)
+            seed_x = np.clip(seed_x, bounds.lb, bounds.ub)
+            global_result = GlobalSearchResult(
+                x=seed_x, fun=objective(seed_x), method="warm-resampled")
         else:
             global_search = get_global_search(global_method)
             global_result = global_search.search(objective, bounds, constraints, seed=seed)
@@ -373,7 +566,8 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     )
 
     v_final_kmh = project_to_integer_kmh(
-        evaluator, slsqp_result.x, v_max_kmh, constraints=constraints)
+        evaluator, slsqp_result.x, v_max_kmh, constraints=constraints,
+        objective=objective)
     final_eval = evaluator(v_final_kmh)
 
     return dict(
@@ -390,6 +584,9 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         driven_km=getattr(final_eval, 'driven_km', 0.0),
         motor_energy_wh=getattr(final_eval, 'motor_energy_wh', 0.0),
         solar_energy_wh=getattr(final_eval, 'solar_energy_wh', 0.0),
+        solar_underutil_wh=getattr(final_eval, 'solar_underutil_j', 0.0) / 3600.0,
+        battery_delta_wh=(float(final_eval.final_soc_pct) - float(start_soc_pct))
+                         * car.battery_nominal_wh / 100.0,
         diagnostics=dict(
             global_fun=global_result.fun,
             slsqp_fun=slsqp_result.fun,

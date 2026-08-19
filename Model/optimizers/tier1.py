@@ -445,10 +445,12 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
         t0_s = rc.day_start_time_s(d) + (elapsed_s if is_today else 0.0)
         gain = overnight_soc_gain(car, solar_provider, d)
 
-        if completion:
-            combos = [((0,) * len(plan.loops), 0.0)]
-        else:
-            combos = list(relaxed_loop_combos(plan, t_window, t_stops_base, loop_speed_ms, pre_attempt_stop_s))
+        # Completion mode imposes a terminal SOC/finish requirement; it does
+        # not disable race loops. Keep the candidate set identical to the
+        # non-completion distance allocator so L1 and L2/L3 cannot disagree
+        # about which loop decisions are even available.
+        combos = list(relaxed_loop_combos(
+            plan, t_window, t_stops_base, loop_speed_ms, pre_attempt_stop_s))
 
         for s_idx, s0 in enumerate(soc_buckets):
             best_val = -np.inf
@@ -497,7 +499,9 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 dist_km = base_km + loop_km
                 p_loss_km = (pen_s * v_base_ms / 1000.0) if pen_s > 0 else 0.0
 
-                val = (1.0 + v_next) if completion else (dist_km + v_next - p_loss_km)
+                # Completion mode is a feasibility constraint, not a different
+                # race objective. Optional loops still contribute race distance.
+                val = dist_km + v_next - p_loss_km
                 if val > best_val:
                     best_val = val
                     best_reps[d][s_idx] = reps
