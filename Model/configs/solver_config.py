@@ -44,6 +44,7 @@ SLSQP_FTOL = 1e-4               # Was 1e-6. Looser tol saves ~30-40% of SLSQP
 INTEGER_PROJECT = True           # round to integer km/h + local search
 L2_SOLVE_BUDGET_S = 120          # re-plan must complete < 2 min (Plan v3)
 SOLAR_UNDERUTIL_WEIGHT = 1.0     # L2 objective penalty for wasted solar
+DP_SOLAR_UNDERUTIL_EQ_SPEED_KMH = 65.0  # Tier-3 equivalent race speed for solar penalty
                                  # (solar_underutil_j from forward_sim), in
                                  # end-of-day SOC-% per wasted Wh-equivalent.
                                  # 1.0 == a wasted Wh is treated exactly like a

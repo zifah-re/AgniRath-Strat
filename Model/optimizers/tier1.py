@@ -34,17 +34,50 @@ class _DayPlan:
     loops: tuple[tuple[str, float], ...]
 
 def _get_day_plan(day_index: int) -> _DayPlan:
-    """Nominal (not-yet-driven) route plan for a day, from route notes."""
-    note = rc.DAY_ROUTE_NOTES[day_index]
-    if note["stage1_km"] is None:
-        stage1_km, stage2_km = 230.0, 0.0  # Fallback for full-blind days
-    else:
-        stage1_km, stage2_km = note["stage1_km"], note["stage2_km"]
+    """
+    Return the nominal route plan for a known race day.
 
-    loops = tuple(note["loops"]) if note["loops"] else (
-        ("blind_loop_placeholder", rc.BLIND_LOOP_PLACEHOLDER_KM),
+    Day 3 is intentionally handled by trust_region.py because it has
+    variant-specific released route files:
+
+        Aryaman:
+            Stage 1: DOES NOT EXIST
+            Stage 2: exists
+            Loop: exists
+
+        Prahlad:
+            Stage 1: exists
+            Stage 2: exists
+            Loop: exists
+
+    Therefore Day 3 must never fabricate a 230 km Stage 1 or a generic
+    blind-loop placeholder here.
+    """
+    note = rc.DAY_ROUTE_NOTES[day_index]
+
+    if day_index == rc.FULL_BLIND_DAY_INDEX:
+        raise ValueError(
+            "Day 3 requires a variant-specific route plan. "
+            "Build it from the Aryaman/Prahlad route files before "
+            "calling _get_day_plan(2)."
+        )
+
+    stage1_km = note["stage1_km"]
+    stage2_km = note["stage2_km"]
+
+    if stage1_km is None or stage2_km is None:
+        raise ValueError(
+            f"Day {day_index + 1} has incomplete route configuration: "
+            f"stage1_km={stage1_km}, stage2_km={stage2_km}"
+        )
+
+    loops = tuple(note["loops"] or ())
+
+    return _DayPlan(
+        float(stage1_km),
+        float(stage2_km),
+        loops,
     )
-    return _DayPlan(stage1_km, stage2_km, loops)
 
 def _regen_cap_w(car: CarState) -> float:
     # Single source of truth: core.physics.regen_cap_w. forward_sim
@@ -404,7 +437,8 @@ def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float
 def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
                    start_soc_pct: float, start_day: int = 0, dist_done_km: float = 0.0,
                    elapsed_s: float = 0.0, cs_taken: bool = False, loops_done: dict | None = None,
-                   kml_paths: dict | None = None) -> dict:
+                   kml_paths: dict | None = None,
+                   plans_override: list | None = None) -> dict:
 
     _energy_diag_logged.clear()  # reset for fresh run
 
@@ -417,7 +451,15 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
     turnaround_s = getattr(rc, "LOOP_TURNAROUND_S", 0.0)
     pre_attempt_stop_s = rc.LOOP_STOP_DURATION_S + turnaround_s
 
-    plans = [_get_day_plan(d) for d in range(n_days)]
+    if plans_override is not None:
+        if len(plans_override) != n_days:
+            raise ValueError(
+                f"plans_override must contain exactly {n_days} day plans; "
+                f"got {len(plans_override)}"
+            )
+        plans = list(plans_override)
+    else:
+        plans = [_get_day_plan(d) for d in range(n_days)]
 
     V = np.full((n_days + 1, nb), -np.inf)
     V[n_days, :] = 0.0
@@ -445,10 +487,12 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
         t0_s = rc.day_start_time_s(d) + (elapsed_s if is_today else 0.0)
         gain = overnight_soc_gain(car, solar_provider, d)
 
-        if completion:
-            combos = [((0,) * len(plan.loops), 0.0)]
-        else:
-            combos = list(relaxed_loop_combos(plan, t_window, t_stops_base, loop_speed_ms, pre_attempt_stop_s))
+        # Completion mode imposes a terminal SOC/finish requirement; it does
+        # not disable race loops. Keep the candidate set identical to the
+        # non-completion distance allocator so L1 and L2/L3 cannot disagree
+        # about which loop decisions are even available.
+        combos = list(relaxed_loop_combos(
+            plan, t_window, t_stops_base, loop_speed_ms, pre_attempt_stop_s))
 
         for s_idx, s0 in enumerate(soc_buckets):
             best_val = -np.inf
@@ -497,7 +541,9 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 dist_km = base_km + loop_km
                 p_loss_km = (pen_s * v_base_ms / 1000.0) if pen_s > 0 else 0.0
 
-                val = (1.0 + v_next) if completion else (dist_km + v_next - p_loss_km)
+                # Completion mode is a feasibility constraint, not a different
+                # race objective. Optional loops still contribute race distance.
+                val = dist_km + v_next - p_loss_km
                 if val > best_val:
                     best_val = val
                     best_reps[d][s_idx] = reps

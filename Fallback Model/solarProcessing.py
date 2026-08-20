@@ -76,21 +76,22 @@ for json_file in folder.glob('*.jsonl'):
   file_name = json_file.stem
 
   stage_point_raw = extractSolarData(json_file)
+  output_data=[]
+  for item in stage_point_raw:
+    stage_point_lat = item['lat']
+    stage_point_long = item['lon']
+    stage_point_data = item['data']
+    day=re.search(r"Day [1-8]",json_file.name).group(0)
+    if 'Day 1' in file_name:
+      mean_data = meanSolar(stage_point_data, day, time(9, 0,tzinfo=SA_TZ))
+    else:
+      mean_data = meanSolar(stage_point_data, day)
 
-  stage_point_lat = stage_point_raw[0]['lat']
-  stage_point_long = stage_point_raw[0]['lon']
-  stage_point_data = stage_point_raw[0]['data']
-  day=re.search(r"Day [1-8]",json_file.name).group(0)
-  if 'Day 1' in file_name:
-    mean_data = meanSolar(stage_point_data, day, time(9, 0,tzinfo=SA_TZ))
-  else:
-    mean_data = meanSolar(stage_point_data, day)
-
-  output_data = [{
-      'lat': stage_point_lat,
-      'lon': stage_point_long,
-      'data': mean_data,
-  }]
+    output_data.append({
+        'lat': stage_point_lat,
+        'lon': stage_point_long,
+        'data': mean_data,
+    })
 
   output_file = output_folder / f'mean_{json_file.name}'
   with open(output_file, 'w') as f:

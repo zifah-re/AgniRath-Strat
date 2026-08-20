@@ -190,18 +190,23 @@ DAY_ROUTE_NOTES = [
     dict(stage1_km=None, loops=None, stage2_km=None,
          start="Kameelboom Lodge (Vryburg)", control_stop=None,
          finish="Kimberley Technical Highschool"),
-    # day 4
-    dict(stage1_km=197.0, loops=[("postmasburg_loop2", 21.0),
-                                 ("postmasburg_loop1", 14.0)], stage2_km=63.3,
-         start="Kimberley Technical Highschool",
-         control_stop="Postmasburg Highschool",
-         finish="Ranch Chalets (Olifantshoek)"),
-    # day 5
-    dict(stage1_km=178.0, loops=[("upington_loop1", 62.0),
-                                 ("upington_loop2", 34.0)], stage2_km=114.0,
-         start="Ranch Chalets (Olifantshoek)",
-         control_stop="Upington Highschool",
-         finish="Kameeldoring Campsite (Augrabies)"),
+    # day 4 — exactly ONE released loop
+    dict(
+    stage1_km=197.0,
+    loops=[("postmasburg_loop", 21.0)],
+    stage2_km=63.3,
+    start="Kimberley Technical Highschool",
+    control_stop="Postmasburg Highschool",
+    finish="Ranch Chalets (Olifantshoek)"),
+
+# day 5 — exactly ONE released loop
+    dict(
+    stage1_km=178.0,
+    loops=[("upington_loop", 62.0)],
+    stage2_km=114.0,
+    start="Ranch Chalets (Olifantshoek)",
+    control_stop="Upington Highschool",
+    finish="Kameeldoring Campsite (Augrabies)"),
     # day 6 — control stop location == finish location
     dict(stage1_km=310.0, loops=[("springbok_loop", 18.2)], stage2_km=0.0,
          start="Kameeldoring Campsite (Augrabies)",

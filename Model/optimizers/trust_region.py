@@ -70,11 +70,26 @@ def replan(routes: list, base_car: CarState, solar_providers: dict, wind_provide
                     elapsed_s=elapsed_s, cs_taken=cs_taken, 
                     loops_done=loops_done, kml_paths=kml_paths, **kwargs)
 
+def _trailered_km_by_day(routes):
+    """Return trailered km from the exact mask consumed by forward_sim."""
+    out = {}
+    for d, route in enumerate(routes or []):
+        if route is None or not hasattr(route, "df") or len(route.df) < 2:
+            out[d] = 0.0
+            continue
+        dist = route.df["distance_m"].to_numpy(dtype=float)
+        mask = route.df["red_flag_trailer"].to_numpy(dtype=bool)
+        out[d] = float(np.sum(np.diff(dist)[mask[:-1]])) / 1000.0
+    return out
+
+
 def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers: dict,
              start_soc_pct: float = 100.0, *, start_day: int = 0,
              dist_done_km: float = 0.0, elapsed_s: float = 0.0,
-             cs_taken: bool = False, loops_done: dict | None = None,
-             kml_paths: dict | None = None, parallel: bool = True,
+                          cs_taken: bool = False, loops_done: dict | None = None,
+             kml_paths: dict | None = None,
+             loop_geoms_by_day: dict | None = None,
+             plans_override: list | None = None, parallel: bool = True,
              n_workers: int | None = None, global_method: str = "ga",
              seed: int | None = None, max_iters: int = MAX_ITERS,
              window_pct: float = CONVERGENCE_WINDOW_PCT,
@@ -96,8 +111,9 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                                     start_soc_pct, start_day=start_day,
                                     dist_done_km=dist_done_km, elapsed_s=elapsed_s,
                                     cs_taken=cs_taken, loops_done=loops_done,
-                                    kml_paths=kml_paths)
-    plans = base["day_plans"]
+                                    kml_paths=kml_paths,
+                                    plans_override=plans_override)
+    plans = plans_override if plans_override is not None else base["day_plans"]
     s_center = base["s0_pct"].copy()
     if not base["feasible"]:
         logger.warning("Tier 1 baseline infeasible from start_soc=%.1f%%", start_soc_pct)
@@ -131,6 +147,7 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
             routes, car, solar_providers, wind_providers, s_center, plans,
             alpha_floors, start_day=start_day, dist_done_km=dist_done_km,
             elapsed_s=elapsed_s, cs_taken=cs_taken, loops_done=loops_done,
+            loop_geoms_by_day=loop_geoms_by_day,
             parallel=parallel, n_workers=n_workers, global_method=global_method, seed=seed)
 
         # Tier 2 surrogate diagnostic + Tier 1 fallback for empty days
@@ -168,7 +185,13 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                 logger.info("Tier2 Day %d: fallback a=%.1f b=%.2f s0=%.1f",
                             d + 1, end_est, 1.0, s0)
 
-        result = tier3.allocate(car, solar_providers, per_day, plans, start_soc_pct, start_day=start_day)
+        trailered_km_by_day = _trailered_km_by_day(routes)
+        if any(km > 0.0 for km in trailered_km_by_day.values()):
+            logger.info("Tier3 credited trailered km by day: %s",
+                        {d + 1: round(km, 1) for d, km in trailered_km_by_day.items() if km > 0.0})
+        result = tier3.allocate(
+            car, solar_providers, per_day, plans, start_soc_pct,
+            start_day=start_day, trailered_km_by_day=trailered_km_by_day)
         s_refined = result["s1_pct"]
 
         drift = np.nanmax(np.abs(s_refined[start_day:] - s_center[start_day:]))
@@ -212,7 +235,9 @@ def _package(result: dict, plans: list, car: CarState, *, converged: bool,
 
 def extract_final_profiles(routes: list, base_car: CarState, solar_providers: dict, 
                            wind_providers: dict, optimize_result: dict, 
-                           overrides: dict | None = None) -> dict:
+                           overrides: dict | None = None,
+                           loop_geoms_by_day: dict | None = None,
+                           plans_override: list | None = None) -> dict:
                            
     if not optimize_result.get("feasible"):
         logger.error("Cannot extract profiles from an infeasible result.")
@@ -234,7 +259,12 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
         
-        nom_plan = _get_day_plan(d)
+        if plans_override is not None:
+            if d >= len(plans_override):
+                raise ValueError(f"plans_override has no plan for day index {d}")
+            nom_plan = plans_override[d]
+        else:
+            nom_plan = _get_day_plan(d)
         loops_committed = []
         for name, km in nom_plan.loops:
             count = d_loops.get(name, 0)
@@ -242,6 +272,10 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             
         logger.info(f"Extracting exact profile for Day {d}...")
         
+                        # Real per-loop geometry for this day so committed reps are actually
+        # simulated (loaded once in __main__ via _load_loop_geometries).
+        loop_geoms = (loop_geoms_by_day or {}).get(d)
+
         res = singleday.solve(
             route=routes[d] if routes else None,
             car=car,
@@ -250,7 +284,8 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             day_index=d,
             start_soc_pct=s_start,
             alpha_next_day_pct=alpha_next,
-            loops_committed=loops_committed
+            loops_committed=loops_committed,
+            loop_geoms=loop_geoms
         )
         
         final_race_plan[d] = {
@@ -276,9 +311,9 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
 
 def fast_replan_today(route, base_car: CarState, solar_providers: dict, wind_providers: dict,
                       cur_soc_pct: float, target_end_soc_pct: float,
-                      planned_loops: dict, cur_day: int, dist_done_km: float, 
-                      elapsed_s: float, cs_taken: bool = False, 
-                      loops_done: dict | None = None, 
+                      planned_loops: dict, cur_day: int, dist_done_km: float,
+                      elapsed_s: float,              cs_taken: bool = False, loops_done: dict | None = None, 
+                      loop_geoms: dict | None = None,
                       overrides: dict | None = None, **kwargs) -> dict:
                       
     car = dataclasses.replace(base_car, **(overrides or {}))
@@ -309,9 +344,10 @@ def fast_replan_today(route, base_car: CarState, solar_providers: dict, wind_pro
         start_soc_pct=cur_soc_pct,
         alpha_next_day_pct=target_end_soc_pct,
         loops_committed=loops_committed,
-        dist_done_km=dist_done_km,   
-        elapsed_s=elapsed_s,         
+                dist_done_km=dist_done_km,
+        elapsed_s=elapsed_s,
         cs_taken=cs_taken,
+        loop_geoms=loop_geoms,
         **kwargs
     )
     
@@ -384,6 +420,43 @@ if __name__ == "__main__":
             return f"loop_{base}"
         return "stage1"  # single-file days (no explicit stage split)
 
+    def _parse_route_file(filepath, day_num, seg_type=None):
+        """Parse ONE route .save file into a DataFrame using the same schema
+        as _load_route's per-file block — factored out so dedicated loop
+        geometry files reuse the exact same parsing. seg_type defaults to the
+        real per-file tag (stage1/stage2/loop_<base>) via _seg_type_for_file;
+        loop geometry's own seg_type is irrelevant because singleday's
+        _splice_loops() re-tags every spliced leg as 'loop_<name>'."""
+        with open(filepath, "r", encoding="utf-8") as f:
+            route_data = json.load(f)
+        prof = route_data["profile"]
+        dists    = [x * 1000.0 for x in prof["Distance"]]
+        slopes   = prof["Gradient"]
+        bearings = prof.get("Headings",   [0.0] * len(dists))
+        alts     = prof.get("Altitude",   [0.0] * len(dists))
+        lats     = [c[0] for c in prof["Coordinates"]]
+        lons     = [c[1] for c in prof["Coordinates"]]
+        # Clamp speed limits: some route data has erroneous 5 km/h entries.
+        # Floor at 30 km/h (highway minimum) to avoid artificial slowdowns.
+        v_maxs   = [max(v, 30.0) / 3.6 for v in prof["SpeedLimit"]]
+        ml = min(len(dists), len(slopes), len(bearings),
+                 len(alts), len(lats), len(lons), len(v_maxs))
+        return pd.DataFrame({
+            "distance_m":      dists[:ml],
+            "elevation_m":     alts[:ml],
+            "slope_pct":       slopes[:ml],
+            "bearing_deg":     bearings[:ml],
+            "lat":             lats[:ml],
+            "lon":             lons[:ml],
+            "v_max_ms":        v_maxs[:ml],
+            "curvature_1pm":   0.0,
+            "circle_id":       0,
+            "red_flag_trailer": False,
+            "control_stop":    False,
+            "day":             day_num,
+            "seg_type":        seg_type or _seg_type_for_file(filepath),
+        })
+
     def _load_route(route_files, day_num):
         """Parse .save files into a single Route for one day.
 
@@ -398,39 +471,100 @@ if __name__ == "__main__":
         day_dfs = []
         offset = 0.0
         for filepath in route_files:
-            with open(filepath, "r", encoding="utf-8") as f:
-                route_data = json.load(f)
-            prof = route_data["profile"]
-            dists    = [x * 1000.0 for x in prof["Distance"]]
-            slopes   = prof["Gradient"]
-            bearings = prof.get("Headings",   [0.0] * len(dists))
-            alts     = prof.get("Altitude",   [0.0] * len(dists))
-            lats     = [c[0] for c in prof["Coordinates"]]
-            lons     = [c[1] for c in prof["Coordinates"]]
-            # Clamp speed limits: some route data has erroneous 5 km/h entries.
-            # Floor at 30 km/h (highway minimum) to avoid artificial slowdowns.
-            v_maxs   = [max(v, 30.0) / 3.6 for v in prof["SpeedLimit"]]
-            ml = min(len(dists), len(slopes), len(bearings),
-                     len(alts), len(lats), len(lons), len(v_maxs))
-            part_df = pd.DataFrame({
-                "distance_m":      dists[:ml],
-                "elevation_m":     alts[:ml],
-                "slope_pct":       slopes[:ml],
-                "bearing_deg":     bearings[:ml],
-                "lat":             lats[:ml],
-                "lon":             lons[:ml],
-                "v_max_ms":        v_maxs[:ml],
-                "curvature_1pm":   0.0,
-                "circle_id":       0,
-                "red_flag_trailer": False,
-                "control_stop":    False,
-                "day":             day_num,
-                "seg_type":        _seg_type_for_file(filepath),
-            })
+            part_df = _parse_route_file(filepath, day_num)
             part_df["distance_m"] += offset
             offset = part_df["distance_m"].max()
             day_dfs.append(part_df)
         return Route(pd.concat(day_dfs, ignore_index=True))
+
+    def _loop_name_tokens(loop_name):
+        """Searchable city/place tokens for a plan loop name, generic words
+        dropped. 'postmasburg_loop2' -> {'postmasburg'};
+        'blind_loop_placeholder' -> set() (no usable token — falls through
+        to closest-distance matching)."""
+        drop = {"loop", "blind", "placeholder", "day", "stage"}
+        tokens = set()
+        for part in loop_name.replace("-", "_").split("_"):
+            part = part.strip().lower()
+            if part and part not in drop:
+                tokens.add(part)
+        return tokens
+
+    def _norm_loop_filename(filepath):
+        """Lowercase, punctuation-stripped basename used for token matching."""
+        bn = os.path.splitext(os.path.basename(filepath))[0].lower()
+        return "".join(ch for ch in bn if ch.isalnum())
+
+    def _load_loop_geometries(route_files, plan, day_num):
+        """Match each plan loop name to a DEDICATED loop .save file for this
+        day and return {loop_name: DataFrame} of its real terrain/speed-limit
+        geometry. Previously these loop files were discarded entirely and
+        every committed rep got a flat synthetic leg — this is the piece that
+        finally feeds real loop physics into Tier 2 and the final profiles.
+
+        Matching is one-to-one (each loop file is consumed at most once):
+          1. Preferred: token match — every non-generic word of the plan loop
+             name must appear in the file's basename (e.g. 'springbok_loop'
+             -> any file containing 'springbok'). Among token hits the file
+             whose real length is closest to the plan's nominal km wins.
+          2. Fallback: closest real driving distance to the nominal km among
+             still-unused loop files (covers blind/placeholder names like
+             Day 3's 'blind_loop_placeholder', whose real loop file is
+             variant-specific).
+
+        Plan loops left unmatched are logged — singleday's _splice_loops()
+        falls back to a flat synthetic leg for them.
+        """
+        loop_files = [f for f in route_files if _is_loop_file(f)]
+        if not loop_files or not (plan.loops or []):
+            return {}
+
+        parsed = []
+        for fp in loop_files:
+            try:
+                df = _parse_route_file(fp, day_num)
+            except Exception as exc:
+                logger.warning("Day %d: skipping unparseable loop file %s (%s)",
+                               day_num, os.path.basename(fp), exc)
+                continue
+            if df is None or len(df) == 0:
+                continue
+            parsed.append((fp, df, float(df["distance_m"].max()) / 1000.0))
+
+        if not parsed:
+            return {}
+
+        geoms: dict = {}
+        used: set = set()
+
+        for name, nom_km in (plan.loops or []):
+            cands = [(fp, df, km) for (fp, df, km) in parsed if fp not in used]
+            if not cands:
+                break
+            match = None
+            tokens = _loop_name_tokens(name)
+            if tokens:
+                hits = [(fp, df, km) for (fp, df, km) in cands
+                        if all(tok in _norm_loop_filename(fp) for tok in tokens)]
+                if hits:
+                    match = min(hits, key=lambda t: abs(t[2] - nom_km))
+            if match is None:
+                # Closest real distance among all still-unused loop files.
+                match = min(cands, key=lambda t: abs(t[2] - nom_km))
+            fp, df, km = match
+            used.add(fp)
+            geoms[name] = df
+            token_hit = tokens and all(tok in _norm_loop_filename(fp) for tok in tokens)
+            logger.info("Day %d: loop '%s' (nom %.1f km) -> geometry %s (%.1f km%s)",
+                        day_num, name, nom_km, os.path.basename(fp), km,
+                        "" if token_hit else " [closest-distance fallback]")
+
+        for name, nom_km in (plan.loops or []):
+            if name not in geoms:
+                logger.warning("Day %d: loop '%s' (%.1f km) has NO geometry file "
+                               "— singleday will use a flat synthetic leg",
+                               day_num, name, nom_km)
+        return geoms
 
     def _apply_trailered_mask(route, kml_paths_for_day: dict | None, day_index: int):
         """Compute the real trailered mask (KML + hardcoded Day7/Day8 ground
@@ -525,6 +659,10 @@ if __name__ == "__main__":
     solar_providers = {}
     wind_providers  = {}
     kml_paths       = {}
+    # Real per-day loop geometry {day_index: {loop_name: DataFrame}}, loaded
+    # from each day's dedicated loop .save files and threaded down to
+    # Tier 2 / singleday.solve so committed loop reps are actually simulated.
+    loop_geoms_by_day = {}
 
     for d in range(8):
         day_num = d + 1
@@ -545,6 +683,12 @@ if __name__ == "__main__":
             logger.warning("Day %d: no route .save files found — flat fallback", day_num)
             routes[d] = None
 
+        # --- Real loop geometry (dedicated loop .save files) ---
+        # Day 3 (d==2) is variant-specific and handled in section 5.
+        if d != 2:
+            loop_geoms_by_day[d] = _load_loop_geometries(
+                route_files, _get_day_plan(d), day_num)
+
         # --- Weather (ALL files for this day) ---
         weather_files = glob.glob(os.path.join(json_dir, f"*Day {day_num}*.json"))
         solar_providers[d], wind_providers[d] = _load_weather(weather_files, routes.get(d), day_num)
@@ -557,6 +701,82 @@ if __name__ == "__main__":
         _apply_trailered_mask(routes.get(d), kml_paths, d)
 
     # ------------------------------------------------------------------ #
+    def _build_day3_variant_plan(variant_route_files, variant_name, day_num=3):
+        """Build Day 3 strictly from the released variant route files.
+
+        Aryaman: Stage 2 + Loop, with NO Stage 1.
+        Prahlad: Stage 1 + Stage 2 + Loop.
+        """
+        stage1_files, stage2_files, loop_files = [], [], []
+
+        for fp in variant_route_files:
+            bn = os.path.basename(fp).lower()
+            if _is_loop_file(fp):
+                loop_files.append(fp)
+            elif "stage 1" in bn:
+                stage1_files.append(fp)
+            elif "stage 2" in bn:
+                stage2_files.append(fp)
+
+        variant = variant_name.lower()
+
+        if variant == "aryaman":
+            if stage1_files:
+                raise ValueError(
+                    "Day 3 Aryaman unexpectedly contains a Stage 1 file: "
+                    f"{stage1_files}"
+                )
+            if len(stage2_files) != 1:
+                raise ValueError(
+                    "Day 3 Aryaman must contain exactly one Stage 2 file; "
+                    f"found {len(stage2_files)}: {stage2_files}"
+                )
+            if len(loop_files) != 1:
+                raise ValueError(
+                    "Day 3 Aryaman must contain exactly one loop file; "
+                    f"found {len(loop_files)}: {loop_files}"
+                )
+            stage1_km = 0.0
+        elif variant == "prahlad":
+            if len(stage1_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one Stage 1 file; "
+                    f"found {len(stage1_files)}: {stage1_files}"
+                )
+            if len(stage2_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one Stage 2 file; "
+                    f"found {len(stage2_files)}: {stage2_files}"
+                )
+            if len(loop_files) != 1:
+                raise ValueError(
+                    "Day 3 Prahlad must contain exactly one loop file; "
+                    f"found {len(loop_files)}: {loop_files}"
+                )
+            stage1_km = _parse_route_file(
+                stage1_files[0], day_num
+            )["distance_m"].max() / 1000.0
+        else:
+            raise ValueError(f"Unknown Day 3 variant '{variant_name}'")
+
+        stage2_km = _parse_route_file(
+            stage2_files[0], day_num
+        )["distance_m"].max() / 1000.0
+        loop_km = _parse_route_file(
+            loop_files[0], day_num
+        )["distance_m"].max() / 1000.0
+
+        plan = tier1._DayPlan(
+            stage1_km=float(stage1_km),
+            stage2_km=float(stage2_km),
+            loops=(("day3_loop", float(loop_km)),),
+        )
+        logger.info(
+            "Day 3 [%s] plan: Stage1=%.1f km, Stage2=%.1f km, Loop=%.1f km",
+            variant_name, plan.stage1_km, plan.stage2_km, loop_km
+        )
+        return plan
+
     # 4.  Day 3 multi-variant discovery
     # ------------------------------------------------------------------ #
     day3_route_files = glob.glob(os.path.join(save_dir, "*Day 3*probables*.save")) or \
@@ -610,12 +830,31 @@ if __name__ == "__main__":
         logger.info("RUNNING VARIANT: Day 3 = %s", variant_name)
         logger.info("=" * 60)
 
-        # Build Day 3 route for this variant
+                # Build Day 3 route for this variant
         if variant_route_files:
             routes[2] = _load_route(variant_route_files, 3)
             logger.info("Day 3 [%s]: route loaded (%d files)", variant_name, len(variant_route_files))
         else:
             routes[2] = None
+
+        # Day 3 is variant-specific: load ITS OWN dedicated loop geometry so
+        # committed 'blind_loop_placeholder' reps simulate the real variant
+        # loop terrain instead of a flat synthetic leg.
+        day3_plan = _build_day3_variant_plan(
+            variant_route_files, variant_name, day_num=3
+        )
+        loop_geoms_by_day[2] = _load_loop_geometries(
+            variant_route_files, day3_plan, 3
+        )
+
+        # Same variant-specific plans are used by Tier 1, Tier 2/Tier 3,
+        # final profile extraction and reporting.
+        variant_plans = [_get_day_plan(d) for d in range(8) if d != 2]
+        variant_plans.insert(2, day3_plan)
+        if len(variant_plans) != rc.N_RACE_DAYS:
+            raise RuntimeError(
+                f"Day 3 variant plan has {len(variant_plans)} days; expected {rc.N_RACE_DAYS}"
+            )
 
         # Build Day 3 weather for this variant
         weather_files = day3_variant_weather.get(variant_name, [])
@@ -629,7 +868,8 @@ if __name__ == "__main__":
         logger.info("Computing Tier 1 baseline for variant '%s'...", variant_name)
         baseline = tier1.guess_baseline(
             routes, car, solar_providers, wind_providers, 100.0,
-            start_day=0, kml_paths=kml_paths)
+            start_day=0, kml_paths=kml_paths,
+            plans_override=variant_plans)
 
         # --- Run trust-region optimizer (per-variant Tier 1 baseline) ---
         result = optimize(
@@ -638,6 +878,8 @@ if __name__ == "__main__":
             solar_providers=solar_providers,
             wind_providers=wind_providers,
             kml_paths=kml_paths,
+            loop_geoms_by_day=loop_geoms_by_day,
+            plans_override=variant_plans,
             start_soc_pct=100.0,
             start_day=0,
             parallel=True,
@@ -649,15 +891,16 @@ if __name__ == "__main__":
         profiles = {}
         if result.get("feasible"):
             profiles = extract_final_profiles(
-                routes, car, solar_providers, wind_providers, result)
+                routes, car, solar_providers, wind_providers, result,
+                loop_geoms_by_day=loop_geoms_by_day,
+                plans_override=variant_plans)
 
-        all_results[variant_name] = {"result": result, "profiles": profiles}
+        all_results[variant_name] = {"result": result, "profiles": profiles, "plans": variant_plans}
 
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-    plans = [_get_day_plan(d) for d in range(8)]
-    
+    # Day 3 is variant-dependent; reporting uses each variant's own plans.
     DAY_NAMES = {
         0: "Johannesburg → Rustenburg",
         1: "Rustenburg → Zeerust",
@@ -756,6 +999,7 @@ if __name__ == "__main__":
     for variant_name, data in all_results.items():
         result   = data["result"]
         profiles = data["profiles"]
+        plans    = data["plans"]
 
         print(f"\n{'━' * 70}")
         print(f"  Day 3 variant: {variant_name.upper()}")
@@ -873,7 +1117,7 @@ if __name__ == "__main__":
 
             # 3. SOC curve (key checkpoints)
             soc_drain_pct = soc_start - soc_end
-            solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+            solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
             drain_wh = soc_drain_pct / 100.0 * _BATT_CAP_WH
             # Prefer the REAL simulated motor energy (integrated directly
             # from physics every substep in forward_sim.py) over the old
@@ -949,6 +1193,7 @@ if __name__ == "__main__":
     for variant_name, data in all_results.items():
         result   = data["result"]
         profiles = data["profiles"]
+        plans    = data["plans"]
 
         json_out = {
             "variant": variant_name,
@@ -987,8 +1232,9 @@ if __name__ == "__main__":
                     "soc_start_pct": round(soc_start, 1),
                 }
 
-                solar_wh = _estimate_solar_input_wh(solar_providers.get(d_idx), d_idx)
+                solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
                 day_data["solar_input_wh"] = round(solar_wh, 0)
+                day_data["solar_underutil_wh"] = round(float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0), 0)
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]
@@ -1024,7 +1270,7 @@ if __name__ == "__main__":
                 _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
                                         if profiles else None)
                 day_data["motor_energy_wh"] = round(
-                    _real_motor_wh_json if _real_motor_wh_json else (drain_wh + solar_wh), 0)
+                    float(_real_motor_wh_json) if _real_motor_wh_json is not None else 0.0, 0)
 
                 _json_real_total_km += day_km
                 _json_total_trailered_km += day_data.get("trailered_km", 0.0)
