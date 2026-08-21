@@ -27,6 +27,31 @@ DP_SOC_BUCKET_PCT = 2.0          # SOC discretisation (Plan v3 §8 L1)
 DP_SOLAR_SCENARIOS = ("p10", "p50", "p90")
 DP_STOPPAGE_SCENARIOS_S = (0, 30 * 60, 60 * 60, 120 * 60)  # §7 time-loss inject
 
+# ---- Late-finish pricing in the Tier 3 allocator ---------------------------
+# The strategist's directive (20/08): "arriving by 17:00 is good and must be
+# followed more or less — only run past it if the extra distance is genuinely
+# worth the next-day penalty." Tier 3 prices each candidate loop plan's
+# finish time: arriving after day_finish_time_s (17:00, or 15:00 on Day 8)
+# costs the SR 2.22.6 penalty, converted to a km-equivalent via the day's own
+# realized average speed, and subtracted from that day's distance value. This
+# makes the allocator stop adding loops around 17:00 and only exceed it when a
+# loop's marginal km beats the penalty (the future-SOC value term already
+# encodes "unless the next day needs the banked energy").
+LATE_FINISH_PENALTY_ENABLED = True
+# Combos finishing after this many minutes past the on-time target are still
+# priced with the penalty; combos past the absolute cutoff are rejected
+# upstream in tier2 (_l2_result_feasible). Kept explicit so the gradient and
+# the hard gate are tuned in one place.
+LATE_FINISH_MAX_LATE_MIN = 60.0
+
+# ---- Dashboard continuous-output resolution --------------------------------
+# The coarse per-control-segment velocity_profile_kmh stays the driver card
+# (Plan v3 §8: one target speed per segment). For the DASHBOARD, forward_sim's
+# fine per-substep traces (soc/velocity/solar/slope vs distance) are exported,
+# downsampled to roughly one point per OUTPUT_TRACE_STRIDE_M metres so the JSON
+# stays a sane size while the curves still read as continuous.
+OUTPUT_TRACE_STRIDE_M = 250.0
+
 # ---- L2 single-day hybrid --------------------------------------------------
 SEED_METHOD = "ga"               # "ga" primary (EAFIT: GA beat BB-BC on 10D),
                                  # "bbbc" fallback for diversity (Plan v3 §8)

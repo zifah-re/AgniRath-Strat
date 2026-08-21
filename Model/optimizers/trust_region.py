@@ -70,6 +70,42 @@ def replan(routes: list, base_car: CarState, solar_providers: dict, wind_provide
                     elapsed_s=elapsed_s, cs_taken=cs_taken, 
                     loops_done=loops_done, kml_paths=kml_paths, **kwargs)
 
+def _downsample_trace_by_distance(x_m, series: dict, stride_m: float) -> dict:
+    """Downsample per-substep traces to ~one point per `stride_m` metres.
+
+    forward_sim integrates on the ~100 m energy grid, so a full day is a few
+    thousand substeps — more than a dashboard needs and heavy in JSON. Pick
+    representative points spaced by distance (not index) so the curves stay
+    faithful regardless of how speed varied. Always keeps the first and last
+    point. Returns {name: list}. Empty in -> empty out.
+    """
+    import numpy as _np
+    x = _np.asarray(x_m, dtype=float)
+    n = x.size
+    if n == 0:
+        return {k: [] for k in (["distance_m"] + list(series.keys()))}
+    if n == 1 or stride_m <= 0:
+        keep = _np.arange(n)
+    else:
+        keep = [0]
+        last_x = x[0]
+        for i in range(1, n):
+            if x[i] - last_x >= stride_m:
+                keep.append(i)
+                last_x = x[i]
+        if keep[-1] != n - 1:
+            keep.append(n - 1)
+        keep = _np.asarray(keep, dtype=int)
+    out = {"distance_m": [round(float(v), 1) for v in x[keep]]}
+    for name, arr in series.items():
+        a = _np.asarray(arr, dtype=float)
+        if a.size != n:
+            out[name] = []
+            continue
+        out[name] = [round(float(v), 2) for v in a[keep]]
+    return out
+
+
 def _trailered_km_by_day(routes):
     """Return trailered km from the exact mask consumed by forward_sim."""
     out = {}
@@ -288,6 +324,22 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             loop_geoms=loop_geoms
         )
         
+        # Continuous distance-indexed dashboard trace (downsampled). The coarse
+        # per-segment velocity_profile_kmh stays the driver card; this is the
+        # smooth SOC/velocity/solar/gradient-vs-distance curve for the dashboard.
+        from configs import solver_config as _sc
+        dashboard_trace = _downsample_trace_by_distance(
+            res.get("x_m", []),
+            {
+                "v_kmh": res.get("v_kmh_trace", []),
+                "soc_pct": res.get("soc_pct_trace", []),
+                "solar_w": res.get("solar_w_trace", []),
+                "slope_pct": res.get("slope_pct_trace", []),
+                "time_s": res.get("t_s", []),
+            },
+            getattr(_sc, "OUTPUT_TRACE_STRIDE_M", 250.0),
+        )
+
         final_race_plan[d] = {
             "start_soc_pct": s_start,
             "loops_committed": loops_committed,
@@ -301,8 +353,12 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "driven_km": res.get("driven_km", 0.0),
             "motor_energy_wh": res.get("motor_energy_wh", 0.0),
             "solar_energy_wh": res.get("solar_energy_wh", 0.0),
+            # Previously never forwarded -> the report defaulted it to 0.0 on
+            # every day even when solar was genuinely clipped at the SOC ceiling.
+            "solar_underutil_wh": res.get("solar_underutil_wh", 0.0),
+            "dashboard_trace": dashboard_trace,
         }
-        
+
     return final_race_plan
 
 # ===========================================================================
@@ -900,17 +956,18 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-    # Day 3 is variant-dependent; reporting uses each variant's own plans.
-    DAY_NAMES = {
-        0: "Johannesburg → Rustenburg",
-        1: "Rustenburg → Zeerust",
-        2: "Zeerust → Vryburg",          # Day 3 (variant-dependent)
-        3: "Vryburg → Upington",
-        4: "Upington → Springbok",
-        5: "Springbok → Van Rhynsdorp",
-        6: "Van Rhynsdorp → Clanwilliam",
-        7: "Clanwilliam → Cape Town",
-    }
+    # Route labels are the single source of truth in race_config.DAY_ROUTE_NOTES
+    # (start → finish per the released 2026 route sheets). The old hardcoded
+    # dict here was stale — e.g. Day 1 read "Johannesburg → Rustenburg" when the
+    # real Day 1 is Sasolburg → Swartruggens (Rustenburg is only the control
+    # stop). Build labels from the config so the report can never drift again.
+    def _day_label(d_idx: int) -> str:
+        try:
+            note = rc.DAY_ROUTE_NOTES[d_idx]
+            return f"{note['start']} → {note['finish']}"
+        except Exception:
+            return f"Day {d_idx + 1}"
+    DAY_NAMES = {d: _day_label(d) for d in range(rc.N_RACE_DAYS)}
 
     def _hms(seconds: float) -> str:
         h = int(seconds // 3600)
@@ -932,31 +989,44 @@ if __name__ == "__main__":
     _SOLAR_EFF   = car.array_efficiency
     _BATT_CAP_WH = car.battery_nominal_wh
 
-    def _real_day_km(d_idx, plan, lp, profiles) -> float:
-        """Distance that actually counts toward the race total: DRIVEN km
-        only, excluding any trailered km (SR's asterisk rule ranks trailered
-        teams below all non-trailered teams regardless of distance, so
-        trailered km must never be added to the reported total). Prefers the
-        real optimizer output (profiles[d_idx]["driven_km"]) when available;
-        falls back to the static route-notes plan estimate otherwise (e.g.
-        infeasible days with no profile).
+    def _loop_km_for(plan, lp) -> float:
+        """Committed loop km = Σ reps × official single-pass loop length."""
+        return sum(cnt * km for (name, km) in plan.loops
+                   for cnt in [lp.get(name, 0)]) if lp else 0.0
 
-        Note this also fixes a separate bug: _get_day_plan() returns a
-        STATIC config-table estimate (rc.DAY_ROUTE_NOTES) that, for Day 3
-        (full-blind day), is a fixed 230.0/0.0 fallback regardless of which
-        Day-3 route variant was actually loaded and driven -- this made
-        Day 3's printed Distance identical across variants even when
-        genuinely different route files were used. profiles[d_idx] comes
-        from a real singleday.solve()/forward_sim run on the actual loaded
-        Route for that variant, so it doesn't have this problem.
-        """
+    def _trailered_km_for(d_idx, profiles) -> float:
         if profiles and d_idx in profiles:
-            driven_km = profiles[d_idx].get("driven_km")
-            if driven_km is not None and driven_km > 0:
-                return float(driven_km)
-        loop_km = sum(cnt * km for (name, km) in plan.loops
-                      for cnt in [lp.get(name, 0)]) if lp else 0.0
-        return plan.stage1_km + plan.stage2_km + loop_km
+            return float(profiles[d_idx].get("trailered_km", 0.0) or 0.0)
+        return 0.0
+
+    def _real_day_km(d_idx, plan, lp, profiles) -> float:
+        """Distance credited to the race total, from the AUTHORITATIVE route
+        table so the reported components always reconcile and match the
+        released sheets:
+
+            distance_km = stage1_km + stage2_km + committed_loop_km
+                          − trailered_km        (SR asterisk rule)
+
+        This is deliberately NOT the raw simulated driven_km: the forward
+        integrator's driven_km differs from the published figure by the
+        KML-linestring-vs-published rounding AND by the small synthetic
+        loop-separator buffers spliced between repeated loop attempts
+        (singleday._splice_loops), so it never reconciles cleanly with the
+        headline stage/loop numbers. The simulated distance is still reported
+        separately (distance_km_simulated) for transparency. Day 3 uses the
+        variant plan's real geometry lengths, so it stays variant-specific.
+        """
+        loop_km = _loop_km_for(plan, lp)
+        trailered_km = _trailered_km_for(d_idx, profiles)
+        return max(0.0, plan.stage1_km + plan.stage2_km + loop_km - trailered_km)
+
+    def _simulated_day_km(d_idx, profiles) -> float:
+        """Raw driven distance from forward_sim (excludes trailered km)."""
+        if profiles and d_idx in profiles:
+            dk = profiles[d_idx].get("driven_km")
+            if dk is not None and dk > 0:
+                return float(dk)
+        return 0.0
 
     def _estimate_solar_input_wh(solar_prov, day_index: int) -> float:
         """Rough total solar energy over the race window (Wh)."""
@@ -972,22 +1042,6 @@ if __name__ == "__main__":
             total += ghi * _SOLAR_AREA * _SOLAR_EFF * dt / 3600.0  # Wh, not joules
             t += dt
         return total
-
-    def _estimate_stall_points(start_soc, end_soc, distance_km, solar_wh,
-                               battery_cap=_BATT_CAP_WH):
-        """Flag if SOC likely dips below 25% mid-day (rough linear check)."""
-        drain_wh = (start_soc - end_soc) / 100.0 * battery_cap
-        motor_wh = drain_wh + solar_wh
-        if motor_wh <= 0:
-            return "None — net energy positive"
-        # Approximate lowest SOC (assumes linear drain, solar ramps up mid-day)
-        # Worst case: first 25% of distance has low solar but full motor drain
-        early_drain_pct = 0.25 * drain_wh / battery_cap * 100
-        early_solar_pct = 0.10 * solar_wh / battery_cap * 100  # ~10% of solar in first quarter
-        min_soc_est = start_soc - early_drain_pct + early_solar_pct
-        if min_soc_est < 25.0:
-            return f"RISK — estimated min SOC ≈ {min_soc_est:.0f}% in first quarter"
-        return "None"
 
     # ------------------------------------------------------------------ #
     # 7.  Print full strategy plan for all variants
@@ -1143,10 +1197,6 @@ if __name__ == "__main__":
             # 5. Energy consumption
             print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery drain: {drain_wh:.0f} Wh ({soc_drain_pct:.1f}%)")
 
-            # 6. Stall risk
-            stall = _estimate_stall_points(soc_start, soc_end, day_km, solar_wh)
-            print(f"  6) Stall risk: {stall}")
-
             # 7. Early start strategy (6-8 AM solar charging)
             if soc_start < 40.0:
                 print(f"  7) Start strategy: EARLY START recommended — prop car roadside"
@@ -1221,12 +1271,20 @@ if __name__ == "__main__":
                 day_km = _real_day_km(d_idx, plan, lp, profiles)
                 soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
 
+                trailered_km_day = _trailered_km_for(d_idx, profiles)
                 day_data = {
                     "route": DAY_NAMES.get(d_idx, f"Day {d_idx + 1}"),
+                    # Authoritative, reconciling distance:
+                    #   distance_km == stage1_km + stage2_km + loop_km - trailered_km
                     "distance_km": round(day_km, 1),
                     "stage1_km": round(plan.stage1_km, 1),
                     "stage2_km": round(plan.stage2_km, 1),
                     "loop_km": round(loop_km, 1),
+                    "trailered_km": round(trailered_km_day, 1),
+                    # Raw forward_sim driven distance (KML linestring + loop
+                    # separators) — for transparency; may differ from the
+                    # published headline by ~1 km. Do NOT sum this for scoring.
+                    "distance_km_simulated": round(_simulated_day_km(d_idx, profiles), 1),
                     "loops": {name: cnt for name, cnt in lp.items()} if lp else {},
                     "n_loops": n_loops,
                     "soc_start_pct": round(soc_start, 1),
@@ -1256,6 +1314,12 @@ if __name__ == "__main__":
                         day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
                         day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
                         day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
+                    # Continuous distance-indexed curves for the dashboard
+                    # (SOC / velocity / solar / gradient vs distance). Coarse
+                    # velocity_profile_kmh above stays the driver card.
+                    dash = p.get("dashboard_trace")
+                    if dash:
+                        day_data["dashboard_trace"] = dash
 
                 if profiles and d_idx in profiles:
                     day_data["trailered_km"] = round(profiles[d_idx].get("trailered_km", 0.0) or 0.0, 1)

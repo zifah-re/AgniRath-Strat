@@ -377,18 +377,28 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
 
 def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
-    """Morning parc-fermé charging gain (battery unsealed 06:00 → race start).
+    """Morning parc-fermé charging gain (06:30 capture start → next race start).
 
-    During this window only the BMS + MPPT charge controller are active,
-    so we use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W)
-    rather than the full 70 W driving electronics.
-    GHI is integrated in 15-minute steps for accuracy during the steep
-    sunrise ramp, rather than a single midpoint sample.
+    SINGLE SOURCE OF TRUTH for the overnight/morning charge across all tiers:
+    tier3.allocate and tier2's empty-day fallback both import THIS function, so
+    the DP transition, the single-day start SOC (fed via the trajectory) and the
+    report all see the same integrated morning energy — no per-tier drift.
+
+    Window: [MORNING_CHARGE_START_S, day_start(day_index+1)] — i.e. 06:30→08:00
+    on Days 2-7 (06:30→09:00 into Day 1). Packs are legally unsealed at 06:00
+    (BATTERY_UNSEAL_TIME_S) but the strategist's directive (20/08) is to count
+    capture only from 06:30, the realistic prop-up time after unseal/setup.
+
+    During this window only the BMS + MPPT charge controller are active, so we
+    use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W) rather than the
+    full driving electronics. Real GHI(t) is integrated in 15-minute steps for
+    accuracy during the steep sunrise ramp, not a single midpoint sample.
     """
     if day_index >= rc.N_RACE_DAYS - 1:
         return 0.0
 
-    t_start = rc.BATTERY_UNSEAL_TIME_S              # 06:00
+    # 06:30 capture start (>= 06:00 unseal), per strategist directive.
+    t_start = getattr(rc, "MORNING_CHARGE_START_S", rc.BATTERY_UNSEAL_TIME_S)
     t_end   = rc.day_start_time_s(day_index + 1)    # 08:00 (or 09:00 Day 1)
     dur     = max(0.0, t_end - t_start)
     if dur == 0.0:

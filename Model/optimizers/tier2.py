@@ -116,6 +116,7 @@ def _sweep_one_offset(task: dict) -> dict:
 
     out: dict[tuple, tuple] = {}
     underutil_by_combo: dict[tuple, float] = {}
+    finish_by_combo: dict[tuple, float] = {}
     # Cross-offset warm-starting: accept an initial warm seed from a
     # previous offset's best result (avoids a full GA run on offset 2).
     warm = task.get("initial_warm_kmh")
@@ -147,9 +148,17 @@ def _sweep_one_offset(task: dict) -> dict:
         key = tuple(reps)
         out[key] = (start_soc, float(res["final_soc_pct"]))
         underutil_by_combo[key] = float(res.get("solar_underutil_wh", 0.0) or 0.0)
+        # Absolute clock finish time (seconds since midnight) for this combo at
+        # this start SOC. Threaded up into the surrogate so tier3 can price
+        # late finishes (SR 2.22.6). total_time_s is the drive duration; adding
+        # the day's start gives the wall-clock arrival used everywhere else.
+        finish_by_combo[key] = (rc.day_start_time_s(day_index)
+                                + float(res.get("total_time_s", 0.0) or 0.0))
         warm = res.get("v_kmh")
 
     return dict(offset_soc=start_soc, points=out,
+                underutil_by_combo=underutil_by_combo,
+                finish_by_combo=finish_by_combo,
                 best_warm_kmh=warm, method_log=method_log)
 
 def _reps_to_committed(plan: _DayPlan, reps: tuple[int, ...]):
@@ -159,15 +168,19 @@ def _reps_to_committed(plan: _DayPlan, reps: tuple[int, ...]):
     return committed
 
 class LinearSurrogate:
-    __slots__ = ("a", "b", "s0", "loop_km", "reps", "soc_lo", "soc_hi", "xs", "ys", "wu")
+    __slots__ = ("a", "b", "s0", "loop_km", "reps", "soc_lo", "soc_hi",
+                 "xs", "ys", "wu", "fs")
 
-    def __init__(self, a, b, s0, loop_km, reps, soc_lo, soc_hi, xs=None, ys=None, wu=None):
+    def __init__(self, a, b, s0, loop_km, reps, soc_lo, soc_hi,
+                 xs=None, ys=None, wu=None, fs=None):
         self.a = a; self.b = b; self.s0 = s0
         self.loop_km = loop_km; self.reps = reps
         self.soc_lo = soc_lo; self.soc_hi = soc_hi
         self.xs = None if xs is None else np.asarray(xs, dtype=float)
         self.ys = None if ys is None else np.asarray(ys, dtype=float)
         self.wu = None if wu is None else np.asarray(wu, dtype=float)
+        # Absolute clock finish time (s since midnight) per sampled start SOC.
+        self.fs = None if fs is None else np.asarray(fs, dtype=float)
 
     def predict(self, start_soc: float) -> float:
         # Never extrapolate a single successful L2 sample with a fabricated
@@ -182,6 +195,16 @@ class LinearSurrogate:
             raise RuntimeError("surrogate has no successful L2 sample")
         return max(0.0, float(np.interp(start_soc, self.xs, self.wu)))
 
+    def predict_finish_s(self, start_soc: float) -> float:
+        """Absolute clock finish time (s since midnight) at this start SOC.
+
+        Returns NaN when no finish time was recorded (e.g. a Tier-1 fallback
+        surrogate) so tier3 can skip late-finish pricing rather than guess.
+        """
+        if self.xs is None or self.fs is None:
+            return float("nan")
+        return float(np.interp(start_soc, self.xs, self.fs))
+
     def in_window(self, start_soc: float) -> bool:
         return self.soc_lo - 1e-9 <= start_soc <= self.soc_hi + 1e-9
 
@@ -192,8 +215,9 @@ def _fit_surrogates(points_by_combo: dict, s0: float, plan: _DayPlan):
         xs = np.array([p[0] for p in pts], dtype=float)
         ys = np.array([p[1] for p in pts], dtype=float)
         wu = np.array([p[2] if len(p) >= 3 else 0.0 for p in pts], dtype=float)
+        fs = np.array([p[3] if len(p) >= 4 else np.nan for p in pts], dtype=float)
         order = np.argsort(xs)
-        xs, ys, wu = xs[order], ys[order], wu[order]
+        xs, ys, wu, fs = xs[order], ys[order], wu[order], fs[order]
         if len(np.unique(xs)) >= 2:
             b, a_at_zero = np.polyfit(xs - s0, ys, 1)
             a = a_at_zero
@@ -205,7 +229,7 @@ def _fit_surrogates(points_by_combo: dict, s0: float, plan: _DayPlan):
             soc_lo=float(xs.min()), soc_hi=float(xs.max()),
             # Keep even a one-point sample.  It becomes a degenerate, exact-SOC
             # surrogate rather than silently falling back to a linear model.
-            xs=xs, ys=ys, wu=wu)
+            xs=xs, ys=ys, wu=wu, fs=fs)
     return surro
 
 
@@ -255,11 +279,14 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
     seen_keys: set = set()
     n_solves = 0
     for sw in sweeps:
+        wu_map = sw.get("underutil_by_combo", {})
+        fs_map = sw.get("finish_by_combo", {})
         for reps, (ss, es) in sw["points"].items():
             key = (day_index, reps, round(ss, 1))
             if key in seen_keys: continue
             seen_keys.add(key)
-            points_by_combo.setdefault(reps, []).append((ss, es, sw.get("underutil_by_combo", {}).get(reps, 0.0)))
+            points_by_combo.setdefault(reps, []).append(
+                (ss, es, wu_map.get(reps, 0.0), fs_map.get(reps, np.nan)))
             n_solves += 1
 
     surrogates = _fit_surrogates(points_by_combo, s0_pct, plan)

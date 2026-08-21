@@ -93,6 +93,20 @@ class DayEvalResult:
     # regardless of distance, so trailered km must never be presented as
     # race distance covered.
     driven_km: float = 0.0
+    # ── Per-substep dashboard traces (Plan v3 §7.2 Dashboard) ──────────────
+    # One entry per integrated substep, aligned 1:1 with t_s / x_m above, so
+    # the dashboard can plot SOC / velocity / solar / gradient vs DISTANCE
+    # (x_m) or time (t_s). These are the continuous curves the coarse
+    # per-control-segment velocity card cannot provide. Empty by default so
+    # every existing caller/return path is unaffected.
+    soc_pct_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    v_kmh_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    solar_w_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    slope_pct_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
 
 
 class DriverSwapScheduler:
@@ -189,6 +203,11 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     # call (route=None flat fallback) hit a NameError here.
     t_array = []
     x_array = []
+    # Per-substep dashboard traces (aligned 1:1 with t_array / x_array).
+    soc_array = []
+    v_kmh_array = []
+    solar_w_array = []
+    slope_array = []
 
     # --- Model-parity knobs (keyword-only; defaults replicate Tier 1) ---
     # Regen clamp: None -> core.physics.regen_cap_w(car), the exact cap Tier 1
@@ -354,6 +373,14 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
 
             t_array.append(t_s)
             x_array.append(x_m)
+            # Dashboard traces (aligned 1:1 with t_array/x_array). battery.soc_pct
+            # already reflects this substep's energy (applied just above). Solar
+            # is 0 on trailered substeps (car is inert cargo — no capture); its
+            # driving speed is the tow speed, not the segment target.
+            soc_array.append(battery.soc_pct)
+            v_kmh_array.append(_TRAILER_SPEED_KMH if is_trailered else float(v))
+            solar_w_array.append(0.0 if is_trailered else float(p_solar_w))
+            slope_array.append(float(slope))
 
             t_s += float(dt_s_step)
             x_m += step_m if use_route else substep_len_km * 1000.0
@@ -399,4 +426,8 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         trailered_substeps=trailered_substeps,
         trailered_km=trailered_km_accum,
         driven_km=driven_km_accum,
+        soc_pct_trace=np.array(soc_array),
+        v_kmh_trace=np.array(v_kmh_array),
+        solar_w_trace=np.array(solar_w_array),
+        slope_pct_trace=np.array(slope_array),
     )

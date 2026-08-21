@@ -587,6 +587,13 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         solar_underutil_wh=getattr(final_eval, 'solar_underutil_j', 0.0) / 3600.0,
         battery_delta_wh=(float(final_eval.final_soc_pct) - float(start_soc_pct))
                          * car.battery_nominal_wh / 100.0,
+        # Per-substep dashboard traces (aligned 1:1 with t_s / x_m). Continuous
+        # SOC / velocity / solar / gradient curves vs distance for the Dashboard;
+        # the coarse per-segment v_kmh above stays the driver card.
+        soc_pct_trace=getattr(final_eval, 'soc_pct_trace', np.array([])),
+        v_kmh_trace=getattr(final_eval, 'v_kmh_trace', np.array([])),
+        solar_w_trace=getattr(final_eval, 'solar_w_trace', np.array([])),
+        slope_pct_trace=getattr(final_eval, 'slope_pct_trace', np.array([])),
         diagnostics=dict(
             global_fun=global_result.fun,
             slsqp_fun=slsqp_result.fun,
