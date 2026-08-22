@@ -44,6 +44,7 @@ import typing as _t
 import numpy as np
 
 from configs import race_config
+from configs import solver_config as _sc_forward
 from configs.car_config import CarState
 from core import physics
 from core.battery import Battery
@@ -107,6 +108,11 @@ class DayEvalResult:
         default_factory=lambda: np.array([]))
     slope_pct_trace: np.ndarray = dataclasses.field(
         default_factory=lambda: np.array([]))
+    # Battery-safety exposure: time-integrated SOC ABOVE the safe band, in
+    # (SOC-fraction · seconds). The L2 objective penalizes this so the car
+    # doesn't coast at ~100% for long (pack-cooking + wasted solar); the more
+    # time near the ceiling, the bigger this grows.
+    soc_over_safe_pct_s: float = 0.0
 
 
 class DriverSwapScheduler:
@@ -212,6 +218,8 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     trailered_substeps = 0
     trailered_km_accum = 0.0
     driven_km_accum = 0.0
+    soc_over_safe_accum = 0.0
+    _soc_safe_max = getattr(_sc_forward, "SOC_SAFE_MAX_PCT", 100.0)
 
     n_seg = len(v_kmh)
     # Per-segment lengths, clamped so the final segment never integrates past
@@ -444,6 +452,9 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             v_kmh_array.append(_TRAILER_SPEED_KMH if is_trailered else float(v))
             solar_w_array.append(0.0 if is_trailered else float(p_solar_w))
             slope_array.append(float(slope))
+            # Battery-safety exposure: accumulate time spent above the safe band.
+            if battery.soc_pct > _soc_safe_max:
+                soc_over_safe_accum += (battery.soc_pct - _soc_safe_max) / 100.0 * float(dt_s_step)
 
             t_s += float(dt_s_step)
             x_m += step_m_local
@@ -489,6 +500,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         trailered_substeps=trailered_substeps,
         trailered_km=trailered_km_accum,
         driven_km=driven_km_accum,
+        soc_over_safe_pct_s=soc_over_safe_accum,
         soc_pct_trace=np.array(soc_array),
         v_kmh_trace=np.array(v_kmh_array),
         solar_w_trace=np.array(solar_w_array),

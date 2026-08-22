@@ -66,10 +66,12 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
     policy_reps = [[None] * nb for _ in range(n_days)]
     policy_next = np.full((n_days, nb), -1, dtype=int)
 
+    safe_max = getattr(sc, "SOC_SAFE_MAX_PCT", 100.0)
+    high_soc_km_per_pct = getattr(sc, "DP_HIGH_SOC_END_PENALTY_KM_PER_PCT", 0.0)
+
     for d in range(n_days - 1, start_day - 1, -1):
         surro = per_day_samples[d]["surrogates"]
         solar_provider = solar_providers.get(d)
-        gain = overnight_soc_gain(car, solar_provider, d)
         trailer_km = (trailered_km_by_day or {}).get(d, 0.0)
         base_km = _base_km(plans[d], trailer_km)
 
@@ -82,6 +84,10 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
                 if end_soc < floor or end_soc > car.soc_max_pct + 1e-6:
                     continue
 
+                # Morning charge gated by END SOC (skip/cap if high) so the
+                # DP can't bank an unsafe surplus into tomorrow's start.
+                gain = overnight_soc_gain(car, solar_provider, d,
+                                          prev_end_soc_pct=end_soc)
                 next_soc = min(end_soc + gain, car.soc_max_pct)
                 v_next = _interp(V[d + 1], soc_buckets, next_soc)
                 if not np.isfinite(v_next):
@@ -106,12 +112,17 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
                 # the next day makes it worth it" falls out of the two terms.
                 late_penalty_km = _late_finish_penalty_km(
                     model, s_start, d, dist)
+                # Battery-safety: dock km for ENDING the day above the safe SOC
+                # band, so the allocator prefers spending that charge on loops /
+                # speed rather than banking an unusable, pack-cooking surplus.
+                high_soc_penalty_km = high_soc_km_per_pct * max(0.0, end_soc - safe_max)
                 # Completion mode means the base race must remain feasible; it
                 # must not turn the multi-day objective into "preserve SOC and
                 # ignore distance". The competition objective is still distance
                 # accumulated across days, with future SOC value as the coupling
                 # term and solar curtailment as a secondary cost.
-                val = dist + v_next - waste_penalty_km - late_penalty_km
+                val = (dist + v_next - waste_penalty_km - late_penalty_km
+                       - high_soc_penalty_km)
                 if val > best_val:
                     best_val = val
                     policy_reps[d][s_idx] = reps
@@ -141,7 +152,9 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
         total_km += _base_km(plans[d], trailer_km) + model.loop_km
         end_soc = model.predict(cur)
         solar_provider = solar_providers.get(d)
-        cur = min(end_soc + overnight_soc_gain(car, solar_provider, d), car.soc_max_pct)
+        cur = min(end_soc + overnight_soc_gain(car, solar_provider, d,
+                                               prev_end_soc_pct=end_soc),
+                  car.soc_max_pct)
 
     return dict(s1_pct=s1, loop_plan=loop_plan, total_distance_km=total_km, feasible=feasible)
 

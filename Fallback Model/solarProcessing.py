@@ -28,7 +28,7 @@ def extractSolarData(json_file):
   return data
 
 
-def trimSolarData(solar_data, start_time=time(8, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
+def trimSolarData(solar_data, start_time=time(6, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
   trimmed_data = []
   for entry in solar_data:
     entry_time = datetime.fromisoformat(entry['period_end']).time()
@@ -37,7 +37,7 @@ def trimSolarData(solar_data, start_time=time(8, 0,tzinfo=SA_TZ), end_time=time(
   return trimmed_data
 
 
-def meanSolar(solar_data, day, start_time=time(8, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
+def meanSolar(solar_data, day, start_time=time(6, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
   time_dict = {
       f'{m // 60:02d}:{m % 60:02d}': []
       for m in range(
