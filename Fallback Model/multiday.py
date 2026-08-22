@@ -31,7 +31,7 @@ P_LOSS = 70
 #battery
 BATTERY_WH = 588.0*6
 SOC_MIN_PCT = 20.0
-SOC_MAX_PCT = 100.0
+SOC_MAX_PCT = 95.0
 
 #speed/accel
 
@@ -148,26 +148,40 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
     Computes solar positions for all horizon steps simultaneously using full vectorization.
     NO loops required.
     """
+    time_len = len(time_base)
     coords_arr = np.array(coords_list)
-    lats = coords_arr[:, 0]
-    lons = coords_arr[:, 1]
     
-    tz_times = pd.to_datetime(time_base, unit='s',utc=True).tz_convert('Africa/Johannesburg')
+    if coords_arr.ndim == 1:
+        lats = np.full(time_len, coords_arr[0])
+        lons = np.full(time_len, coords_arr[1])
+    else:
+        lats = coords_arr[:, 0]
+        lons = coords_arr[:, 1]
+        
+    alt_arr = np.full(time_len, altitude_profile) if np.isscalar(altitude_profile) or len(np.atleast_1d(altitude_profile)) == 1 else np.array(altitude_profile)
+    
+    tz_times = pd.to_datetime(time_base, unit='s', utc=True).tz_convert('Africa/Johannesburg')
     
     solpos = pvlib.solarposition.get_solarposition(
         tz_times, 
         lats, 
         lons, 
-        altitude=np.array(altitude_profile)
+        altitude=alt_arr
     )
     
     apparent_zenith = solpos['apparent_zenith'].values
     azimuth = solpos['azimuth'].values
     zenith_rad = np.radians(apparent_zenith)
-    
+
+    headings_arr = np.array(heading_profile)
+    if len(headings_arr) == time_len - 1:
+        headings_arr = np.append(headings_arr, headings_arr[-1])
+    elif len(headings_arr) != time_len:
+        headings_arr = np.resize(headings_arr, time_len)
+        
     aoi = pvlib.irradiance.aoi(
         PANEL_TILT, 
-        np.concatenate((np.array(heading_profile),[0])), 
+        headings_arr, 
         apparent_zenith, 
         azimuth
     )
@@ -177,8 +191,7 @@ def precompute_solar_gti_factors(time_base, coords_list, heading_profile, altitu
     ground_factor = (1 - np.cos(tilt_rad)) / 2
     
     a_headings = np.cos(np.radians(aoi)) - (np.cos(zenith_rad) * sky_factor)
-    
-    b_constants = np.full(len(time_base), sky_factor + ALBEDO * ground_factor)
+    b_constants = np.full(time_len, sky_factor + ALBEDO * ground_factor)
     
     return a_headings, b_constants
 
@@ -224,7 +237,7 @@ def stage_soc_profile(v,fname,start_date,start_time,soc_start):
     ax[2].plot(distances,solar_irr,color="seagreen")
     ax[2].set_title("Solar")
     plt.show()'''
-    return soc,power,time_base[-1]
+    return soc,power,time_base
 
     
 def loops_range(d1,d2,dl,day_1=False):
@@ -253,30 +266,39 @@ def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distance
        return np.array([loop_soc_start]),end_time
 
 
-def charged(soc, start_ts, end_ts):
-    """Placeholder for the overnight/standstill charging model.
+def charged(soc, start_ts, end_ts, coords, heading, altitude, solar_obj):
+    """Stationary charging model integrating solar yield over time."""
+    if start_ts >= end_ts:
+        return soc
 
-    Meant to model SoC gain while the car is stationary and charging
-    (e.g. finish-line to sunset, or the 05:00-08:00 morning window
-    before racing begins). Not implemented yet — currently a no-op
-    that just returns the SoC unchanged.
-    """
-    return soc
+    dt = 300.0  # 5-minute step in seconds
+    time_base = np.arange(start_ts, end_ts, dt)
+    n_points = len(time_base)
 
+    if n_points == 0:
+        return soc
+
+    c_array = np.tile(coords, (n_points, 1)) if np.ndim(coords) == 1 else np.array([coords] * n_points)
+    h_array = np.full(n_points, heading, dtype=float)
+    a_array = np.full(n_points, altitude, dtype=float)
+
+    solar_pwr = solar(time_base, c_array, h_array, a_array, solar_obj)
+    net_pwr = np.maximum(solar_pwr - 10.0, 0.0) # 10 W loss
+    energy_wh = np.sum(net_pwr * dt) / 3600.0
+    soc_gained = (energy_wh / BATTERY_WH) * 100.0
+    return min(SOC_MAX_PCT, soc + soc_gained)
 
 def local_time_of_day(ts):
-    """Return the SAST time-of-day (a datetime.time) for a unix timestamp."""
     return datetime.fromtimestamp(ts, tz=SA_TZ).time()
 
-
 def stitchAllDays():
+    """Simulates multi-day solar vehicle race profile across 8 days with daily summaries."""
     day_names = [f"Day {i}" for i in range(1, 9)]
 
-    # ---- multi-day inputs ----
-    # n[i]        -> number of loops to run on day i+1
-    # v["Day N"]  -> [stage1_speed_kmh, loop_speed_kmh, stage2_speed_kmh] for that day
-    
+    # Loop counts per day
     n = [0, 0, 0, 0, 0, 0, 0, 0]
+
+    # Target speeds in km/h -> [stage1, loop, stage2]
     v = {
         "Day 1": [70, 55, 70],
         "Day 2": [60, 55, 60],
@@ -288,25 +310,65 @@ def stitchAllDays():
         "Day 8": [50, 55, 50],
     }
 
-    soc = 95.0  # starting SoC on the morning of Day 1
-
+    soc = 95.0  # Starting SoC on Day 1 morning (no charge added on Day 1 morning)
     x_all = []
     y_all = []
+    day_boundaries = []
     cumulative_distance = 0.0
 
     fig, axes = plt.subplots(1, 1, figsize=(14, 6))
+    
+    print("\n" + "=" * 65)
+    print("           8-DAY RACE SIMULATION SUMMARY")
+    print("=" * 65)
 
     for day_idx, day in enumerate(day_names):
         day_no = day_idx + 1
-        s1_name = DAYWISE_FILES[day]["s1"]
-        l_name = DAYWISE_FILES[day]["l"]
-        s2_name = DAYWISE_FILES[day]["s2"]
-        l_dist = DAY_DISTANCES[day]["l"]
         start_date = DAYWISE_FILES[day]["date"]
 
-        morning_start_ts = datetime.combine(start_date, time(6, 0), tzinfo=SA_TZ).timestamp() # Morning Charging section
-        morning_end_ts = datetime.combine(start_date, time(8, 0), tzinfo=SA_TZ).timestamp()
-        soc = charged(soc, morning_start_ts, morning_end_ts)
+        s1_name = DAYWISE_FILES[day]["s1"]
+        route_s1 = extractSolarData(f"Saves/{s1_name}.kml.save")["profile"]
+        distances_s1 = np.array(route_s1["Distance"])
+        s1_solar_obj = weather_logs[f"mean_{s1_name}"]
+
+        l_name = DAYWISE_FILES[day]["l"]
+        l_dist = DAY_DISTANCES[day]["l"]
+        solar_obj_l = weather_logs[f"mean_{l_name}"]
+        route_loop = extractSolarData(f"Saves/{l_name}.kml.save")["profile"]
+        coords_l, headings_l, altitude_l = (
+            np.array(route_loop["Coordinates"]),
+            np.array(route_loop["Headings"]),
+            np.array(route_loop["Altitude"]),
+        )
+        single_loop_dist = np.array(route_loop["Distance"])
+
+        s2_name = DAYWISE_FILES[day].get("s2")
+        try:
+            route_s2 = extractSolarData(f"Saves/{s2_name}.kml.save")["profile"]
+            distances_s2 = np.array(route_s2["Distance"])
+            s2_solar_obj = weather_logs[f"mean_{s2_name}"]
+            has_s2 = True
+        except Exception:
+            route_s2 = None
+            distances_s2 = np.array([0.0])
+            s2_solar_obj = None
+            has_s2 = False
+
+
+        # Morning Charging
+        if day_no == 1:
+            morning_soc_gained = 0.0
+        else:
+            m_coords = route_s1["Coordinates"][0]
+            m_heading = route_s1["Headings"][0]
+            m_alt = route_s1["Altitude"][0]
+
+            morning_start_ts = datetime.combine(start_date, time(6, 0), tzinfo=SA_TZ).timestamp()
+            morning_end_ts = datetime.combine(start_date, time(8, 0), tzinfo=SA_TZ).timestamp()
+
+            soc_after_m_charge = charged(soc, morning_start_ts, morning_end_ts, m_coords, m_heading, m_alt, s1_solar_obj)
+            morning_soc_gained = soc_after_m_charge - soc
+            soc = soc_after_m_charge
 
         start_time_ts = datetime.combine(
             start_date,
@@ -314,83 +376,164 @@ def stitchAllDays():
             tzinfo=SA_TZ,
         ).timestamp()
 
-        end_soc_s1, power_s1, end_time = stage_soc_profile(
-            v[day][0] / 3.6, s1_name, start_date, start_time_ts, soc
-        )
-        distances_s1 = np.array(
-            extractSolarData(f"Saves/{s1_name}.kml.save")["profile"]["Distance"]
-        )
+        v_s1_ms = v[day][0] / 3.6
+        soc_s1, power_s1, time_s1 = stage_soc_profile(v_s1_ms, s1_name, start_date, start_time_ts, soc)
+        s1_end_time = time_s1[-1]
+        s1_end_str = datetime.fromtimestamp(s1_end_time, tz=SA_TZ).strftime("%H:%M:%S")
 
-        solar_obj = weather_logs[f"mean_{l_name}"]
-        route_loop = extractSolarData(f"Saves/{l_name}.kml.save")["profile"]
-        coords = np.array(route_loop["Coordinates"])
-        headings = np.array(route_loop["Headings"])
-        altitude = np.array(route_loop["Altitude"])
-        single_loop_dist = np.array(route_loop["Distance"])
+        last_coords = route_s1["Coordinates"][-1]
+        last_heading = route_s1["Headings"][-1]
+        last_alt = route_s1["Altitude"][-1]
+        last_solar_obj = s1_solar_obj
+
+        cs_start_ts = s1_end_time
+        cs_end_ts = cs_start_ts + 1800.0 
+        soc_before_cs = soc_s1[-1]
+        soc_after_cs = charged(soc_before_cs, cs_start_ts, cs_end_ts, last_coords, last_heading, last_alt, last_solar_obj)
+        cs_soc_gained = soc_after_cs - soc_before_cs
+
+        current_time = cs_end_ts
+        current_soc = soc_after_cs
 
         n_loops = n[day_idx]
-        loop_soc, end_loop_time = stitch_loops(
-            n_loops,
-            end_time,
-            end_soc_s1[-1],
-            solar_obj,
-            coords,
-            altitude,
-            headings,
-            l_dist,
-            l_name,
-            start_date,
-        )
+        loop_soc_list = []
+        loop_gaps_soc_gained = 0.0
 
-        if s2_name is not None:
-            end_soc_s2, power_s2, day_end_time = stage_soc_profile(
-                v[day][2] / 3.6, s2_name, start_date, end_loop_time, soc_start=loop_soc[-1]
-            )
-            distances_s2 = np.array(
-                extractSolarData(f"Saves/{s2_name}.kml.save")["profile"]["Distance"]
-            )
+        if n_loops > 0:
+            v_loop_ms = v[day][1] / 3.6
+            for k in range(n_loops):
+                single_loop_soc, loop_drive_end_time = stitch_loops(
+                    1,
+                    current_time,
+                    current_soc,
+                    solar_obj_l,
+                    coords_l,
+                    altitude_l,
+                    headings_l,
+                    l_dist,
+                    l_name,
+                    start_date,
+                    v_loop_ms
+                )
+                loop_soc_list.append(single_loop_soc)
+                soc_post_drive = single_loop_soc[-1]
+
+                # 5-minute gap stationary charge 
+                gap_start_ts = loop_drive_end_time
+                gap_end_ts = gap_start_ts + 300.0  
+
+                last_coords = coords_l[-1]
+                last_heading = headings_l[-1]
+                last_alt = altitude_l[-1]
+                last_solar_obj = solar_obj_l
+
+                soc_post_gap = charged(
+                    soc_post_drive, gap_start_ts, gap_end_ts, last_coords, last_heading, last_alt, last_solar_obj
+                )
+                loop_gaps_soc_gained += (soc_post_gap - soc_post_drive)
+
+                current_soc = soc_post_gap
+                current_time = gap_end_ts
+
+            loop_soc = np.concatenate(loop_soc_list)
         else:
-            end_soc_s2 = np.array([loop_soc[-1]])
-            day_end_time = end_loop_time
-            distances_s2 = np.array([0.0])
+            loop_soc = np.array([])
+
+        if has_s2 and s2_name is not None:
+            s2_start_str = datetime.fromtimestamp(current_time, tz=SA_TZ).strftime("%H:%M:%S")
+            v_s2_ms = v[day][2] / 3.6
+
+            soc_s2, power_s2, time_s2 = stage_soc_profile(
+                v_s2_ms, s2_name, start_date, current_time, soc_start=current_soc
+            )
+            day_end_time = time_s2[-1]
+            s2_finish_str = datetime.fromtimestamp(day_end_time, tz=SA_TZ).strftime("%H:%M:%S")
+
+            last_coords = route_s2["Coordinates"][-1]
+            last_heading = route_s2["Headings"][-1]
+            last_alt = route_s2["Altitude"][-1]
+            last_solar_obj = s2_solar_obj
+        else:
+            soc_s2 = np.array([])
+            day_end_time = current_time
+            s2_start_str = datetime.fromtimestamp(current_time, tz=SA_TZ).strftime("%H:%M:%S")
+            s2_finish_str = "N/A (No Stage 2)"
 
         if n_loops > 0:
             distances_loops_stacked = np.concatenate(
                 [single_loop_dist + k * l_dist for k in range(n_loops)]
             )
             x_loops = distances_s1[-1] + distances_loops_stacked
-            x_s2 = x_loops[-1] + distances_s2
-            x_day = np.concatenate((distances_s1, x_loops, x_s2))
-            y_day = np.concatenate((end_soc_s1, loop_soc, end_soc_s2))
+            x_s2 = x_loops[-1] + distances_s2 if (has_s2 and len(soc_s2) > 0) else np.array([])
+
+            x_day = np.concatenate([x for x in (distances_s1, x_loops, x_s2) if len(x) > 0])
+            y_day = np.concatenate([y for y in (soc_s1, loop_soc, soc_s2) if len(y) > 0])
         else:
-            x_s2 = distances_s1[-1] + distances_s2
-            x_day = np.concatenate((distances_s1, x_s2))
-            y_day = np.concatenate((end_soc_s1, end_soc_s2))
+            x_s2 = distances_s1[-1] + distances_s2 if (has_s2 and len(soc_s2) > 0) else np.array([])
+
+            x_day = np.concatenate([x for x in (distances_s1, x_s2) if len(x) > 0])
+            y_day = np.concatenate([y for y in (soc_s1, soc_s2) if len(y) > 0])
 
         x_all.append(cumulative_distance + x_day)
         y_all.append(y_day)
-        cumulative_distance += x_day[-1]
 
-        final_soc = y_day[-1]
+        km_covered_today = x_day[-1]
+        cumulative_distance += km_covered_today
+        day_boundaries.append(cumulative_distance)
+
+        final_soc = y_day[-1] if len(y_day) > 0 else current_soc
+
+        evening_end_ts = datetime.combine(start_date, time(17, 0), tzinfo=SA_TZ).timestamp()
+        soc_before_e_charge = final_soc
+
+        if day_end_time < evening_end_ts:
+            final_soc = charged(final_soc, day_end_time, evening_end_ts,
+                                last_coords, last_heading, last_alt, last_solar_obj)
+
+        evening_soc_gained = final_soc - soc_before_e_charge
+        soc = final_soc
+
+        print(f"\n--- {day} ({start_date}) ---")
+        print(f"  • Distance Covered:           {km_covered_today:.2f} km")
+        print(f"  • Stage 1 Finish Time:        {s1_end_str}")
+        print(f"  • 30-Min Stop SoC Gain:       +{cs_soc_gained:.2f}%")
+        if n_loops > 0:
+            print(f"  • Loop Gaps SoC Gain:         +{loop_gaps_soc_gained:.2f}% ({n_loops} x 5 min gaps)")
+        print(f"  • Stage 2 Start Time:         {s2_start_str}")
+        print(f"  • Stage 2 Finish Time:        {s2_finish_str}")
+        print(f"  • Morning SoC Gain:           +{morning_soc_gained:.2f}%")
+        print(f"  • Evening SoC Gain:           +{evening_soc_gained:.2f}%")
+        print(f"  • End of Day Final SoC:       {final_soc:.2f}%")
 
         if final_soc < SOC_MIN_PCT:
-            print(f"{day}: SoC fell below minimum ({final_soc:.2f}%) — stopping simulation.")
+            print(f"\n[CRITICAL WARNING] {day}: SoC fell below minimum limit ({final_soc:.2f}%) — stopping simulation.")
             break
 
-        if local_time_of_day(day_end_time) < time(17, 0):
-            evening_end_ts = datetime.combine(start_date, time(17, 0), tzinfo=SA_TZ).timestamp()
-            final_soc = charged(final_soc, day_end_time, evening_end_ts)
-
-        soc = final_soc
+    print("\n" + "=" * 65)
 
     x_full = np.concatenate(x_all)
     y_full = np.concatenate(y_all)
-    axes.plot(x_full, y_full, color="tomato")
+
+    axes.plot(x_full, y_full, color="tomato", linewidth=2, label="SoC (%)")
+
+    for b_idx, boundary in enumerate(day_boundaries[:-1]):
+        axes.axvline(
+            x=boundary,
+            color="black",
+            linestyle=":",
+            linewidth=1.2,
+            alpha=0.7,
+            label="Day Separator" if b_idx == 0 else ""
+        )
+
     axes.set_xlabel("Distance (km)")
     axes.set_ylabel("State of Charge (%)")
     axes.set_title("8-Day SoC Profile")
-    axes.grid(True)
+    axes.grid(True, alpha=0.3)
+    axes.legend(loc="upper right")
     plt.show()
+
+    return x_full, y_full
 
 def main():
     day_no = 6
