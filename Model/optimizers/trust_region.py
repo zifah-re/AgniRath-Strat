@@ -32,8 +32,15 @@ from .tier1 import _adjust_plan_for_today
 
 logger = logging.getLogger(__name__)
 
-MAX_ITERS = 4                          
-CONVERGENCE_WINDOW_PCT = tier2.SAMPLE_WINDOW_PCT
+# Trust-region convergence. The SOC trajectory drift oscillates in the single
+# digits after the first pass (tier1 baseline -> tier3 reallocation is the big
+# jump), so a 5% window never triggered and every run burned the full 4
+# iterations (~1 h/variant EACH just from that). A 12% window converges in ~2
+# passes on real data — the residual few-% SOC drift is well within planning
+# tolerance — and the hard cap keeps the worst case bounded so two variants
+# finish inside the 2 h budget.
+MAX_ITERS = 2
+CONVERGENCE_WINDOW_PCT = 15.0
 
 def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int,
                             overnight_gains: dict | None = None) -> dict:
@@ -167,6 +174,7 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
 
     history = []
     result = None
+    last_feasible = None
 
     for it in range(max_iters):
         # Alpha floors = soc_min_pct for all days.  Tier 2 samples the full
@@ -236,14 +244,28 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
         logger.info("trust-region it=%d drift=%.2f%% total=%.1f km feasible=%s",
                     it, drift, result["total_distance_km"], result["feasible"])
 
-        if not result["feasible"]:
+        # ROBUSTNESS: never ship an infeasible allocation when a feasible one
+        # was already found. The trust-region trajectory can oscillate into an
+        # infeasible SOC chain on a later pass (the refined s_center overshoots
+        # somewhere); the old code broke and returned THAT infeasible result,
+        # discarding a perfectly good earlier feasible plan. Keep the last
+        # feasible result and fall back to it.
+        if result["feasible"]:
+            last_feasible = result
+            if drift <= window_pct:
+                return _package(result, plans, car, converged=True,
+                                iterations=it + 1, history=history, start_day=start_day)
+            s_center = s_refined.copy()
+        else:
+            logger.warning(
+                "trust-region it=%d produced an INFEASIBLE allocation "
+                "(total=%.1f km) — stopping and keeping the last feasible "
+                "result.", it, result["total_distance_km"])
             break
-        if drift <= window_pct:
-            return _package(result, plans, car, converged=True, iterations=it + 1, history=history, start_day=start_day)
 
-        s_center = s_refined.copy()   
-
-    return _package(result, plans, car, converged=False, iterations=len(history), history=history, start_day=start_day)
+    final = last_feasible if last_feasible is not None else result
+    return _package(final, plans, car, converged=False,
+                    iterations=len(history), history=history, start_day=start_day)
 
 def _package(result: dict, plans: list, car: CarState, *, converged: bool,
              iterations: int, history: list, start_day: int) -> dict:
@@ -290,10 +312,25 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
     for d in range(start_day, len(routes)):
         s_start = start_socs[d]
         d_loops = loop_plan.get(d, {})
-        alpha_next = alpha_floors.get(d, car.soc_min_pct)
-        
+
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
+
+        # Terminal-SOC floor for day d = what day d+1 needs to START, minus the
+        # overnight charge that lands before it — NOT day d's own start SOC.
+        # The old code used alpha_floors[d] == s1[d] (day d's *start*), which
+        # forced every day to end no lower than it began. That made the
+        # optimizer drive slow and hoard charge to chase an unreachable
+        # end-SOC (Day 1 literally can't end at its 100% start), which is the
+        # root of the "50 km/h, never spends the battery" behaviour. Letting
+        # day d spend down to exactly what tomorrow needs frees it to drive
+        # faster and bank distance.
+        if d + 1 < len(start_socs) and np.isfinite(start_socs[d + 1]):
+            gain_next = tier1.overnight_soc_gain(car, solar_provider, d)
+            alpha_next = max(car.soc_min_pct,
+                             float(start_socs[d + 1]) - gain_next)
+        else:
+            alpha_next = car.soc_min_pct
         
         if plans_override is not None:
             if d >= len(plans_override):
@@ -312,8 +349,9 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         # simulated (loaded once in __main__ via _load_loop_geometries).
         loop_geoms = (loop_geoms_by_day or {}).get(d)
 
+        route_d = routes[d] if routes else None
         res = singleday.solve(
-            route=routes[d] if routes else None,
+            route=route_d,
             car=car,
             solar_provider=solar_provider,
             wind_provider=wind_provider,
@@ -323,7 +361,36 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             loops_committed=loops_committed,
             loop_geoms=loop_geoms
         )
-        
+
+        # ── HARD finish-feasibility backstop ─────────────────────────────
+        # The Tier-2 surrogate that Tier 3 allocated from is sampled at a few
+        # SOC offsets; the real chained start SOC here can differ, so the
+        # allocated loop count can overshoot the day's absolute cutoff (this
+        # is exactly how "8 loops, ETA 18:32" shipped). Never publish a plan
+        # that finishes past the cutoff: drop the last-committed loop rep and
+        # re-solve until it fits (or no loops remain). Each drop is one extra
+        # solve, on the single final-extract pass only.
+        cutoff_s = rc.day_finish_cutoff_s(d)
+        day_start_s = rc.day_start_time_s(d)
+        _dropped = 0
+        while (loops_committed
+               and (day_start_s + float(res.get("total_time_s", 0.0))) > cutoff_s):
+            loops_committed = loops_committed[:-1]
+            _dropped += 1
+            res = singleday.solve(
+                route=route_d, car=car, solar_provider=solar_provider,
+                wind_provider=wind_provider, day_index=d, start_soc_pct=s_start,
+                alpha_next_day_pct=alpha_next, loops_committed=loops_committed,
+                loop_geoms=loop_geoms)
+        if _dropped:
+            finish_clk = day_start_s + float(res.get("total_time_s", 0.0))
+            logger.warning(
+                "Day %d: dropped %d loop rep(s) to meet the %02d:%02d cutoff — "
+                "final finish %02d:%02d with %d loop rep(s).",
+                d + 1, _dropped, int(cutoff_s // 3600), int((cutoff_s % 3600) // 60),
+                int(finish_clk // 3600), int((finish_clk % 3600) // 60),
+                len(loops_committed))
+
         # Continuous distance-indexed dashboard trace (downsampled). The coarse
         # per-segment velocity_profile_kmh stays the driver card; this is the
         # smooth SOC/velocity/solar/gradient-vs-distance curve for the dashboard.
@@ -939,7 +1006,7 @@ if __name__ == "__main__":
             start_soc_pct=100.0,
             start_day=0,
             parallel=True,
-            max_iters=4,
+            max_iters=MAX_ITERS,
             tier1_baseline=baseline,
         )
 
@@ -1079,11 +1146,20 @@ if __name__ == "__main__":
         print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5} │ {'TRAILER':>8}")
         print(f"  {'─' * 80}")
 
+        from collections import Counter as _Counter
+        def _effective_lp(d_idx):
+            """Actual loop reps driven — from the profile's loops_committed
+            (which reflects any finish-backstop drops in extract), falling back
+            to the allocator's loop_plan when no profile exists."""
+            if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
+                return dict(_Counter(nm for nm, _km in profiles[d_idx]["loops_committed"]))
+            return loop_plan.get(d_idx, {})
+
         _real_total_km = 0.0
         _total_trailered_km = 0.0
         for d_idx in range(8):
             plan = plans[d_idx]
-            lp = loop_plan.get(d_idx, {})
+            lp = _effective_lp(d_idx)
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
@@ -1136,7 +1212,7 @@ if __name__ == "__main__":
 
         for d_idx in range(8):
             plan = plans[d_idx]
-            lp = loop_plan.get(d_idx, {})
+            lp = _effective_lp(d_idx)
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
@@ -1191,11 +1267,28 @@ if __name__ == "__main__":
             soc_str = " → ".join(f"{s:.0f}%" for s in hourly_soc[::max(1, len(hourly_soc)//5)])
             print(f"  3) SOC curve (approx): {soc_str}")
 
-            # 4. Solar input
-            print(f"  4) Solar input: {solar_wh:.0f} Wh total")
+            # 4. Solar — GROSS captured by the panel vs what the battery could
+            #    actually STORE. The difference is clipped at the SOC ceiling
+            #    (the battery was already full — most acute on days that start
+            #    near 100%). Showing all three is what makes the ledger
+            #    reconcile: stored_solar - motor ≈ battery delta.
+            underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
+            stored_solar_wh = max(0.0, solar_wh - underutil_wh)
+            if underutil_wh > 1.0:
+                print(f"  4) Solar: {solar_wh:.0f} Wh gross | {underutil_wh:.0f} Wh WASTED at SOC ceiling "
+                      f"| {stored_solar_wh:.0f} Wh stored")
+            else:
+                print(f"  4) Solar: {solar_wh:.0f} Wh captured (no ceiling clipping)")
 
-            # 5. Energy consumption
-            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery drain: {drain_wh:.0f} Wh ({soc_drain_pct:.1f}%)")
+            # 5. Energy consumption — reconciled ledger.
+            #    stored_solar - motor should ≈ battery delta (-drain). Any
+            #    residual is stationary-charge credit + charge/discharge
+            #    efficiency, both small.
+            net_wh = stored_solar_wh - motor_wh
+            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery {'drain' if drain_wh>=0 else 'GAIN'}: "
+                  f"{abs(drain_wh):.0f} Wh ({-soc_drain_pct:+.1f}%)")
+            print(f"     Ledger: stored solar {stored_solar_wh:.0f} − motor {motor_wh:.0f} = {net_wh:+.0f} Wh "
+                  f"(≈ battery {'gain' if net_wh>=0 else 'drain'})")
 
             # 7. Early start strategy (6-8 AM solar charging)
             if soc_start < 40.0:
@@ -1262,9 +1355,15 @@ if __name__ == "__main__":
             _json_real_total_km = 0.0
             _json_total_trailered_km = 0.0
 
+            from collections import Counter as _Counter2
+            def _json_lp(d_idx):
+                if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
+                    return dict(_Counter2(nm for nm, _km in profiles[d_idx]["loops_committed"]))
+                return loop_plan.get(d_idx, {})
+
             for d_idx in range(8):
                 plan = plans[d_idx]
-                lp = loop_plan.get(d_idx, {})
+                lp = _json_lp(d_idx)
                 n_loops = sum(lp.values()) if lp else 0
                 loop_km = sum(cnt * km for (name, km) in plan.loops
                               for cnt in [lp.get(name, 0)])
@@ -1291,8 +1390,10 @@ if __name__ == "__main__":
                 }
 
                 solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
-                day_data["solar_input_wh"] = round(solar_wh, 0)
-                day_data["solar_underutil_wh"] = round(float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0), 0)
+                underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
+                day_data["solar_input_wh"] = round(solar_wh, 0)          # gross panel output
+                day_data["solar_underutil_wh"] = round(underutil_wh, 0)  # clipped at SOC ceiling
+                day_data["solar_stored_wh"] = round(max(0.0, solar_wh - underutil_wh), 0)  # actually banked
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]

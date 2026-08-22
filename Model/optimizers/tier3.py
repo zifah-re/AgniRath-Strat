@@ -86,6 +86,9 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
                 v_next = _interp(V[d + 1], soc_buckets, next_soc)
                 if not np.isfinite(v_next):
                     continue
+                # Discount future SOC value so distance TODAY is preferred over
+                # hoarding charge later days can't spend (see solver_config).
+                v_next = float(getattr(sc, "DP_FUTURE_VALUE_DISCOUNT", 1.0)) * v_next
 
                 dist = base_km + model.loop_km
                 waste_wh = model.predict_underutil(s_start)

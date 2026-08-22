@@ -434,7 +434,18 @@ def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float
     if not loops:
         yield (), 0.0
         return
-    budget = max(0.0, t_window_s - t_stops_base_s)
+    # RESERVE the base Stage-1+Stage-2 drive time before handing the rest to
+    # loops. Without this the generator counted only loop time and emitted
+    # loop counts that could never finish by the cutoff (the "8 loops, ETA
+    # 18:32" bug). Base is reserved at a realistic sustainable cruise
+    # (DP_BASE_PLANNING_SPEED_KMH), not v_max, so the ceiling is both
+    # time- AND roughly energy-feasible. SOC feasibility is still enforced
+    # per-combo downstream (tier2._l2_result_feasible); this just stops the
+    # obviously-impossible high-loop combos from ever being generated.
+    base_km = plan.stage1_km + plan.stage2_km
+    base_speed_ms = max(getattr(sc, "DP_BASE_PLANNING_SPEED_KMH", 65.0) / 3.6, 1e-6)
+    base_drive_s = (base_km * 1000.0) / base_speed_ms if base_km > 0 else 0.0
+    budget = max(0.0, t_window_s - t_stops_base_s - base_drive_s)
     t_per_attempt = [(km * 1000.0) / loop_speed_ms + pre_attempt_stop_s for _n, km in loops]
     caps = [int(budget // t) if t > 0 else 0 for t in t_per_attempt]
     import itertools

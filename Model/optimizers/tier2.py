@@ -245,8 +245,14 @@ def sample_day(route, car: CarState, solar_provider, wind_provider,
 
     ordered = _ordered_combos(plan, day_index, car, is_today, elapsed_s)
 
-    # Low/mid/high samples capture the battery ceiling curvature while keeping
-    # the L2 solve count manageable.
+    # Low/mid/high SOC samples. Three anchors are needed for COVERAGE, not
+    # curvature: a combo whose low-SOC sample comes back infeasible collapses
+    # a 2-point surrogate to a single valid SOC (in_window() only accepts the
+    # exact sampled SOC), and Tier 3 then can't allocate that day unless the
+    # chained SOC lands exactly there — which shows up as a spurious
+    # "infeasible" whole-race result. The midpoint keeps a usable window even
+    # when one endpoint drops out. (Runtime is recovered from the forward_sim
+    # vectorization + 150 m grid instead, which don't cost feasibility.)
     lo = float(np.clip(car.soc_min_pct + 5.0, car.soc_min_pct, car.soc_max_pct))
     hi = float(car.soc_max_pct)
     mid = 0.5 * (lo + hi)
