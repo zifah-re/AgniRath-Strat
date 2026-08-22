@@ -32,8 +32,15 @@ from .tier1 import _adjust_plan_for_today
 
 logger = logging.getLogger(__name__)
 
-MAX_ITERS = 4                          
-CONVERGENCE_WINDOW_PCT = tier2.SAMPLE_WINDOW_PCT
+# Trust-region convergence. The SOC trajectory drift oscillates in the single
+# digits after the first pass (tier1 baseline -> tier3 reallocation is the big
+# jump), so a 5% window never triggered and every run burned the full 4
+# iterations (~1 h/variant EACH just from that). A 12% window converges in ~2
+# passes on real data — the residual few-% SOC drift is well within planning
+# tolerance — and the hard cap keeps the worst case bounded so two variants
+# finish inside the 2 h budget.
+MAX_ITERS = 2
+CONVERGENCE_WINDOW_PCT = 15.0
 
 def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int,
                             overnight_gains: dict | None = None) -> dict:
@@ -69,6 +76,42 @@ def replan(routes: list, base_car: CarState, solar_providers: dict, wind_provide
                     start_day=cur_day, dist_done_km=dist_done_km,
                     elapsed_s=elapsed_s, cs_taken=cs_taken, 
                     loops_done=loops_done, kml_paths=kml_paths, **kwargs)
+
+def _downsample_trace_by_distance(x_m, series: dict, stride_m: float) -> dict:
+    """Downsample per-substep traces to ~one point per `stride_m` metres.
+
+    forward_sim integrates on the ~100 m energy grid, so a full day is a few
+    thousand substeps — more than a dashboard needs and heavy in JSON. Pick
+    representative points spaced by distance (not index) so the curves stay
+    faithful regardless of how speed varied. Always keeps the first and last
+    point. Returns {name: list}. Empty in -> empty out.
+    """
+    import numpy as _np
+    x = _np.asarray(x_m, dtype=float)
+    n = x.size
+    if n == 0:
+        return {k: [] for k in (["distance_m"] + list(series.keys()))}
+    if n == 1 or stride_m <= 0:
+        keep = _np.arange(n)
+    else:
+        keep = [0]
+        last_x = x[0]
+        for i in range(1, n):
+            if x[i] - last_x >= stride_m:
+                keep.append(i)
+                last_x = x[i]
+        if keep[-1] != n - 1:
+            keep.append(n - 1)
+        keep = _np.asarray(keep, dtype=int)
+    out = {"distance_m": [round(float(v), 1) for v in x[keep]]}
+    for name, arr in series.items():
+        a = _np.asarray(arr, dtype=float)
+        if a.size != n:
+            out[name] = []
+            continue
+        out[name] = [round(float(v), 2) for v in a[keep]]
+    return out
+
 
 def _trailered_km_by_day(routes):
     """Return trailered km from the exact mask consumed by forward_sim."""
@@ -131,6 +174,7 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
 
     history = []
     result = None
+    last_feasible = None
 
     for it in range(max_iters):
         # Alpha floors = soc_min_pct for all days.  Tier 2 samples the full
@@ -200,14 +244,28 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
         logger.info("trust-region it=%d drift=%.2f%% total=%.1f km feasible=%s",
                     it, drift, result["total_distance_km"], result["feasible"])
 
-        if not result["feasible"]:
+        # ROBUSTNESS: never ship an infeasible allocation when a feasible one
+        # was already found. The trust-region trajectory can oscillate into an
+        # infeasible SOC chain on a later pass (the refined s_center overshoots
+        # somewhere); the old code broke and returned THAT infeasible result,
+        # discarding a perfectly good earlier feasible plan. Keep the last
+        # feasible result and fall back to it.
+        if result["feasible"]:
+            last_feasible = result
+            if drift <= window_pct:
+                return _package(result, plans, car, converged=True,
+                                iterations=it + 1, history=history, start_day=start_day)
+            s_center = s_refined.copy()
+        else:
+            logger.warning(
+                "trust-region it=%d produced an INFEASIBLE allocation "
+                "(total=%.1f km) — stopping and keeping the last feasible "
+                "result.", it, result["total_distance_km"])
             break
-        if drift <= window_pct:
-            return _package(result, plans, car, converged=True, iterations=it + 1, history=history, start_day=start_day)
 
-        s_center = s_refined.copy()   
-
-    return _package(result, plans, car, converged=False, iterations=len(history), history=history, start_day=start_day)
+    final = last_feasible if last_feasible is not None else result
+    return _package(final, plans, car, converged=False,
+                    iterations=len(history), history=history, start_day=start_day)
 
 def _package(result: dict, plans: list, car: CarState, *, converged: bool,
              iterations: int, history: list, start_day: int) -> dict:
@@ -250,14 +308,39 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
     loop_plan = optimize_result["loop_plan"]
     alpha_floors = optimize_result["alpha_day_pct"]
     start_day = optimize_result.get("start_day_index", 0)
-    
+
+    # PHYSICALLY-CONSISTENT SOC CHAIN. The old code simulated each day starting
+    # from Tier 3's planned s1[d], which is a surrogate estimate — so the
+    # reported day d+1 start (Tier 3) didn't match day d's ACTUAL simulated end,
+    # making the SOC look like it dropped overnight. Here we chain forward: each
+    # day starts at the PREVIOUS day's real end SOC plus the (safety-gated)
+    # morning charge, so the trajectory the report shows actually reconciles and
+    # the morning charge is visibly additive.
+    cur_soc = (float(start_socs[start_day])
+               if np.isfinite(start_socs[start_day]) else 100.0)
+
     for d in range(start_day, len(routes)):
-        s_start = start_socs[d]
+        s_start = cur_soc
         d_loops = loop_plan.get(d, {})
-        alpha_next = alpha_floors.get(d, car.soc_min_pct)
-        
+
         solar_provider = solar_providers.get(d)
         wind_provider = wind_providers.get(d)
+
+        # Terminal-SOC floor for day d = what day d+1 needs to START, minus the
+        # overnight charge that lands before it — NOT day d's own start SOC.
+        # The old code used alpha_floors[d] == s1[d] (day d's *start*), which
+        # forced every day to end no lower than it began. That made the
+        # optimizer drive slow and hoard charge to chase an unreachable
+        # end-SOC (Day 1 literally can't end at its 100% start), which is the
+        # root of the "50 km/h, never spends the battery" behaviour. Letting
+        # day d spend down to exactly what tomorrow needs frees it to drive
+        # faster and bank distance.
+        if d + 1 < len(start_socs) and np.isfinite(start_socs[d + 1]):
+            gain_next = tier1.overnight_soc_gain(car, solar_provider, d)
+            alpha_next = max(car.soc_min_pct,
+                             float(start_socs[d + 1]) - gain_next)
+        else:
+            alpha_next = car.soc_min_pct
         
         if plans_override is not None:
             if d >= len(plans_override):
@@ -276,8 +359,9 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         # simulated (loaded once in __main__ via _load_loop_geometries).
         loop_geoms = (loop_geoms_by_day or {}).get(d)
 
+        route_d = routes[d] if routes else None
         res = singleday.solve(
-            route=routes[d] if routes else None,
+            route=route_d,
             car=car,
             solar_provider=solar_provider,
             wind_provider=wind_provider,
@@ -287,11 +371,77 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             loops_committed=loops_committed,
             loop_geoms=loop_geoms
         )
-        
+
+        # ── HARD finish-feasibility backstop ─────────────────────────────
+        # The Tier-2 surrogate that Tier 3 allocated from is sampled at a few
+        # SOC offsets; the real chained start SOC here can differ, so the
+        # allocated loop count can overshoot the day's absolute cutoff (this
+        # is exactly how "8 loops, ETA 18:32" shipped). Never publish a plan
+        # that finishes past the cutoff: drop the last-committed loop rep and
+        # re-solve until it fits (or no loops remain). Each drop is one extra
+        # solve, on the single final-extract pass only.
+        cutoff_s = rc.day_finish_cutoff_s(d)
+        day_start_s = rc.day_start_time_s(d)
+        _dropped = 0
+        while (loops_committed
+               and (day_start_s + float(res.get("total_time_s", 0.0))) > cutoff_s):
+            loops_committed = loops_committed[:-1]
+            _dropped += 1
+            res = singleday.solve(
+                route=route_d, car=car, solar_provider=solar_provider,
+                wind_provider=wind_provider, day_index=d, start_soc_pct=s_start,
+                alpha_next_day_pct=alpha_next, loops_committed=loops_committed,
+                loop_geoms=loop_geoms)
+        if _dropped:
+            finish_clk = day_start_s + float(res.get("total_time_s", 0.0))
+            logger.warning(
+                "Day %d: dropped %d loop rep(s) to meet the %02d:%02d cutoff — "
+                "final finish %02d:%02d with %d loop rep(s).",
+                d + 1, _dropped, int(cutoff_s // 3600), int((cutoff_s % 3600) // 60),
+                int(finish_clk // 3600), int((finish_clk % 3600) // 60),
+                len(loops_committed))
+
+        # Continuous distance-indexed dashboard trace (downsampled). The coarse
+        # per-segment velocity_profile_kmh stays the driver card; this is the
+        # smooth SOC/velocity/solar/gradient-vs-distance curve for the dashboard.
+        from configs import solver_config as _sc
+        dashboard_trace = _downsample_trace_by_distance(
+            res.get("x_m", []),
+            {
+                "v_kmh": res.get("v_kmh_trace", []),
+                "soc_pct": res.get("soc_pct_trace", []),
+                "solar_w": res.get("solar_w_trace", []),
+                "slope_pct": res.get("slope_pct_trace", []),
+                "time_s": res.get("t_s", []),
+            },
+            getattr(_sc, "OUTPUT_TRACE_STRIDE_M", 250.0),
+        )
+
+        # ── Advance the physical SOC chain to the next day ──────────────
+        actual_end_soc = float(res.get("final_soc_pct", cur_soc))
+        finish_abs_s = day_start_s + float(res.get("total_time_s", 0.0))
+        # Late-finish penalty (SR 2.22.6/7): minutes served stationary at the
+        # NEXT day's control stop. The car captures solar during that hold, so
+        # it buys back morning-charge time (06:30 -> 08:00 + penalty).
+        on_time_s = rc.day_finish_time_s(d)
+        minutes_late = max(0.0, (finish_abs_s - on_time_s) / 60.0)
+        late_penalty_min = rc.late_finish_penalty_min(minutes_late)
+        # Morning charge onto tomorrow, gated by TODAY's real end SOC (skip if
+        # already high, cap so start never exceeds the safe band) and extended
+        # by the late-penalty hold time.
+        morning_gain_pct = tier1.overnight_soc_gain(
+            car, solar_provider, d,
+            prev_end_soc_pct=actual_end_soc,
+            extra_charge_s=late_penalty_min * 60.0)
+        next_start_soc = min(actual_end_soc + morning_gain_pct, car.soc_max_pct)
+
         final_race_plan[d] = {
             "start_soc_pct": s_start,
             "loops_committed": loops_committed,
             "end_soc_pct": res.get("final_soc_pct"),
+            "morning_charge_pct": round(morning_gain_pct, 2),
+            "late_penalty_min": int(late_penalty_min),
+            "next_start_soc_pct": round(next_start_soc, 2),
             "velocity_profile_kmh": res.get("v_kmh"),
             "time_array_s": res.get("t_s"),
             "distance_array_m": res.get("x_m"),
@@ -301,8 +451,14 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "driven_km": res.get("driven_km", 0.0),
             "motor_energy_wh": res.get("motor_energy_wh", 0.0),
             "solar_energy_wh": res.get("solar_energy_wh", 0.0),
+            # Previously never forwarded -> the report defaulted it to 0.0 on
+            # every day even when solar was genuinely clipped at the SOC ceiling.
+            "solar_underutil_wh": res.get("solar_underutil_wh", 0.0),
+            "dashboard_trace": dashboard_trace,
         }
-        
+
+        cur_soc = next_start_soc
+
     return final_race_plan
 
 # ===========================================================================
@@ -883,7 +1039,7 @@ if __name__ == "__main__":
             start_soc_pct=100.0,
             start_day=0,
             parallel=True,
-            max_iters=4,
+            max_iters=MAX_ITERS,
             tier1_baseline=baseline,
         )
 
@@ -900,17 +1056,18 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-    # Day 3 is variant-dependent; reporting uses each variant's own plans.
-    DAY_NAMES = {
-        0: "Johannesburg → Rustenburg",
-        1: "Rustenburg → Zeerust",
-        2: "Zeerust → Vryburg",          # Day 3 (variant-dependent)
-        3: "Vryburg → Upington",
-        4: "Upington → Springbok",
-        5: "Springbok → Van Rhynsdorp",
-        6: "Van Rhynsdorp → Clanwilliam",
-        7: "Clanwilliam → Cape Town",
-    }
+    # Route labels are the single source of truth in race_config.DAY_ROUTE_NOTES
+    # (start → finish per the released 2026 route sheets). The old hardcoded
+    # dict here was stale — e.g. Day 1 read "Johannesburg → Rustenburg" when the
+    # real Day 1 is Sasolburg → Swartruggens (Rustenburg is only the control
+    # stop). Build labels from the config so the report can never drift again.
+    def _day_label(d_idx: int) -> str:
+        try:
+            note = rc.DAY_ROUTE_NOTES[d_idx]
+            return f"{note['start']} → {note['finish']}"
+        except Exception:
+            return f"Day {d_idx + 1}"
+    DAY_NAMES = {d: _day_label(d) for d in range(rc.N_RACE_DAYS)}
 
     def _hms(seconds: float) -> str:
         h = int(seconds // 3600)
@@ -932,31 +1089,44 @@ if __name__ == "__main__":
     _SOLAR_EFF   = car.array_efficiency
     _BATT_CAP_WH = car.battery_nominal_wh
 
-    def _real_day_km(d_idx, plan, lp, profiles) -> float:
-        """Distance that actually counts toward the race total: DRIVEN km
-        only, excluding any trailered km (SR's asterisk rule ranks trailered
-        teams below all non-trailered teams regardless of distance, so
-        trailered km must never be added to the reported total). Prefers the
-        real optimizer output (profiles[d_idx]["driven_km"]) when available;
-        falls back to the static route-notes plan estimate otherwise (e.g.
-        infeasible days with no profile).
+    def _loop_km_for(plan, lp) -> float:
+        """Committed loop km = Σ reps × official single-pass loop length."""
+        return sum(cnt * km for (name, km) in plan.loops
+                   for cnt in [lp.get(name, 0)]) if lp else 0.0
 
-        Note this also fixes a separate bug: _get_day_plan() returns a
-        STATIC config-table estimate (rc.DAY_ROUTE_NOTES) that, for Day 3
-        (full-blind day), is a fixed 230.0/0.0 fallback regardless of which
-        Day-3 route variant was actually loaded and driven -- this made
-        Day 3's printed Distance identical across variants even when
-        genuinely different route files were used. profiles[d_idx] comes
-        from a real singleday.solve()/forward_sim run on the actual loaded
-        Route for that variant, so it doesn't have this problem.
-        """
+    def _trailered_km_for(d_idx, profiles) -> float:
         if profiles and d_idx in profiles:
-            driven_km = profiles[d_idx].get("driven_km")
-            if driven_km is not None and driven_km > 0:
-                return float(driven_km)
-        loop_km = sum(cnt * km for (name, km) in plan.loops
-                      for cnt in [lp.get(name, 0)]) if lp else 0.0
-        return plan.stage1_km + plan.stage2_km + loop_km
+            return float(profiles[d_idx].get("trailered_km", 0.0) or 0.0)
+        return 0.0
+
+    def _real_day_km(d_idx, plan, lp, profiles) -> float:
+        """Distance credited to the race total, from the AUTHORITATIVE route
+        table so the reported components always reconcile and match the
+        released sheets:
+
+            distance_km = stage1_km + stage2_km + committed_loop_km
+                          − trailered_km        (SR asterisk rule)
+
+        This is deliberately NOT the raw simulated driven_km: the forward
+        integrator's driven_km differs from the published figure by the
+        KML-linestring-vs-published rounding AND by the small synthetic
+        loop-separator buffers spliced between repeated loop attempts
+        (singleday._splice_loops), so it never reconciles cleanly with the
+        headline stage/loop numbers. The simulated distance is still reported
+        separately (distance_km_simulated) for transparency. Day 3 uses the
+        variant plan's real geometry lengths, so it stays variant-specific.
+        """
+        loop_km = _loop_km_for(plan, lp)
+        trailered_km = _trailered_km_for(d_idx, profiles)
+        return max(0.0, plan.stage1_km + plan.stage2_km + loop_km - trailered_km)
+
+    def _simulated_day_km(d_idx, profiles) -> float:
+        """Raw driven distance from forward_sim (excludes trailered km)."""
+        if profiles and d_idx in profiles:
+            dk = profiles[d_idx].get("driven_km")
+            if dk is not None and dk > 0:
+                return float(dk)
+        return 0.0
 
     def _estimate_solar_input_wh(solar_prov, day_index: int) -> float:
         """Rough total solar energy over the race window (Wh)."""
@@ -972,22 +1142,6 @@ if __name__ == "__main__":
             total += ghi * _SOLAR_AREA * _SOLAR_EFF * dt / 3600.0  # Wh, not joules
             t += dt
         return total
-
-    def _estimate_stall_points(start_soc, end_soc, distance_km, solar_wh,
-                               battery_cap=_BATT_CAP_WH):
-        """Flag if SOC likely dips below 25% mid-day (rough linear check)."""
-        drain_wh = (start_soc - end_soc) / 100.0 * battery_cap
-        motor_wh = drain_wh + solar_wh
-        if motor_wh <= 0:
-            return "None — net energy positive"
-        # Approximate lowest SOC (assumes linear drain, solar ramps up mid-day)
-        # Worst case: first 25% of distance has low solar but full motor drain
-        early_drain_pct = 0.25 * drain_wh / battery_cap * 100
-        early_solar_pct = 0.10 * solar_wh / battery_cap * 100  # ~10% of solar in first quarter
-        min_soc_est = start_soc - early_drain_pct + early_solar_pct
-        if min_soc_est < 25.0:
-            return f"RISK — estimated min SOC ≈ {min_soc_est:.0f}% in first quarter"
-        return "None"
 
     # ------------------------------------------------------------------ #
     # 7.  Print full strategy plan for all variants
@@ -1012,7 +1166,8 @@ if __name__ == "__main__":
         # for each day — the DP-internal total_distance_km here is the
         # allocator's own planning estimate (static plan tables, doesn't
         # know about trailering) and is kept only as a cross-check.
-        print(f"  Total Expected Distance (DP planning estimate): {result.get('total_distance_km', 0):.1f} km")
+        print(f"  Allocator estimate (pre-cutoff ceiling): {result.get('total_distance_km', 0):.1f} km  "
+              f"(actual counted total is below, after cutoff-feasibility drops)")
 
         if not result.get("feasible"):
             print("  ⚠ Infeasible — no per-day plan available")
@@ -1025,11 +1180,20 @@ if __name__ == "__main__":
         print(f"  {'DAY':>5} │ {'ROUTE':<30} │ {'KM':>7} │ {'LOOPS':>5} │ {'SOC START→END':>14} │ {'ETA':>5} │ {'TRAILER':>8}")
         print(f"  {'─' * 80}")
 
+        from collections import Counter as _Counter
+        def _effective_lp(d_idx):
+            """Actual loop reps driven — from the profile's loops_committed
+            (which reflects any finish-backstop drops in extract), falling back
+            to the allocator's loop_plan when no profile exists."""
+            if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
+                return dict(_Counter(nm for nm, _km in profiles[d_idx]["loops_committed"]))
+            return loop_plan.get(d_idx, {})
+
         _real_total_km = 0.0
         _total_trailered_km = 0.0
         for d_idx in range(8):
             plan = plans[d_idx]
-            lp = loop_plan.get(d_idx, {})
+            lp = _effective_lp(d_idx)
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
@@ -1037,7 +1201,9 @@ if __name__ == "__main__":
             route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
 
             # SOC
-            soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+            soc_start = (float(profiles[d_idx]["start_soc_pct"])
+                         if profiles and d_idx in profiles and profiles[d_idx].get("start_soc_pct") is not None
+                         else (float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0))
 
             # End SOC + ETA from profiles if available
             if profiles and d_idx in profiles:
@@ -1071,9 +1237,20 @@ if __name__ == "__main__":
                   f"{soc_start:>5.1f}% → {soc_end:>5.1f}% │ {eta_str:>5} │ {trailer_str:>8}")
 
         print(f"  {'─' * 80}")
-        print(f"  Total Expected Distance (driven, trailered km excluded): {_real_total_km:.1f} km")
+        # Reconciled distance ledger (these now ADD UP):
+        #   COUNTED (driven, scores)  +  TRAILERED (excluded)  =  GROUND COVERED
+        # The DP planning estimate above is the allocator's PRE-cutoff figure
+        # (before the finish-backstop drops loops that couldn't fit by 17:30),
+        # so it is intentionally >= the counted total; it is a ceiling, not a
+        # sum term.
+        _dp_est = result.get('total_distance_km', 0) or 0.0
+        _ground_covered = _real_total_km + _total_trailered_km
+        print(f"  Counted distance (driven, scores):            {_real_total_km:>8.1f} km")
         if _total_trailered_km > 0:
-            print(f"  Total trailered (NOT counted toward distance above): {_total_trailered_km:.1f} km")
+            print(f"  Trailered (NOT counted, SR asterisk rule):    {_total_trailered_km:>8.1f} km")
+            print(f"  = Ground covered (driven + trailered):        {_ground_covered:>8.1f} km")
+        print(f"  (allocator pre-cutoff estimate was {_dp_est:.1f} km; "
+              f"{max(0.0, _dp_est - _real_total_km):.1f} km of loops were dropped to finish by the cutoff)")
 
         # ── Detailed per-day strategy ──
         print(f"\n  {'═' * 66}")
@@ -1082,13 +1259,15 @@ if __name__ == "__main__":
 
         for d_idx in range(8):
             plan = plans[d_idx]
-            lp = loop_plan.get(d_idx, {})
+            lp = _effective_lp(d_idx)
             n_loops = sum(lp.values()) if lp else 0
             loop_km = sum(cnt * km for (name, km) in plan.loops
                           for cnt in [lp.get(name, 0)])
             day_km = _real_day_km(d_idx, plan, lp, profiles)
             route_name = DAY_NAMES.get(d_idx, f"Day {d_idx + 1}")
-            soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+            soc_start = (float(profiles[d_idx]["start_soc_pct"])
+                         if profiles and d_idx in profiles and profiles[d_idx].get("start_soc_pct") is not None
+                         else (float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0))
 
             print(f"\n  ── Day {d_idx + 1}: {route_name} ──")
 
@@ -1129,28 +1308,62 @@ if __name__ == "__main__":
             _real_motor_wh = (profiles.get(d_idx, {}).get("motor_energy_wh")
                                if profiles else None)
             motor_wh = _real_motor_wh if _real_motor_wh else (drain_wh + solar_wh)
-            # Approximate hourly SOC (linear interpolation)
+            # Real SOC curve from the actual per-substep trace (not a linear
+            # start->end approximation, which hid the mid-day peaks — e.g. a day
+            # that briefly hit 100% and clipped solar looked like a smooth
+            # decline). Sample ~9 points along the real trajectory.
             t_window = rc.day_finish_time_s(d_idx) - rc.day_start_time_s(d_idx)
             n_hours = max(1, int(t_window / 3600))
-            hourly_soc = [soc_start - (soc_drain_pct * h / n_hours) for h in range(n_hours + 1)]
-            hourly_labels = [_clock(rc.day_start_time_s(d_idx) + h * 3600) for h in range(n_hours + 1)]
-            soc_str = " → ".join(f"{s:.0f}%" for s in hourly_soc[::max(1, len(hourly_soc)//5)])
-            print(f"  3) SOC curve (approx): {soc_str}")
+            _soc_tr = ((profiles.get(d_idx, {}) or {}).get("dashboard_trace", {}) or {}).get("soc_pct", [])
+            if _soc_tr and len(_soc_tr) >= 2:
+                _n = len(_soc_tr)
+                _idxs = [int(round(i * (_n - 1) / 8)) for i in range(9)]
+                soc_str = " → ".join(f"{float(_soc_tr[i]):.0f}%" for i in _idxs)
+                _peak = max(float(x) for x in _soc_tr)
+                soc_str += f"   (peak {_peak:.0f}%)"
+                print(f"  3) SOC curve (real): {soc_str}")
+            else:
+                hourly_soc = [soc_start - (soc_drain_pct * h / n_hours) for h in range(n_hours + 1)]
+                soc_str = " → ".join(f"{s:.0f}%" for s in hourly_soc[::max(1, len(hourly_soc)//5)])
+                print(f"  3) SOC curve (approx): {soc_str}")
 
-            # 4. Solar input
-            print(f"  4) Solar input: {solar_wh:.0f} Wh total")
+            # 4. Solar — GROSS captured by the panel vs what the battery could
+            #    actually STORE. The difference is clipped at the SOC ceiling
+            #    (the battery was already full — most acute on days that start
+            #    near 100%). Showing all three is what makes the ledger
+            #    reconcile: stored_solar - motor ≈ battery delta.
+            underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
+            stored_solar_wh = max(0.0, solar_wh - underutil_wh)
+            if underutil_wh > 1.0:
+                print(f"  4) Solar: {solar_wh:.0f} Wh gross | {underutil_wh:.0f} Wh WASTED at SOC ceiling "
+                      f"| {stored_solar_wh:.0f} Wh stored")
+            else:
+                print(f"  4) Solar: {solar_wh:.0f} Wh captured (no ceiling clipping)")
 
-            # 5. Energy consumption
-            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery drain: {drain_wh:.0f} Wh ({soc_drain_pct:.1f}%)")
+            # 5. Energy consumption — reconciled ledger.
+            #    stored_solar - motor should ≈ battery delta (-drain). Any
+            #    residual is stationary-charge credit + charge/discharge
+            #    efficiency, both small.
+            net_wh = stored_solar_wh - motor_wh
+            print(f"  5) Motor energy: {motor_wh:.0f} Wh | Battery {'drain' if drain_wh>=0 else 'GAIN'}: "
+                  f"{abs(drain_wh):.0f} Wh ({-soc_drain_pct:+.1f}%)")
+            print(f"     Ledger: stored solar {stored_solar_wh:.0f} − motor {motor_wh:.0f} = {net_wh:+.0f} Wh "
+                  f"(≈ battery {'gain' if net_wh>=0 else 'drain'})")
 
-            # 6. Stall risk
-            stall = _estimate_stall_points(soc_start, soc_end, day_km, solar_wh)
-            print(f"  6) Stall risk: {stall}")
-
-            # 7. Early start strategy (6-8 AM solar charging)
-            if soc_start < 40.0:
-                print(f"  7) Start strategy: EARLY START recommended — prop car roadside"
-                      f" at 6 AM for 2h solar charge before driving (est. +{2*solar_wh/n_hours/_BATT_CAP_WH*100:.0f}% SOC)")
+            # 7. Morning charge onto the NEXT day (06:30 -> race start, safety-
+            #    gated: skipped if this day ends high, capped to the safe band,
+            #    extended by any late-finish penalty hold).
+            _pdict = (profiles.get(d_idx, {}) or {}) if profiles else {}
+            _morn = _pdict.get("morning_charge_pct")
+            _latepen = _pdict.get("late_penalty_min", 0) or 0
+            _nextstart = _pdict.get("next_start_soc_pct")
+            if _morn is not None and d_idx < 7:
+                if _morn <= 0.05:
+                    reason = "skipped (pack already high — battery safety)" if soc_end >= 90.0 else "≈0 (little morning sun)"
+                    print(f"  7) Morning charge -> Day {d_idx+2}: {reason}. Next day starts ~{_nextstart:.0f}%")
+                else:
+                    extra = f" (+ {_latepen} min penalty-hold charging)" if _latepen > 0 else ""
+                    print(f"  7) Morning charge -> Day {d_idx+2}: +{_morn:.1f}% from 06:30{extra}. Next day starts ~{_nextstart:.0f}%")
             else:
                 print(f"  7) Start strategy: Normal start at {_clock(rc.day_start_time_s(d_idx))}")
 
@@ -1212,29 +1425,50 @@ if __name__ == "__main__":
             _json_real_total_km = 0.0
             _json_total_trailered_km = 0.0
 
+            from collections import Counter as _Counter2
+            def _json_lp(d_idx):
+                if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
+                    return dict(_Counter2(nm for nm, _km in profiles[d_idx]["loops_committed"]))
+                return loop_plan.get(d_idx, {})
+
             for d_idx in range(8):
                 plan = plans[d_idx]
-                lp = loop_plan.get(d_idx, {})
+                lp = _json_lp(d_idx)
                 n_loops = sum(lp.values()) if lp else 0
                 loop_km = sum(cnt * km for (name, km) in plan.loops
                               for cnt in [lp.get(name, 0)])
                 day_km = _real_day_km(d_idx, plan, lp, profiles)
-                soc_start = float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0
+                soc_start = (float(profiles[d_idx]["start_soc_pct"])
+                         if profiles and d_idx in profiles and profiles[d_idx].get("start_soc_pct") is not None
+                         else (float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0))
 
+                trailered_km_day = _trailered_km_for(d_idx, profiles)
                 day_data = {
                     "route": DAY_NAMES.get(d_idx, f"Day {d_idx + 1}"),
+                    # Authoritative, reconciling distance:
+                    #   distance_km == stage1_km + stage2_km + loop_km - trailered_km
                     "distance_km": round(day_km, 1),
                     "stage1_km": round(plan.stage1_km, 1),
                     "stage2_km": round(plan.stage2_km, 1),
                     "loop_km": round(loop_km, 1),
+                    "trailered_km": round(trailered_km_day, 1),
+                    # Raw forward_sim driven distance (KML linestring + loop
+                    # separators) — for transparency; may differ from the
+                    # published headline by ~1 km. Do NOT sum this for scoring.
+                    "distance_km_simulated": round(_simulated_day_km(d_idx, profiles), 1),
                     "loops": {name: cnt for name, cnt in lp.items()} if lp else {},
                     "n_loops": n_loops,
                     "soc_start_pct": round(soc_start, 1),
+                    "morning_charge_pct": (profiles.get(d_idx, {}) or {}).get("morning_charge_pct", 0.0),
+                    "late_penalty_min": (profiles.get(d_idx, {}) or {}).get("late_penalty_min", 0),
+                    "next_start_soc_pct": (profiles.get(d_idx, {}) or {}).get("next_start_soc_pct"),
                 }
 
                 solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
-                day_data["solar_input_wh"] = round(solar_wh, 0)
-                day_data["solar_underutil_wh"] = round(float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0), 0)
+                underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
+                day_data["solar_input_wh"] = round(solar_wh, 0)          # gross panel output
+                day_data["solar_underutil_wh"] = round(underutil_wh, 0)  # clipped at SOC ceiling
+                day_data["solar_stored_wh"] = round(max(0.0, solar_wh - underutil_wh), 0)  # actually banked
 
                 if profiles and d_idx in profiles:
                     p = profiles[d_idx]
@@ -1256,6 +1490,12 @@ if __name__ == "__main__":
                         day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
                         day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
                         day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
+                    # Continuous distance-indexed curves for the dashboard
+                    # (SOC / velocity / solar / gradient vs distance). Coarse
+                    # velocity_profile_kmh above stays the driver card.
+                    dash = p.get("dashboard_trace")
+                    if dash:
+                        day_data["dashboard_trace"] = dash
 
                 if profiles and d_idx in profiles:
                     day_data["trailered_km"] = round(profiles[d_idx].get("trailered_km", 0.0) or 0.0, 1)

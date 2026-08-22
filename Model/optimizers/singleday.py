@@ -294,11 +294,17 @@ def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float
     Wh, making the two terms dimensionally comparable.
     """
     _w = float(SCFG.SOLAR_UNDERUTIL_WEIGHT)
+    # Battery-safety: seconds of penalty per (SOC-fraction·second) spent above
+    # the safe band. Pushes the profile to draw the pack down (drive faster)
+    # instead of coasting at ~100% — addresses both "we can't sit at full SOC"
+    # and "the model under-drives / leaves speed on the table".
+    _w_high = float(getattr(SCFG, "SOC_HIGH_PENALTY_WEIGHT", 0.0))
 
     def _objective(v_kmh: np.ndarray) -> float:
         res = evaluator(v_kmh)
         solar_penalty_s = _w * float(res.solar_underutil_j) / 3600.0
-        return float(res.total_time_s) + solar_penalty_s
+        high_soc_penalty_s = _w_high * float(getattr(res, "soc_over_safe_pct_s", 0.0))
+        return float(res.total_time_s) + solar_penalty_s + high_soc_penalty_s
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
@@ -587,6 +593,14 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         solar_underutil_wh=getattr(final_eval, 'solar_underutil_j', 0.0) / 3600.0,
         battery_delta_wh=(float(final_eval.final_soc_pct) - float(start_soc_pct))
                          * car.battery_nominal_wh / 100.0,
+        # Per-substep dashboard traces (aligned 1:1 with t_s / x_m). Continuous
+        # SOC / velocity / solar / gradient curves vs distance for the Dashboard;
+        # the coarse per-segment v_kmh above stays the driver card.
+        soc_over_safe_pct_s=getattr(final_eval, 'soc_over_safe_pct_s', 0.0),
+        soc_pct_trace=getattr(final_eval, 'soc_pct_trace', np.array([])),
+        v_kmh_trace=getattr(final_eval, 'v_kmh_trace', np.array([])),
+        solar_w_trace=getattr(final_eval, 'solar_w_trace', np.array([])),
+        slope_pct_trace=getattr(final_eval, 'slope_pct_trace', np.array([])),
         diagnostics=dict(
             global_fun=global_result.fun,
             slsqp_fun=slsqp_result.fun,

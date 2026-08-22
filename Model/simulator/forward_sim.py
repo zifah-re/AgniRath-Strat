@@ -44,6 +44,7 @@ import typing as _t
 import numpy as np
 
 from configs import race_config
+from configs import solver_config as _sc_forward
 from configs.car_config import CarState
 from core import physics
 from core.battery import Battery
@@ -93,6 +94,25 @@ class DayEvalResult:
     # regardless of distance, so trailered km must never be presented as
     # race distance covered.
     driven_km: float = 0.0
+    # ── Per-substep dashboard traces (Plan v3 §7.2 Dashboard) ──────────────
+    # One entry per integrated substep, aligned 1:1 with t_s / x_m above, so
+    # the dashboard can plot SOC / velocity / solar / gradient vs DISTANCE
+    # (x_m) or time (t_s). These are the continuous curves the coarse
+    # per-control-segment velocity card cannot provide. Empty by default so
+    # every existing caller/return path is unaffected.
+    soc_pct_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    v_kmh_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    solar_w_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    slope_pct_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    # Battery-safety exposure: time-integrated SOC ABOVE the safe band, in
+    # (SOC-fraction · seconds). The L2 objective penalizes this so the car
+    # doesn't coast at ~100% for long (pack-cooking + wasted solar); the more
+    # time near the ceiling, the bigger this grows.
+    soc_over_safe_pct_s: float = 0.0
 
 
 class DriverSwapScheduler:
@@ -116,6 +136,34 @@ class DriverSwapScheduler:
                                    piggybacked=coincides_with_stop,
                                    added_s=added_s))
         return added_s
+
+
+def _ghi_segment(solar_provider, t_nom: np.ndarray, x_pre: np.ndarray,
+                 seg_nodes, ghi_at_node_fn) -> np.ndarray:
+    """GHI for a whole segment's substeps in as few provider calls as possible.
+
+    Fast path: providers exposing ghi_wm2_array (HourlyJSONSolarProvider and
+    the Gaussian-floored wrapper) evaluate one cubic spline per weather node,
+    vectorized over the substeps assigned to that node. Fallbacks preserve the
+    old scalar behaviour for providers without the batch API. Always clipped
+    to >= 0.
+    """
+    n = len(t_nom)
+    arr_fn = getattr(solar_provider, "ghi_wm2_array", None)
+    if arr_fn is not None:
+        try:
+            out = np.asarray(arr_fn(t_nom, x_pre), dtype=float)
+            if out.shape == t_nom.shape:
+                return np.clip(out, 0.0, None)
+        except Exception:
+            pass
+    if ghi_at_node_fn is not None and seg_nodes is not None:
+        out = np.array([ghi_at_node_fn(float(t_nom[k]), int(seg_nodes[k]))
+                        for k in range(n)], dtype=float)
+        return np.clip(out, 0.0, None)
+    out = np.array([solar_provider.ghi_wm2(float(t_nom[k]), float(x_pre[k]))
+                    for k in range(n)], dtype=float)
+    return np.clip(out, 0.0, None)
 
 
 def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
@@ -170,6 +218,8 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     trailered_substeps = 0
     trailered_km_accum = 0.0
     driven_km_accum = 0.0
+    soc_over_safe_accum = 0.0
+    _soc_safe_max = getattr(_sc_forward, "SOC_SAFE_MAX_PCT", 100.0)
 
     n_seg = len(v_kmh)
     # Per-segment lengths, clamped so the final segment never integrates past
@@ -189,6 +239,11 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     # call (route=None flat fallback) hit a NameError here.
     t_array = []
     x_array = []
+    # Per-substep dashboard traces (aligned 1:1 with t_array / x_array).
+    soc_array = []
+    v_kmh_array = []
+    solar_w_array = []
+    slope_array = []
 
     # --- Model-parity knobs (keyword-only; defaults replicate Tier 1) ---
     # Regen clamp: None -> core.physics.regen_cap_w(car), the exact cap Tier 1
@@ -231,6 +286,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             continue
         n_substeps = max(1, round(seg_len_i / energy_grid_m))
         substep_len_km = (seg_len_i / n_substeps) / 1000.0
+        step_m_local = substep_len_km * 1000.0
 
         # ── Resolve every route + weather lookup for this whole segment ONCE,
         # as vectorized arrays, instead of per-substep Python-API calls
@@ -261,24 +317,60 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             seg_slopes = seg_reds = seg_stops = None
             seg_nodes = None
 
-        for k in range(n_substeps):
-            if use_route:
-                slope = float(seg_slopes[k])
-                is_trailered = bool(seg_reds[k])
-                stop_here = bool(seg_stops[k])
-                cs_stop_here = bool(seg_cs_stops[k])
-                loop_stop_here = bool(seg_loop_stops[k])
-            else:
-                slope = 0.0
-                is_trailered = False
-                stop_here = False
-                cs_stop_here = False
-                loop_stop_here = False
+        # ── VECTORIZED per-segment physics + solar (15/09 perf rewrite) ──
+        # The old inner loop called physics.net_power (forces) and the GHI
+        # spline ONCE PER SUBSTEP in pure Python — profiling showed ~88% of
+        # forward_sim time was those two calls, ~2.4k times per candidate,
+        # multiplied across every GA/SLSQP evaluation. Both are elementwise,
+        # so they're now computed ONCE PER SEGMENT as numpy arrays; only the
+        # genuinely-sequential state (SOC clip/underutil, breakdown risk,
+        # driver-swap clock, traces) stays in the light loop below.
+        #
+        # GHI is evaluated on the within-segment NOMINAL time grid
+        # (t_seg_start + cumulative dt, ignoring intra-segment breakdown/swap
+        # drift). The segment-start t_s already carries ALL prior breakdown +
+        # swap time, so the only error is sub-minute drift WITHIN one ~10 km
+        # segment — negligible for GHI (which varies on an hourly scale) and
+        # zero for energy (energy integrates dt, not clock time).
+        if use_route:
+            seg_reds_b = seg_reds.astype(bool)
+            seg_cs_b = seg_cs_stops.astype(bool)
+            seg_loop_b = seg_loop_stops.astype(bool)
+            seg_stops_b = seg_stops.astype(bool)
+            slopes_arr = np.asarray(seg_slopes, dtype=float)
+            x_pre_arr = x_pre
+        else:
+            seg_reds_b = np.zeros(n_substeps, dtype=bool)
+            seg_cs_b = np.zeros(n_substeps, dtype=bool)
+            seg_loop_b = np.zeros(n_substeps, dtype=bool)
+            seg_stops_b = np.zeros(n_substeps, dtype=bool)
+            slopes_arr = np.zeros(n_substeps, dtype=float)
+            x_pre_arr = x_m + np.arange(n_substeps, dtype=float) * step_m_local
 
-            if seg_nodes is not None and ghi_at_node_fn is not None:
-                ghi = float(ghi_at_node_fn(t_s, int(seg_nodes[k])))
-            else:
-                ghi = solar_provider.ghi_wm2(t_s, x_m)
+        drive_dt = step_m_local / v_ms
+        trailer_dt = step_m_local / (_TRAILER_SPEED_KMH / 3.6)
+        dt_arr = np.where(seg_reds_b, trailer_dt, drive_dt)
+        # Within-segment nominal clock for GHI lookups (start-of-substep).
+        t_nom = t_s + np.concatenate(([0.0], np.cumsum(dt_arr)[:-1]))
+        ghi_arr = _ghi_segment(solar_provider, t_nom, x_pre_arr,
+                               seg_nodes, ghi_at_node_fn)
+        # Physics for the whole segment at once (as if driving); trailered
+        # substeps are zeroed right after (inert cargo — no energy flow).
+        v_ms_arr = np.full(n_substeps, v_ms, dtype=float)
+        p_net_arr, _dt_unused = physics.net_power(
+            car, v_ms_arr, v_ms_arr, slopes_arr, ghi_arr, substep_len_km,
+            regen_cap_w=regen_cap_w)
+        p_net_arr = np.where(seg_reds_b, 0.0, p_net_arr)
+        p_solar_arr = car.array_area_m2 * car.array_efficiency * ghi_arr
+
+        for k in range(n_substeps):
+            slope = float(slopes_arr[k])
+            is_trailered = bool(seg_reds_b[k])
+            stop_here = bool(seg_stops_b[k])
+            cs_stop_here = bool(seg_cs_b[k])
+            loop_stop_here = bool(seg_loop_b[k])
+            ghi = float(ghi_arr[k])
+            p_solar_w = float(p_solar_arr[k])
 
             # --- Check if this grid point is on a trailered segment ---
             if is_trailered:
@@ -286,15 +378,13 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                 # charging whatsoever (explicit requirement — trailered
                 # segments must not accumulate any energy, solar or
                 # otherwise; the car is inert cargo on a tow truck here).
-                trailer_v_ms = _TRAILER_SPEED_KMH / 3.6
-                dt_s_step = float(substep_len_km * 1000.0 / trailer_v_ms)
+                dt_s_step = float(trailer_dt)
                 p_net = 0.0
                 trailered_substeps += 1
                 trailered_km_accum += substep_len_km
             else:
-                p_net, dt_s_step = physics.net_power(
-                    car, v_ms, v_ms, slope, ghi, substep_len_km,
-                    regen_cap_w=regen_cap_w)
+                dt_s_step = float(drive_dt)
+                p_net = float(p_net_arr[k])
                 driven_km_accum += substep_len_km
 
             # --- Stop-time solar charging (Tier 1 parity) ---
@@ -354,9 +444,20 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
 
             t_array.append(t_s)
             x_array.append(x_m)
+            # Dashboard traces (aligned 1:1 with t_array/x_array). battery.soc_pct
+            # already reflects this substep's energy (applied just above). Solar
+            # is 0 on trailered substeps (car is inert cargo — no capture); its
+            # driving speed is the tow speed, not the segment target.
+            soc_array.append(battery.soc_pct)
+            v_kmh_array.append(_TRAILER_SPEED_KMH if is_trailered else float(v))
+            solar_w_array.append(0.0 if is_trailered else float(p_solar_w))
+            slope_array.append(float(slope))
+            # Battery-safety exposure: accumulate time spent above the safe band.
+            if battery.soc_pct > _soc_safe_max:
+                soc_over_safe_accum += (battery.soc_pct - _soc_safe_max) / 100.0 * float(dt_s_step)
 
             t_s += float(dt_s_step)
-            x_m += step_m if use_route else substep_len_km * 1000.0
+            x_m += step_m_local
 
             t_s += swap_scheduler.advance(
                 float(dt_s_step), t_s, x_m, coincides_with_stop=stop_here)
@@ -399,4 +500,9 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         trailered_substeps=trailered_substeps,
         trailered_km=trailered_km_accum,
         driven_km=driven_km_accum,
+        soc_over_safe_pct_s=soc_over_safe_accum,
+        soc_pct_trace=np.array(soc_array),
+        v_kmh_trace=np.array(v_kmh_array),
+        solar_w_trace=np.array(solar_w_array),
+        slope_pct_trace=np.array(slope_array),
     )
