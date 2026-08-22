@@ -377,18 +377,28 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
 
 def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
-    """Morning parc-fermé charging gain (battery unsealed 06:00 → race start).
+    """Morning parc-fermé charging gain (06:30 capture start → next race start).
 
-    During this window only the BMS + MPPT charge controller are active,
-    so we use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W)
-    rather than the full 70 W driving electronics.
-    GHI is integrated in 15-minute steps for accuracy during the steep
-    sunrise ramp, rather than a single midpoint sample.
+    SINGLE SOURCE OF TRUTH for the overnight/morning charge across all tiers:
+    tier3.allocate and tier2's empty-day fallback both import THIS function, so
+    the DP transition, the single-day start SOC (fed via the trajectory) and the
+    report all see the same integrated morning energy — no per-tier drift.
+
+    Window: [MORNING_CHARGE_START_S, day_start(day_index+1)] — i.e. 06:30→08:00
+    on Days 2-7 (06:30→09:00 into Day 1). Packs are legally unsealed at 06:00
+    (BATTERY_UNSEAL_TIME_S) but the strategist's directive (20/08) is to count
+    capture only from 06:30, the realistic prop-up time after unseal/setup.
+
+    During this window only the BMS + MPPT charge controller are active, so we
+    use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W) rather than the
+    full driving electronics. Real GHI(t) is integrated in 15-minute steps for
+    accuracy during the steep sunrise ramp, not a single midpoint sample.
     """
     if day_index >= rc.N_RACE_DAYS - 1:
         return 0.0
 
-    t_start = rc.BATTERY_UNSEAL_TIME_S              # 06:00
+    # 06:30 capture start (>= 06:00 unseal), per strategist directive.
+    t_start = getattr(rc, "MORNING_CHARGE_START_S", rc.BATTERY_UNSEAL_TIME_S)
     t_end   = rc.day_start_time_s(day_index + 1)    # 08:00 (or 09:00 Day 1)
     dur     = max(0.0, t_end - t_start)
     if dur == 0.0:
@@ -424,7 +434,18 @@ def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float
     if not loops:
         yield (), 0.0
         return
-    budget = max(0.0, t_window_s - t_stops_base_s)
+    # RESERVE the base Stage-1+Stage-2 drive time before handing the rest to
+    # loops. Without this the generator counted only loop time and emitted
+    # loop counts that could never finish by the cutoff (the "8 loops, ETA
+    # 18:32" bug). Base is reserved at a realistic sustainable cruise
+    # (DP_BASE_PLANNING_SPEED_KMH), not v_max, so the ceiling is both
+    # time- AND roughly energy-feasible. SOC feasibility is still enforced
+    # per-combo downstream (tier2._l2_result_feasible); this just stops the
+    # obviously-impossible high-loop combos from ever being generated.
+    base_km = plan.stage1_km + plan.stage2_km
+    base_speed_ms = max(getattr(sc, "DP_BASE_PLANNING_SPEED_KMH", 65.0) / 3.6, 1e-6)
+    base_drive_s = (base_km * 1000.0) / base_speed_ms if base_km > 0 else 0.0
+    budget = max(0.0, t_window_s - t_stops_base_s - base_drive_s)
     t_per_attempt = [(km * 1000.0) / loop_speed_ms + pre_attempt_stop_s for _n, km in loops]
     caps = [int(budget // t) if t > 0 else 0 for t in t_per_attempt]
     import itertools

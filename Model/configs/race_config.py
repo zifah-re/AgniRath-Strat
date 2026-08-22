@@ -57,6 +57,12 @@ DAY8_PROCEEDINGS_END_S = 17 * 3600       # SR 2.22.5: Day 8 finish-line
                                          #   proceedings end 17H00
 
 BATTERY_UNSEAL_TIME_S = 6 * 3600         # SR 2.30.9: packs unsealed 06H00
+# Team-chosen morning solar-capture start. Packs are legally unsealed at 06:00
+# (BATTERY_UNSEAL_TIME_S), but the strategist's directive (discussion, 20/08)
+# is to count morning charging from 06:30 — the realistic time the array is
+# actually propped and capturing after unseal/setup. overnight_soc_gain()
+# integrates real GHI over [MORNING_CHARGE_START_S, next-day start].
+MORNING_CHARGE_START_S = 6 * 3600 + 30 * 60   # 06H30 (>= BATTERY_UNSEAL_TIME_S)
 BATTERY_SEAL_AFTER_FINISH_S = 5 * 60     # SR 2.30.7/2.30.8: pack disconnected &
                                          #   sealed within 5 min of finish line
 ARRAY_DISCONNECT_AFTER_FINISH_S = 5 * 60 # SR 2.31.2: demonstrate array
@@ -67,8 +73,27 @@ def day_start_time_s(day_index: int) -> int:
     return START_TIME_DAY1_S if day_index == 0 else START_TIME_OTHER_S
 
 def day_finish_time_s(day_index: int) -> int:
-    """Official finish time (seconds since midnight) for day_index (0-based)."""
+    """Official ON-TIME finish target (seconds since midnight) for day_index.
+
+    Days 1-7: 17H00 (SR 2.22.3). Day 8: 15H00 timed finish (SR 2.22.4).
+    This is the threshold past which the late-finish penalty (SR 2.22.6)
+    starts to accrue — arriving by this time is "on time".
+    """
     return DAY8_TIMED_FINISH_S if day_index == N_RACE_DAYS - 1 else FINISH_TIME_S
+
+def day_finish_cutoff_s(day_index: int) -> int:
+    """Absolute latest finish before severe penalty / exclusion, per day.
+
+    Days 1-7: 17H30 parc-ferme cutoff (SR 2.30.2). Day 8: the timed race is
+    over at 15H00 but finish-line proceedings run to 17H00 (SR 2.22.5), so
+    17H00 is used as Day 8's absolute cutoff.
+
+    TODO-VERIFY (Day 8): confirm against SR 2.22 whether a Day-8 arrival
+    between 15H00 and 17H00 incurs the standard late penalty or a different
+    Marathon/timed-stage rule. Until confirmed, Day 8 uses the 15H00 target
+    (day_finish_time_s) for the penalty gradient and 17H00 as the hard cutoff.
+    """
+    return DAY8_PROCEEDINGS_END_S if day_index == N_RACE_DAYS - 1 else FINISH_CUTOFF_ABS_S
 
 # ---------------------------------------------------------------------------
 # Late-finish penalty (SR 2.22.6): 1 min per minute (or part) up to and incl.

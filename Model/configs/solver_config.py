@@ -19,13 +19,68 @@ CONTROL_SEGMENT_M = 10_000       # L2 velocity control resolution
                                  # count. At 10km, still captures major slope
                                  # features; sub-integration at ENERGY_GRID_M
                                  # handles fine-grained physics within each segment.
-ENERGY_GRID_M = 100              # fine grid for energy/physics integration
+ENERGY_GRID_M = 150              # fine grid for energy/physics integration.
+                                 # Was 100. Coarsened to 150 m after the
+                                 # forward_sim vectorization: on real routes the
+                                 # end-of-day SOC/motor/solar differ <0.3% from
+                                 # the 100 m grid (verified) while cutting substep
+                                 # count ~1.5x — a real wall-clock win with
+                                 # negligible accuracy loss (slopes vary on a
+                                 # much longer length scale than 150 m).
 ROUTE_GRID_M = 10                # route parquet native grid
 
 # ---- L1 multi-day DP -------------------------------------------------------
 DP_SOC_BUCKET_PCT = 2.0          # SOC discretisation (Plan v3 §8 L1)
 DP_SOLAR_SCENARIOS = ("p10", "p50", "p90")
 DP_STOPPAGE_SCENARIOS_S = (0, 30 * 60, 60 * 60, 120 * 60)  # §7 time-loss inject
+
+# Realistic sustainable cruise for RESERVING base-route drive time when
+# bounding how many loop attempts can fit in a day (relaxed_loop_combos).
+# The old combo generator reserved ZERO time for the base Stage-1+Stage-2
+# drive, so it emitted physically impossible loop counts (e.g. 8-9 attempts
+# of a 40 km loop on top of a 220 km base) that could never finish by the
+# cutoff — the allocator then happily picked them and the day "finished" at
+# 18:30+. Reserving base_km / this_speed leaves only the genuinely spare time
+# for loops. 65 km/h is the strategist's target sustainable cruise (fast
+# enough to bank distance, slow enough to be energy-feasible on most days).
+DP_BASE_PLANNING_SPEED_KMH = 65.0
+
+# Future-SOC value discount in the Tier 3 allocator (0 < d <= 1). The DP's
+# value-to-go term rewards ending a day with high SOC (more options tomorrow),
+# but SOC banked beyond what later days can actually spend before their own
+# ceilings clip is worthless — so the raw DP hoards charge and skips loops on
+# good days (the "Day 5: 1 loop, 50 km/h, ends 99.8%" complaint). A discount
+# < 1 makes distance banked TODAY worth marginally more than SOC carried to
+# tomorrow, so the allocator takes a loop whenever its km beat the discounted
+# future value. Strategist directive (21/08): "SOC conservation matters, but
+# not at the cost of more distance." 1.0 = pure Bellman (hoards); lower =
+# more aggressive distance. Keep gentle so late days stay feasible.
+DP_FUTURE_VALUE_DISCOUNT = 0.93
+
+# ---- Late-finish pricing in the Tier 3 allocator ---------------------------
+# The strategist's directive (20/08): "arriving by 17:00 is good and must be
+# followed more or less — only run past it if the extra distance is genuinely
+# worth the next-day penalty." Tier 3 prices each candidate loop plan's
+# finish time: arriving after day_finish_time_s (17:00, or 15:00 on Day 8)
+# costs the SR 2.22.6 penalty, converted to a km-equivalent via the day's own
+# realized average speed, and subtracted from that day's distance value. This
+# makes the allocator stop adding loops around 17:00 and only exceed it when a
+# loop's marginal km beats the penalty (the future-SOC value term already
+# encodes "unless the next day needs the banked energy").
+LATE_FINISH_PENALTY_ENABLED = True
+# Combos finishing after this many minutes past the on-time target are still
+# priced with the penalty; combos past the absolute cutoff are rejected
+# upstream in tier2 (_l2_result_feasible). Kept explicit so the gradient and
+# the hard gate are tuned in one place.
+LATE_FINISH_MAX_LATE_MIN = 60.0
+
+# ---- Dashboard continuous-output resolution --------------------------------
+# The coarse per-control-segment velocity_profile_kmh stays the driver card
+# (Plan v3 §8: one target speed per segment). For the DASHBOARD, forward_sim's
+# fine per-substep traces (soc/velocity/solar/slope vs distance) are exported,
+# downsampled to roughly one point per OUTPUT_TRACE_STRIDE_M metres so the JSON
+# stays a sane size while the curves still read as continuous.
+OUTPUT_TRACE_STRIDE_M = 250.0
 
 # ---- L2 single-day hybrid --------------------------------------------------
 SEED_METHOD = "ga"               # "ga" primary (EAFIT: GA beat BB-BC on 10D),

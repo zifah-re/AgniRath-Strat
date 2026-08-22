@@ -57,7 +57,7 @@ SA_TZ=ZoneInfo("Africa/Johannesburg")
 HALF_BLIND_LOOP_PLACEHOLDER_KM = 14.0 #Change later somehow
 DAY_DISTANCES={
     "Day 1": {"s1": 172.7, "l":22.6, "s2":65.6},
-    "Day 2": {"s1": 71.5, "l":22.6, "s2":231.0},
+    "Day 2": {"s1": 71.5, "l":18.5, "s2":231.0},
     "Day 3": {"s1": 8.0, "l":39.9, "s2":208.0},
     "Day 4": {"s1": 197.0, "l":21.0, "s2":63.3},
     "Day 5": {"s1": 178.0, "l":60.7, "s2":114.0},
@@ -109,7 +109,7 @@ DAY_ROUTE_NOTES = [
 ]
 DAYWISE_FILES={
     "Day 1": {"date":date(2026,9,10),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _Rustenburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 2 Rustenburg to Swartruggens"},
-    "Day 2": {"date":date(2026,9,11),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust","l":None,"s2":"2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
+    "Day 2": {"date":date(2026,9,11),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust","l":"SSC ROUTE FINAL_Day 2 Half Blind_Day 2 Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
     "Day 3": [{"date":date(2026,9,12),"s1": None,"l":"Day 3 probables_Probable Aryaman Day 3_Day 3 Loop","s2":"Day 3 probables_Probable Aryaman Day 3_Stage 2"},
               {"date":date(2026,9,12),"s1":"Day 3 probables_Probable Prahlad Route_Stage 1", "l":"Day 3 probables_Probable Prahlad Route_Day 3 Loop","s2":"Day 3 probables_Probable Prahlad Route_Stage 2" }][1],
     "Day 4": {"date":date(2026,9,13),"s1":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg","l":"2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek"},
@@ -253,10 +253,10 @@ def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distance
        return np.array([loop_soc_start]),end_time
 
 def main():
-    v1 = 55 / 3.6
-    v2 = 55 / 3.6
-    day_no = 3
-    soc_start = 95 - ((day_no-1)/(7))*70
+    day_no = 6
+    v1 = [70 / 3.6,60/3.6,60/3.6,55/3.6,60/3.6,55/3.6,55/3.6,50/3.6][day_no-1]
+    v2 = [70 / 3.6,60/3.6,60/3.6,55/3.6,60/3.6,55/3.6,55/3.6,50/3.6][day_no-1]
+    soc_start = [95,82,63,53,67,67,53,53][day_no-1]
     loop_bounds = []
 
     for day in [f"Day {day_no}"]:
@@ -291,7 +291,7 @@ def main():
         )
 
         fig, axes = plt.subplots(1, 1, figsize=(10, 5))
-
+        
         solar_obj = weather_logs[f"mean_{DAYWISE_FILES[day]['l']}"]
 
         # Extract base route profiles once
@@ -310,10 +310,13 @@ def main():
         ]
         distances_s1 = np.array(route_s1["Distance"])
 
-        route_s2 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s2']}.kml.save")[
-            "profile"
-        ]
-        distances_s2 = np.array(route_s2["Distance"])
+        try:
+            route_s2 = extractSolarData(f"Saves/{DAYWISE_FILES[day]['s2']}.kml.save")[
+                "profile"
+            ]
+            distances_s2 = np.array(route_s2["Distance"])
+        except:
+            distances_s2=np.array([0])
 
         for i in range(len(loop_bounds[-1])):
             n_loops = loop_bounds[-1][i]
@@ -332,13 +335,17 @@ def main():
             )
 
             if len(loop_soc)>1 and not loop_soc[-1] < SOC_MIN_PCT:
-                end_soc_s2, power_s2, day_end_time = stage_soc_profile(
-                    v2,
-                    DAYWISE_FILES[day]["s2"],
-                    start_date,
-                    end_loop_time,
-                    soc_start=loop_soc[-1],
-                )
+                if DAYWISE_FILES[day]['s2'] is not None:
+                    end_soc_s2, power_s2, day_end_time = stage_soc_profile(
+                        v2,
+                        DAYWISE_FILES[day]["s2"],
+                        start_date,
+                        end_loop_time,
+                        soc_start=loop_soc[-1],
+                    )
+                else:
+                    end_soc_s2=[loop_soc[-1]]
+                    day_end_time=end_loop_time
 
                 if not end_soc_s2[-1] < SOC_MIN_PCT:
                 # --- CORRECT DISTANCE CONCATENATION ---
@@ -363,14 +370,18 @@ def main():
                         f" {end_soc_s2[-1]:.2f}%"
                     )
             elif len(loop_soc)==1:
-                end_soc_s2, power_s2, day_end_time = stage_soc_profile(
-                v2,
-                DAYWISE_FILES[day]["s2"],
-                start_date,
-                end_loop_time,
-                soc_start=loop_soc[-1],
-                )
-            
+                if DAYWISE_FILES[day]['s2'] is not None:
+                    end_soc_s2, power_s2, day_end_time = stage_soc_profile(
+                    v2,
+                    DAYWISE_FILES[day]["s2"],
+                    start_date,
+                    end_loop_time,
+                    soc_start=loop_soc[-1],
+                    )
+                else:
+                    end_soc_s2=[loop_soc[-1]]
+                    day_end_time=end_loop_time
+
                 if not end_soc_s2[-1] < SOC_MIN_PCT:
                     # --- CORRECT DISTANCE CONCATENATION ---
                     

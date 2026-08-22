@@ -18,6 +18,39 @@ def _base_km(plan, trailered_km: float = 0.0) -> float:
     """Base distance credited to the race, excluding mandatory trailering."""
     return max(0.0, plan.stage1_km + plan.stage2_km - float(trailered_km or 0.0))
 
+
+def _late_finish_penalty_km(model, s_start: float, day_index: int,
+                            dist_km: float) -> float:
+    """Km-equivalent cost of finishing after the day's on-time target.
+
+    Implements the strategist directive (20/08): arriving by day_finish_time_s
+    (17:00, or 15:00 on Day 8) is the target; finishing later costs the
+    SR 2.22.6 penalty (served next day at the control stop). The penalty
+    minutes are converted to a distance the car would otherwise have covered,
+    using the combo's OWN realized average speed (finish - day_start over the
+    distance driven) — the same "penalty * marginal rate" conversion tier1 and
+    multiday_dp already use. Returns 0 when pricing is disabled, when the
+    surrogate has no finish time (Tier-1 fallback), or when the combo is on
+    time. Combos past the absolute cutoff are rejected upstream in tier2
+    (_l2_result_feasible), so this only ever prices the [on_time, cutoff] band.
+    """
+    if not getattr(sc, "LATE_FINISH_PENALTY_ENABLED", True):
+        return 0.0
+    finish_s = model.predict_finish_s(s_start)
+    if not np.isfinite(finish_s):
+        return 0.0
+    on_time_s = rc.day_finish_time_s(day_index)
+    minutes_late = (finish_s - on_time_s) / 60.0
+    if minutes_late <= 0.0:
+        return 0.0
+    pen_min = rc.late_finish_penalty_min(minutes_late)
+    if pen_min <= 0:
+        return 0.0
+    day_start_s = rc.day_start_time_s(day_index)
+    drive_hr = max((finish_s - day_start_s) / 3600.0, 1e-6)
+    avg_speed_kmh = max(0.0, float(dist_km)) / drive_hr
+    return (pen_min / 60.0) * avg_speed_kmh
+
 def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans: list,
              start_soc_pct: float, start_day: int = 0,
              trailered_km_by_day: dict[int, float] | None = None) -> dict:
@@ -53,6 +86,9 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
                 v_next = _interp(V[d + 1], soc_buckets, next_soc)
                 if not np.isfinite(v_next):
                     continue
+                # Discount future SOC value so distance TODAY is preferred over
+                # hoarding charge later days can't spend (see solver_config).
+                v_next = float(getattr(sc, "DP_FUTURE_VALUE_DISCOUNT", 1.0)) * v_next
 
                 dist = base_km + model.loop_km
                 waste_wh = model.predict_underutil(s_start)
@@ -62,12 +98,20 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
                     / 3600.0
                     * waste_wh
                 )
+                # Late-finish pricing (SR 2.22.6): arriving past the day's
+                # on-time target (17:00, or 15:00 on Day 8) costs the penalty,
+                # km-converted, so the allocator only runs late when a loop's
+                # marginal distance beats that cost. v_next already values
+                # banking SOC for a harder next day, so "arrive by 17:00 unless
+                # the next day makes it worth it" falls out of the two terms.
+                late_penalty_km = _late_finish_penalty_km(
+                    model, s_start, d, dist)
                 # Completion mode means the base race must remain feasible; it
                 # must not turn the multi-day objective into "preserve SOC and
                 # ignore distance". The competition objective is still distance
                 # accumulated across days, with future SOC value as the coupling
                 # term and solar curtailment as a secondary cost.
-                val = dist + v_next - waste_penalty_km
+                val = dist + v_next - waste_penalty_km - late_penalty_km
                 if val > best_val:
                     best_val = val
                     policy_reps[d][s_idx] = reps
