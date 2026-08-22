@@ -43,7 +43,33 @@ DP_STOPPAGE_SCENARIOS_S = (0, 30 * 60, 60 * 60, 120 * 60)  # §7 time-loss injec
 # 18:30+. Reserving base_km / this_speed leaves only the genuinely spare time
 # for loops. 65 km/h is the strategist's target sustainable cruise (fast
 # enough to bank distance, slow enough to be energy-feasible on most days).
-DP_BASE_PLANNING_SPEED_KMH = 65.0
+DP_BASE_PLANNING_SPEED_KMH = 65.0   # strategist directive (21/08): the car
+                                    # CANNOT sustain ~78 km/h — that was the
+                                    # opposite extreme from the old ~48 km/h
+                                    # crawl. The realistic sustainable cruise is
+                                    # a 60-70 km/h AVERAGE, so the base route is
+                                    # budgeted at 65 (mid-band) and the per-
+                                    # segment target is hard-capped at
+                                    # SUSTAINABLE_CRUISE_KMH below. Reserving
+                                    # base time at the speed the car actually
+                                    # drives keeps the loop budget honest.
+
+# ---- Sustainable cruise cap (strategist directive 21/08) -------------------
+# The car's INSTANTANEOUS physical ceiling (car.v_max_ms, ~90 km/h) is not a
+# speed it can hold: motor thermals, efficiency roll-off and driver endurance
+# make anything above the low-70s unsustainable over a full race day. Once the
+# breakdown-time governor was removed from the objective, the optimizer was
+# free to chase that 90 km/h ceiling and settled around ~78 — physically
+# unrealistic for this car. This is a HARD per-segment cap on the L2 target
+# speed (applied on top of the route speed-limit and the car v_max), chosen so
+# the day-average lands in the strategist's 60-70 km/h sweet spot: with normal
+# terrain/turn slow-downs pulling the mean below the cap, a 70 cap yields a
+# ~67-68 average on energy-rich days and less when solar/SOC bind. The optimizer still
+# WANTS to reach the cap (minimize time, spend solar on distance/loops), it just
+# can't exceed a pace the car can actually hold. Lower this if telemetry shows
+# the true sustainable cruise is slower; raise it if the car proves it can hold
+# more.
+SUSTAINABLE_CRUISE_KMH = 70.0
 
 # Future-SOC value discount in the Tier 3 allocator (0 < d <= 1). The DP's
 # value-to-go term rewards ending a day with high SOC (more options tomorrow),
@@ -151,3 +177,10 @@ CIRCLE_TARGET_DIAMETER_KM = 25.0  # ~ irradiance decorrelation scale guess
 PULL_EVENING_LOCAL_H = 19         # evening pull -> tomorrow's DP/L2
 PULL_MORNING_LOCAL_H = 6          # morning pull -> final fit before start
 NOWCAST_INTERVAL_S = 30 * 60      # intra-day nowcast pulls (MPC only)
+# ---- Breakdown risk in the optimization objective (21/08 root-cause fix) ----
+# The deterministic expected-breakdown-time term was dominating total_time_s and
+# preventing the optimizer from ever driving fast (see diag: pure-drive time
+# halves from 45->85 km/h but expected-breakdown time explodes, so the total the
+# optimizer minimizes is flat). Breakdown is now a REPORTED risk, not a governor
+# on speed. Set True only if you deliberately want the risk-averse behaviour.
+INCLUDE_BREAKDOWN_IN_TIME = False

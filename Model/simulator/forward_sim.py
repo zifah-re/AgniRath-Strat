@@ -483,7 +483,18 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                                                    category=triggered_category,
                                                    duration_s=breakdown_s))
                 total_breakdown_s += breakdown_s
-                t_s += breakdown_s
+                # Whether EXPECTED breakdown time inflates the clock the
+                # optimizer minimizes. The deterministic (rng=None) expected
+                # value accumulates ~10 min * probability over ~2400 substeps,
+                # which grows so fast with motor power that "minimize time"
+                # refuses to drive fast at all — the single biggest reason the
+                # model underdrove and left distance on the table. Default:
+                # breakdown is a REPORTED risk (total_breakdown_s), NOT a
+                # governor on the deterministic objective. The STOCHASTIC path
+                # (rng given, used by scenarios/robustness) always applies it,
+                # because that's exactly what those Monte-Carlo runs are for.
+                if rng is not None or getattr(_sc_forward, "INCLUDE_BREAKDOWN_IN_TIME", False):
+                    t_s += breakdown_s
 
     return DayEvalResult(
         final_soc_pct=battery.soc_pct,

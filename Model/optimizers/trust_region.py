@@ -319,6 +319,14 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
     cur_soc = (float(start_socs[start_day])
                if np.isfinite(start_socs[start_day]) else 100.0)
 
+    # FEATURE B: the previous day's late-finish penalty (seconds) is served
+    # stationary at the START of the current day. It both extends the morning
+    # charge (already done via overnight_soc_gain extra_charge_s) AND eats into
+    # the current day's legal driving window — so it is threaded forward into
+    # singleday.solve as penalty_stoppage_s and pushes the finish clock later.
+    # Zero for the first simulated day (nothing finished late before it).
+    carryover_penalty_s = 0.0
+
     for d in range(start_day, len(routes)):
         s_start = cur_soc
         d_loops = loop_plan.get(d, {})
@@ -369,7 +377,8 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             start_soc_pct=s_start,
             alpha_next_day_pct=alpha_next,
             loops_committed=loops_committed,
-            loop_geoms=loop_geoms
+            loop_geoms=loop_geoms,
+            penalty_stoppage_s=carryover_penalty_s,
         )
 
         # ── HARD finish-feasibility backstop ─────────────────────────────
@@ -382,18 +391,22 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         # solve, on the single final-extract pass only.
         cutoff_s = rc.day_finish_cutoff_s(d)
         day_start_s = rc.day_start_time_s(d)
+        # The prior day's penalty is served stationary at the top of this day,
+        # so the real finish clock is day_start + penalty_hold + drive_time.
         _dropped = 0
         while (loops_committed
-               and (day_start_s + float(res.get("total_time_s", 0.0))) > cutoff_s):
+               and (day_start_s + carryover_penalty_s
+                    + float(res.get("total_time_s", 0.0))) > cutoff_s):
             loops_committed = loops_committed[:-1]
             _dropped += 1
             res = singleday.solve(
                 route=route_d, car=car, solar_provider=solar_provider,
                 wind_provider=wind_provider, day_index=d, start_soc_pct=s_start,
                 alpha_next_day_pct=alpha_next, loops_committed=loops_committed,
-                loop_geoms=loop_geoms)
+                loop_geoms=loop_geoms, penalty_stoppage_s=carryover_penalty_s)
         if _dropped:
-            finish_clk = day_start_s + float(res.get("total_time_s", 0.0))
+            finish_clk = (day_start_s + carryover_penalty_s
+                          + float(res.get("total_time_s", 0.0)))
             logger.warning(
                 "Day %d: dropped %d loop rep(s) to meet the %02d:%02d cutoff — "
                 "final finish %02d:%02d with %d loop rep(s).",
@@ -419,7 +432,12 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
 
         # ── Advance the physical SOC chain to the next day ──────────────
         actual_end_soc = float(res.get("final_soc_pct", cur_soc))
-        finish_abs_s = day_start_s + float(res.get("total_time_s", 0.0))
+        # Absolute finish clock INCLUDES the prior day's penalty hold served at
+        # the top of today (see carryover_penalty_s), so a day that started with
+        # a penalty is correctly reported as finishing later — and that later
+        # finish is what determines whether TODAY itself finishes late.
+        finish_abs_s = (day_start_s + carryover_penalty_s
+                        + float(res.get("total_time_s", 0.0)))
         # Late-finish penalty (SR 2.22.6/7): minutes served stationary at the
         # NEXT day's control stop. The car captures solar during that hold, so
         # it buys back morning-charge time (06:30 -> 08:00 + penalty).
@@ -441,6 +459,11 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             "end_soc_pct": res.get("final_soc_pct"),
             "morning_charge_pct": round(morning_gain_pct, 2),
             "late_penalty_min": int(late_penalty_min),
+            # FEATURE B: minutes of penalty inherited from the PREVIOUS day and
+            # actually charged against today's driving window (0 on the first
+            # day). Distinct from late_penalty_min, which is what THIS day hands
+            # to tomorrow. Surfaced so the report can show the propagation.
+            "inherited_penalty_min": int(round(carryover_penalty_s / 60.0)),
             "next_start_soc_pct": round(next_start_soc, 2),
             "velocity_profile_kmh": res.get("v_kmh"),
             "time_array_s": res.get("t_s"),
@@ -458,6 +481,9 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
         }
 
         cur_soc = next_start_soc
+        # Hand this day's late-finish penalty forward: it will be served
+        # stationary at the top of tomorrow, shrinking tomorrow's drive window.
+        carryover_penalty_s = late_penalty_min * 60.0
 
     return final_race_plan
 
@@ -510,15 +536,175 @@ def fast_replan_today(route, base_car: CarState, solar_providers: dict, wind_pro
     if res.get("final_soc_pct", -float('inf')) < car.soc_min_pct:
         logger.warning("Fast Replan Failed: Cannot hit target SOC. Macro-Replan required.")
         return {"feasible": False}
-        
+
     return {
         "feasible": True,
         "velocity_profile_kmh": res.get("v_kmh"),
         "predicted_end_soc_pct": res.get("final_soc_pct")
     }
 
+
+# ===========================================================================
+# 3. Re-solve from realized actuals  (strategist directive 21/08 — "the feature")
+# ===========================================================================
+#
+# "I should be able to rerun the model the night before day x+1 (or the night
+#  after day x) inputting whatever performance parameters actually happened —
+#  the distance and loops actually driven, the SOC actually reached, and the
+#  solar efficiency we actually saw — with sensible defaults for the rest, and
+#  have the remaining days re-optimized around that reality."
+#
+# This is the between-days macro re-solve. Days already completed are locked;
+# everything from `resume_day` onward is re-optimized as a fresh multi-day plan
+# that STARTS from the SOC you actually reached and uses the solar efficiency
+# you actually measured going forward. It reuses the exact same optimize() ->
+# extract_final_profiles() pipeline as a cold start, so a re-solve is just a
+# cold solve with a different start day, start SOC and (optionally) car params.
+#
+# Why start SOC is the load-bearing input: each future day is planned fresh from
+# its own route/weather, so yesterday's distance and loop count only influence
+# tomorrow THROUGH the battery state you carried into it. Feeding the measured
+# start SOC is therefore what actually re-anchors the plan; distance/loops-done
+# are accepted too (recorded, and used if you re-solve mid-day) but do not
+# retro-change a completed day's optimization.
+#
+# Solar efficiency: forward solar power is area * array_efficiency * GHI, so a
+# measured effective efficiency (panel x real-world capture: dust, soiling,
+# haze) is applied simply by overriding array_efficiency for the remaining days.
+# Scaling efficiency by k is mathematically identical to scaling every future
+# day's GHI by k, so this single knob captures "we're only getting 90% of the
+# predicted solar from here on" exactly. Defaults to the car's nominal value.
+
+def resolve_from_actuals(
+        routes: list, base_car: CarState,
+        solar_providers: dict, wind_providers: dict, *,
+        resume_day: int,
+        start_soc_pct: float,
+        solar_efficiency: float | None = None,
+        car_overrides: dict | None = None,
+        actual_distance_km: float | None = None,
+        actual_loops_done: dict | None = None,
+        dist_done_km: float = 0.0,
+        elapsed_s: float = 0.0,
+        cs_taken: bool = False,
+        loops_done: dict | None = None,
+        kml_paths: dict | None = None,
+        loop_geoms_by_day: dict | None = None,
+        plans_override: list | None = None,
+        tier1_baseline: dict | None = None,
+        parallel: bool = True,
+        n_workers: int | None = None,
+        global_method: str = "ga",
+        seed: int | None = None,
+        max_iters: int = MAX_ITERS) -> dict:
+    """Re-optimize days `resume_day`..end from what actually happened.
+
+    Parameters
+    ----------
+    resume_day : int
+        0-indexed first day to (re)plan. To replan the night AFTER Day 2 for
+        Day 3 onward, pass resume_day=2 (Day 3). Everything before it is frozen.
+    start_soc_pct : float
+        The battery SOC (percent) actually available at the START of `resume_day`
+        — i.e. the measured end-of-previous-day SOC plus whatever overnight/
+        morning charge really landed. This is the primary reality anchor.
+    solar_efficiency : float, optional
+        Measured EFFECTIVE array efficiency (0..1) to use for all remaining days
+        (e.g. 0.20 if soiling knocked the nominal 0.22 panel down). Defaults to
+        the car's configured array_efficiency (no change).
+    car_overrides : dict, optional
+        Any other measured car parameters that changed (mass_kg, p_idle_w, ...).
+        Sensible default: {} (keep the configured car). solar_efficiency, if
+        given, is merged in as array_efficiency and wins over any array_efficiency
+        placed here.
+    actual_distance_km, actual_loops_done : optional
+        Recorded for the returned audit block only — they describe COMPLETED days
+        and do not alter the forward optimization (each future day is planned
+        fresh). Provided so the caller can log "what happened" alongside "what's
+        planned next" in one object.
+    dist_done_km, elapsed_s, cs_taken, loops_done : optional
+        Only for the rarer MID-day re-solve (you're partway through `resume_day`
+        itself). Left at their between-days defaults (0 / 0 / False / None), the
+        remaining days are planned from a clean morning start — the common case.
+    The remaining parameters mirror optimize() and default sensibly, so the
+    minimal call is:
+        resolve_from_actuals(routes, car, solar_p, wind_p,
+                             resume_day=2, start_soc_pct=58.0)
+
+    Returns
+    -------
+    dict with keys:
+        feasible       : bool
+        result         : the raw optimize() result (or None if infeasible)
+        profiles       : extract_final_profiles() output ({} if infeasible)
+        forward_car    : the CarState actually used for the remaining days
+        actuals        : echo of the realized inputs (audit trail)
+    """
+    if not (0 <= resume_day < len(routes)):
+        raise ValueError(
+            f"resume_day={resume_day} out of range 0..{len(routes) - 1}")
+
+    # Build the forward car: nominal car + measured overrides + solar efficiency.
+    fwd_overrides = dict(car_overrides or {})
+    if solar_efficiency is not None:
+        if not (0.0 < solar_efficiency <= 1.0):
+            raise ValueError(
+                f"solar_efficiency must be in (0, 1]; got {solar_efficiency}")
+        fwd_overrides["array_efficiency"] = float(solar_efficiency)
+    fwd_car = dataclasses.replace(base_car, **fwd_overrides)
+
+    logger.info(
+        "RESOLVE from actuals: resume Day %d at SOC=%.1f%%, array_eff=%.3f%s",
+        resume_day + 1, start_soc_pct, fwd_car.array_efficiency,
+        (f", +overrides {sorted(k for k in fwd_overrides if k != 'array_efficiency')}"
+         if len(fwd_overrides) > 1 or (fwd_overrides and 'array_efficiency' not in fwd_overrides)
+         else ""))
+
+    # Recompute the Tier-1 baseline against the FORWARD car unless the caller
+    # supplied one — array_efficiency (or mass, etc.) changed the energy balance,
+    # so a baseline built on the old car would misseed the SOC window.
+    result = optimize(
+        routes=routes, car=fwd_car,
+        solar_providers=solar_providers, wind_providers=wind_providers,
+        start_soc_pct=float(start_soc_pct), start_day=resume_day,
+        dist_done_km=dist_done_km, elapsed_s=elapsed_s, cs_taken=cs_taken,
+        loops_done=loops_done, kml_paths=kml_paths,
+        loop_geoms_by_day=loop_geoms_by_day, plans_override=plans_override,
+        parallel=parallel, n_workers=n_workers, global_method=global_method,
+        seed=seed, max_iters=max_iters, tier1_baseline=tier1_baseline)
+
+    profiles = {}
+    if result.get("feasible"):
+        # Pass the forward car as base_car with no further overrides so the
+        # extracted physics match the re-solve exactly.
+        profiles = extract_final_profiles(
+            routes, fwd_car, solar_providers, wind_providers, result,
+            loop_geoms_by_day=loop_geoms_by_day, plans_override=plans_override)
+    else:
+        logger.warning(
+            "RESOLVE infeasible from SOC=%.1f%% at Day %d — the measured start "
+            "state can't legally finish the remaining route. Try a higher start "
+            "SOC or confirm the efficiency input.", start_soc_pct, resume_day + 1)
+
+    return {
+        "feasible": bool(result.get("feasible")),
+        "result": result if result.get("feasible") else None,
+        "profiles": profiles,
+        "forward_car": fwd_car,
+        "actuals": {
+            "resume_day_index": resume_day,
+            "start_soc_pct": float(start_soc_pct),
+            "solar_efficiency_used": fwd_car.array_efficiency,
+            "car_overrides": fwd_overrides,
+            "actual_distance_km": actual_distance_km,
+            "actual_loops_done": actual_loops_done,
+            "mid_day": bool(dist_done_km or elapsed_s or cs_taken or loops_done),
+        },
+    }
+
 if __name__ == "__main__":
     import os
+    import sys
     import glob
     import logging
     import json
@@ -978,6 +1164,101 @@ if __name__ == "__main__":
     # variant so each result is self-consistent (cost: one ~10-min Tier 1
     # pass per variant).
     kml_files_d3 = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
+
+    # ------------------------------------------------------------------ #
+    # 5a. RE-SOLVE-FROM-ACTUALS CLI  (Feature C — locally testable)
+    # ------------------------------------------------------------------ #
+    # Usage (skips the full 2-variant race run and re-optimizes just the
+    # remaining days from a realized state you type in):
+    #
+    #   python -m optimizers.trust_region resolve \
+    #       --resume-day 4 --start-soc 58 [--solar-eff 0.20] [--variant prahlad]
+    #
+    #   --resume-day  human day number (4 == Day 4) that you want to plan NEXT;
+    #                 everything before it is treated as already run.
+    #   --start-soc   the SOC (%) actually available at the start of that day.
+    #   --solar-eff   OPTIONAL measured effective array efficiency (0..1) for the
+    #                 remaining days; defaults to the car's nominal value.
+    #   --variant     OPTIONAL Day-3 route variant to assume (default 'prahlad');
+    #                 only matters if --resume-day <= 3.
+    #
+    # This is the exact optimize()->extract pipeline used for a cold start, so a
+    # re-solve is just a cold solve from a different day/SOC/efficiency. Fast for
+    # late resume days (only the tail is optimized).
+    if "resolve" in sys.argv[1:]:
+        def _flag(name, cast, default=None):
+            if name in sys.argv:
+                return cast(sys.argv[sys.argv.index(name) + 1])
+            return default
+
+        human_day = _flag("--resume-day", int, None)
+        start_soc = _flag("--start-soc", float, None)
+        if human_day is None or start_soc is None:
+            logger.error("resolve needs --resume-day <N> and --start-soc <pct>")
+            sys.exit(2)
+        resume_idx = human_day - 1
+        solar_eff = _flag("--solar-eff", float, None)
+        variant_name = _flag("--variant", str, "prahlad")
+
+        # Materialise a Day-3 route/plan/weather for the chosen variant so the
+        # routes dict covers all 8 day slots (optimize/extract index 0..7).
+        variant_route_files = day3_variants.get(
+            variant_name, next(iter(day3_variants.values())))
+        routes[2] = _load_route(variant_route_files, 3) if variant_route_files else None
+        day3_plan = _build_day3_variant_plan(variant_route_files, variant_name, day_num=3)
+        loop_geoms_by_day[2] = _load_loop_geometries(variant_route_files, day3_plan, 3)
+        solar_providers[2], wind_providers[2] = _load_weather(
+            day3_variant_weather.get(variant_name, []), routes.get(2), 3)
+        kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
+        _apply_trailered_mask(routes.get(2), kml_paths, 2)
+
+        variant_plans = [_get_day_plan(d) for d in range(8) if d != 2]
+        variant_plans.insert(2, day3_plan)
+
+        logger.info("=" * 60)
+        logger.info("RE-SOLVE FROM ACTUALS: Day %d onward, start SOC %.1f%%%s",
+                    human_day, start_soc,
+                    f", solar_eff={solar_eff}" if solar_eff is not None else "")
+        logger.info("=" * 60)
+
+        rr = resolve_from_actuals(
+            routes, car, solar_providers, wind_providers,
+            resume_day=resume_idx, start_soc_pct=start_soc,
+            solar_efficiency=solar_eff,
+            kml_paths=kml_paths, loop_geoms_by_day=loop_geoms_by_day,
+            plans_override=variant_plans, parallel=True)
+
+        print("\n" + "=" * 64)
+        print(f" RE-SOLVE RESULT — Day {human_day} onward "
+              f"(variant={variant_name})")
+        print("=" * 64)
+        print(f" feasible          : {rr['feasible']}")
+        print(f" start SOC          : {rr['actuals']['start_soc_pct']:.1f}%")
+        print(f" array efficiency   : {rr['actuals']['solar_efficiency_used']:.3f}")
+        if rr["feasible"]:
+            profs = rr["profiles"]
+            tot_driven = 0.0
+            for d in sorted(profs):
+                p = profs[d]
+                driven = float(p.get("driven_km", 0.0))
+                tot_driven += driven
+                fin = rc.day_start_time_s(d) + float(p.get("total_time_s", 0.0)) \
+                      + float(p.get("inherited_penalty_min", 0)) * 60.0
+                vprof = p.get("velocity_profile_kmh")
+                avg_v = float(np.mean(vprof)) if vprof is not None and len(vprof) else 0.0
+                print(f"  Day {d+1}: start {p['start_soc_pct']:.1f}%  "
+                      f"end {p['end_soc_pct']:.1f}%  driven {driven:.1f} km  "
+                      f"avg {avg_v:.1f} km/h  "
+                      f"finish {int(fin//3600):02d}:{int((fin%3600)//60):02d}  "
+                      f"loops {len(p.get('loops_committed', []))}  "
+                      f"latepen {p.get('late_penalty_min',0)}m  "
+                      f"inherited {p.get('inherited_penalty_min',0)}m")
+            print(f"  --> remaining driven distance: {tot_driven:.1f} km")
+        else:
+            print("  (infeasible from this state — raise start SOC or check "
+                  "the efficiency input)")
+        print("=" * 64 + "\n")
+        sys.exit(0)
 
     all_results = {}
 

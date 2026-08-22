@@ -389,6 +389,17 @@ class GeneticAlgorithmSearch:
         dim = lb.size
 
         pop = rng.uniform(lb, ub, size=(self.population, dim))
+        # SEED the population with the max-speed profile (the upper bound) and a
+        # few scaled-down versions. The race objective is "drive as fast as
+        # feasible subject to the SOC floor", so the optimum lives near the upper
+        # bound — but pure-random GA init almost never samples near it on a
+        # ~25-dim box, so the search used to converge to a mediocre ~55 km/h
+        # profile even though driving near v_max scored ~2x better. Injecting the
+        # fast seeds guarantees the search STARTS from the right basin; SLSQP
+        # then pulls back only the segments that would breach the SOC floor.
+        n_seed = min(self.population, 4)
+        for i, frac in enumerate((1.0, 0.9, 0.8, 0.65)[:n_seed]):
+            pop[i] = np.clip(lb + frac * (ub - lb), lb, ub)
         fitness = np.array([self._penalized_fitness(objective, constraints, ind)
                              for ind in pop])
         n_elite = max(1, int(self.elite_frac * self.population))
@@ -476,6 +487,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
           loops_committed, global_method: str = "ga", seed: int | None = None,
           dist_done_km: float = 0.0, elapsed_s: float = 0.0, cs_taken: bool = False,
           loop_geoms: dict | None = None,
+          penalty_stoppage_s: float = 0.0,
           **kwargs):
 
     # ROOT-CAUSE FIX: splice committed loop reps into the real simulated
@@ -499,8 +511,19 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     if sim_route:
         v_max_kmh = apply_turn_speed_caps(sim_route, v_max_kmh, seg_start_m)
 
-    v_max_kmh = np.maximum(v_max_kmh, 5.0)    
-    bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh) 
+    # Enforce the CAR's physical max speed. The route's own speed-limit column
+    # can read up to ~120 km/h, which was leaking into the bounds and letting
+    # the optimizer "drive" faster than the car can (the 112 km/h you saw).
+    v_max_kmh = np.minimum(v_max_kmh, car.v_max_ms * 3.6)
+    # SUSTAINABLE-CRUISE CAP (strategist directive 21/08): the car cannot HOLD
+    # its ~90 km/h instantaneous ceiling. Cap every segment's target at the
+    # sustainable continuous cruise so the day-average lands in the 60-70 km/h
+    # sweet spot instead of the unrealistic ~78 the uncapped objective chased.
+    _cruise_cap_kmh = getattr(SCFG, "SUSTAINABLE_CRUISE_KMH", None)
+    if _cruise_cap_kmh:
+        v_max_kmh = np.minimum(v_max_kmh, float(_cruise_cap_kmh))
+    v_max_kmh = np.maximum(v_max_kmh, 5.0)
+    bounds = Bounds(lb=np.full(n_segments, 5.0), ub=v_max_kmh)
 
     t0_s = race_config.day_start_time_s(day_index) + elapsed_s
     
@@ -529,7 +552,16 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         - race_config.UNPLANNED_STOP_BUDGET_S
         - n_loops * (race_config.LOOP_STOP_DURATION_S
                      + getattr(race_config, "LOOP_TURNAROUND_S", 0.0))
-    )  
+        # FEATURE B (strategist directive 21/08): a late finish on the PREVIOUS
+        # day incurs the SR 2.22.6 time penalty, served stationary at the start
+        # of THIS day. That penalty is not just a reporting artifact — it is
+        # parked time this car cannot drive, so it must shrink today's real
+        # driving window exactly like any other stoppage. Threaded in from
+        # trust_region.extract_final_profiles as the prior day's realized
+        # late-finish penalty (seconds). Zero on Day 1 and on any day whose
+        # predecessor finished on time.
+        - max(0.0, penalty_stoppage_s)
+    )
 
     constraints = [
         _terminal_soc_constraint(evaluator, alpha_next_day_pct),
