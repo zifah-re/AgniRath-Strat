@@ -252,6 +252,146 @@ def stitch_loops(n,t_start,soc_start,solar_obj,coords,altitude,headings,distance
     else:
        return np.array([loop_soc_start]),end_time
 
+
+def charged(soc, start_ts, end_ts):
+    """Placeholder for the overnight/standstill charging model.
+
+    Meant to model SoC gain while the car is stationary and charging
+    (e.g. finish-line to sunset, or the 05:00-08:00 morning window
+    before racing begins). Not implemented yet — currently a no-op
+    that just returns the SoC unchanged.
+    """
+    return soc
+
+
+def local_time_of_day(ts):
+    """Return the SAST time-of-day (a datetime.time) for a unix timestamp."""
+    return datetime.fromtimestamp(ts, tz=SA_TZ).time()
+
+
+def stitchAllDays():
+    day_names = [f"Day {i}" for i in range(1, 9)]
+
+    # ---- multi-day inputs ----
+    # n[i]        -> number of loops to run on day i+1
+    # v["Day N"]  -> [stage1_speed_kmh, loop_speed_kmh, stage2_speed_kmh] for that day
+    
+    n = [0, 0, 0, 0, 0, 0, 0, 0]
+    v = {
+        "Day 1": [70, 55, 70],
+        "Day 2": [60, 55, 60],
+        "Day 3": [60, 55, 60],
+        "Day 4": [55, 55, 55],
+        "Day 5": [60, 55, 60],
+        "Day 6": [55, 55, 55],
+        "Day 7": [55, 55, 55],
+        "Day 8": [50, 55, 50],
+    }
+
+    soc = 95.0  # starting SoC on the morning of Day 1
+
+    x_all = []
+    y_all = []
+    cumulative_distance = 0.0
+
+    fig, axes = plt.subplots(1, 1, figsize=(14, 6))
+
+    for day_idx, day in enumerate(day_names):
+        day_no = day_idx + 1
+        s1_name = DAYWISE_FILES[day]["s1"]
+        l_name = DAYWISE_FILES[day]["l"]
+        s2_name = DAYWISE_FILES[day]["s2"]
+        l_dist = DAY_DISTANCES[day]["l"]
+        start_date = DAYWISE_FILES[day]["date"]
+
+        morning_start_ts = datetime.combine(start_date, time(6, 0), tzinfo=SA_TZ).timestamp() # Morning Charging section
+        morning_end_ts = datetime.combine(start_date, time(8, 0), tzinfo=SA_TZ).timestamp()
+        soc = charged(soc, morning_start_ts, morning_end_ts)
+
+        start_time_ts = datetime.combine(
+            start_date,
+            datetime.strptime("09:00:00" if day_no == 1 else "08:00:00", "%H:%M:%S").time(),
+            tzinfo=SA_TZ,
+        ).timestamp()
+
+        end_soc_s1, power_s1, end_time = stage_soc_profile(
+            v[day][0] / 3.6, s1_name, start_date, start_time_ts, soc
+        )
+        distances_s1 = np.array(
+            extractSolarData(f"Saves/{s1_name}.kml.save")["profile"]["Distance"]
+        )
+
+        solar_obj = weather_logs[f"mean_{l_name}"]
+        route_loop = extractSolarData(f"Saves/{l_name}.kml.save")["profile"]
+        coords = np.array(route_loop["Coordinates"])
+        headings = np.array(route_loop["Headings"])
+        altitude = np.array(route_loop["Altitude"])
+        single_loop_dist = np.array(route_loop["Distance"])
+
+        n_loops = n[day_idx]
+        loop_soc, end_loop_time = stitch_loops(
+            n_loops,
+            end_time,
+            end_soc_s1[-1],
+            solar_obj,
+            coords,
+            altitude,
+            headings,
+            l_dist,
+            l_name,
+            start_date,
+        )
+
+        if s2_name is not None:
+            end_soc_s2, power_s2, day_end_time = stage_soc_profile(
+                v[day][2] / 3.6, s2_name, start_date, end_loop_time, soc_start=loop_soc[-1]
+            )
+            distances_s2 = np.array(
+                extractSolarData(f"Saves/{s2_name}.kml.save")["profile"]["Distance"]
+            )
+        else:
+            end_soc_s2 = np.array([loop_soc[-1]])
+            day_end_time = end_loop_time
+            distances_s2 = np.array([0.0])
+
+        if n_loops > 0:
+            distances_loops_stacked = np.concatenate(
+                [single_loop_dist + k * l_dist for k in range(n_loops)]
+            )
+            x_loops = distances_s1[-1] + distances_loops_stacked
+            x_s2 = x_loops[-1] + distances_s2
+            x_day = np.concatenate((distances_s1, x_loops, x_s2))
+            y_day = np.concatenate((end_soc_s1, loop_soc, end_soc_s2))
+        else:
+            x_s2 = distances_s1[-1] + distances_s2
+            x_day = np.concatenate((distances_s1, x_s2))
+            y_day = np.concatenate((end_soc_s1, end_soc_s2))
+
+        x_all.append(cumulative_distance + x_day)
+        y_all.append(y_day)
+        cumulative_distance += x_day[-1]
+
+        final_soc = y_day[-1]
+
+        if final_soc < SOC_MIN_PCT:
+            print(f"{day}: SoC fell below minimum ({final_soc:.2f}%) — stopping simulation.")
+            break
+
+        if local_time_of_day(day_end_time) < time(17, 0):
+            evening_end_ts = datetime.combine(start_date, time(17, 0), tzinfo=SA_TZ).timestamp()
+            final_soc = charged(final_soc, day_end_time, evening_end_ts)
+
+        soc = final_soc
+
+    x_full = np.concatenate(x_all)
+    y_full = np.concatenate(y_all)
+    axes.plot(x_full, y_full, color="tomato")
+    axes.set_xlabel("Distance (km)")
+    axes.set_ylabel("State of Charge (%)")
+    axes.set_title("8-Day SoC Profile")
+    axes.grid(True)
+    plt.show()
+
 def main():
     day_no = 6
     v1 = [70 / 3.6,60/3.6,60/3.6,55/3.6,60/3.6,55/3.6,55/3.6,50/3.6][day_no-1]
@@ -410,4 +550,4 @@ def main():
         axes.grid(True)
         plt.show()
     
-main()
+stitchAllDays()
