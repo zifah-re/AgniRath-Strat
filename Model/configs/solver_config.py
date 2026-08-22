@@ -57,6 +57,32 @@ DP_BASE_PLANNING_SPEED_KMH = 65.0
 # more aggressive distance. Keep gentle so late days stay feasible.
 DP_FUTURE_VALUE_DISCOUNT = 0.93
 
+# ---- Battery-safety / high-SOC discouragement (strategist directive 21/08) --
+# "We cannot run the car at ~100% SOC for long — the pack will cook. Heavily
+# discourage it, and if a day is predicted to END high, don't top the pack up
+# the next morning." These knobs implement that as a soft band, NOT a hard cap
+# (physics still clips at soc_max_pct):
+#   * SOC_SAFE_MAX_PCT — the top of the comfortable band. Time spent above it
+#     inside a day is penalized in the L2 objective (so the car drives faster /
+#     spends charge instead of coasting at the ceiling), and the DP is penalized
+#     for ENDING a day above it (so it prefers spending SOC on loops/distance).
+#   * MORNING_CHARGE_SKIP_ABOVE_PCT — if the previous day is predicted to end
+#     at/above this, the morning charge is skipped entirely (you don't need it
+#     and topping a near-full pack is exactly the unsafe case). Between
+#     SAFE_MAX and this, the morning charge is capped so start SOC never exceeds
+#     SOC_SAFE_MAX_PCT.
+SOC_SAFE_MAX_PCT = 90.0
+MORNING_CHARGE_SKIP_ABOVE_PCT = 90.0
+# L2 objective weight: equivalent seconds of "cost" per (SOC-fraction-second)
+# spent above SOC_SAFE_MAX_PCT. Bigger = the optimizer works harder to keep the
+# pack out of the danger band (drives faster to draw it down). Tune vs the time
+# and solar-underutil terms (both also in seconds).
+SOC_HIGH_PENALTY_WEIGHT = 4.0
+# DP (Tier 3) penalty: km docked per SOC-% that a day ENDS above SOC_SAFE_MAX_PCT.
+# Nudges the allocator toward more loops / higher speed instead of banking an
+# unusable, unsafe charge surplus into the next day.
+DP_HIGH_SOC_END_PENALTY_KM_PER_PCT = 1.5
+
 # ---- Late-finish pricing in the Tier 3 allocator ---------------------------
 # The strategist's directive (20/08): "arriving by 17:00 is good and must be
 # followed more or less — only run past it if the extra distance is genuinely

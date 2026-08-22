@@ -376,7 +376,9 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
     return bat.soc_pct
 
 
-def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
+def overnight_soc_gain(car: CarState, solar_provider, day_index: int,
+                       prev_end_soc_pct: float | None = None,
+                       extra_charge_s: float = 0.0) -> float:
     """Morning parc-fermé charging gain (06:30 capture start → next race start).
 
     SINGLE SOURCE OF TRUTH for the overnight/morning charge across all tiers:
@@ -384,22 +386,33 @@ def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
     the DP transition, the single-day start SOC (fed via the trajectory) and the
     report all see the same integrated morning energy — no per-tier drift.
 
-    Window: [MORNING_CHARGE_START_S, day_start(day_index+1)] — i.e. 06:30→08:00
-    on Days 2-7 (06:30→09:00 into Day 1). Packs are legally unsealed at 06:00
-    (BATTERY_UNSEAL_TIME_S) but the strategist's directive (20/08) is to count
-    capture only from 06:30, the realistic prop-up time after unseal/setup.
+    Window: [MORNING_CHARGE_START_S, day_start(day_index+1) + extra_charge_s].
+    Base is 06:30→08:00 (06:30→09:00 into Day 1). `extra_charge_s` extends the
+    window when the PREVIOUS day finished late: the SR 2.22.6 penalty is served
+    stationary at the next control stop, and the car captures solar during that
+    hold — so a late finish buys back some charging time (strategist directive
+    21/08: "if we finish after 17:00 and take the penalty, charge 06:30→08:00+x").
 
-    During this window only the BMS + MPPT charge controller are active, so we
-    use a reduced idle draw (PARC_FERME_IDLE_W, default 10 W) rather than the
-    full driving electronics. Real GHI(t) is integrated in 15-minute steps for
-    accuracy during the steep sunrise ramp, not a single midpoint sample.
+    BATTERY-SAFETY GATING (strategist directive 21/08): topping up an
+    already-high pack is exactly the unsafe case, and it wastes solar the pack
+    can't hold. So:
+      * prev_end_soc_pct >= MORNING_CHARGE_SKIP_ABOVE_PCT -> charge is SKIPPED.
+      * otherwise the gain is capped so the resulting start SOC never exceeds
+        SOC_SAFE_MAX_PCT.
+    prev_end_soc_pct=None keeps the old uncapped behaviour (legacy call sites).
     """
     if day_index >= rc.N_RACE_DAYS - 1:
         return 0.0
 
+    # Battery-safety: don't top up a pack that's already predicted to end high.
+    skip_above = getattr(sc, "MORNING_CHARGE_SKIP_ABOVE_PCT", 101.0)
+    safe_max = getattr(sc, "SOC_SAFE_MAX_PCT", 100.0)
+    if prev_end_soc_pct is not None and prev_end_soc_pct >= skip_above:
+        return 0.0
+
     # 06:30 capture start (>= 06:00 unseal), per strategist directive.
     t_start = getattr(rc, "MORNING_CHARGE_START_S", rc.BATTERY_UNSEAL_TIME_S)
-    t_end   = rc.day_start_time_s(day_index + 1)    # 08:00 (or 09:00 Day 1)
+    t_end   = rc.day_start_time_s(day_index + 1) + max(0.0, float(extra_charge_s))
     dur     = max(0.0, t_end - t_start)
     if dur == 0.0:
         return 0.0
@@ -425,7 +438,13 @@ def overnight_soc_gain(car: CarState, solar_provider, day_index: int) -> float:
         delta_wh += p_eve * extra_s / 3600.0
 
     stored = delta_wh * car.charge_eff if delta_wh >= 0 else delta_wh / car.discharge_eff
-    return stored / car.battery_nominal_wh * 100.0
+    gain_pct = stored / car.battery_nominal_wh * 100.0
+
+    # Cap so the morning charge never pushes the start SOC past the safe band.
+    if prev_end_soc_pct is not None and gain_pct > 0.0:
+        headroom = max(0.0, safe_max - float(prev_end_soc_pct))
+        gain_pct = min(gain_pct, headroom)
+    return gain_pct
 
 
 def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float,
@@ -554,6 +573,9 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                 if end_soc < floor:
                     continue
 
+                # Morning charge is gated by the day's END SOC (skip/cap if high).
+                gain = overnight_soc_gain(car, solar_provider, d,
+                                          prev_end_soc_pct=end_soc)
                 next_soc = min(end_soc + gain, car.soc_max_pct)
                 v_next = _interp_value(V[d + 1], soc_buckets, next_soc)
                 if not np.isfinite(v_next):
@@ -595,7 +617,8 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
             else:
                 logger.error("  Day %d has NO feasible SOC buckets at all!", d + 1)
             break
-        gain = overnight_soc_gain(car, solar_providers.get(d), d)
+        gain = overnight_soc_gain(car, solar_providers.get(d), d,
+                                  prev_end_soc_pct=end)
         cur = min(end + gain, car.soc_max_pct)
         logger.info("Tier1 Day %d: start=%.1f%% end=%.1f%% +overnight=%.1f%% -> next=%.1f%%",
                     d + 1, s0_traj[d], end, gain, cur)
