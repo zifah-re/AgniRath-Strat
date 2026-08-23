@@ -236,3 +236,23 @@ SKIP_BREAKDOWN_WHEN_UNUSED = True   # FASTENED (was False): skip discarded break
 # wall-clock changes. Left False in the baseline (thread path, unchanged); the
 # fastened build flips it True. See Model_fastened_hafiz/README_PERF.md.
 TIER2_USE_PROCESS_POOL = True   # FASTENED (was False): true multi-core Tier 2 (biggest win on 8-16 cores)
+
+# ---- Early-finish (evening) charging (strategist directive 23/08) ----------
+# If a day finishes before the 17:00 close, the panel keeps charging the pack
+# from the finish moment until 17:00 and that energy banks into the next day.
+# Modelled in extract_final_profiles via tier1.evening_soc_gain. On by default
+# (it's physically real free energy); set False to reproduce the old behaviour
+# where an early finish banked nothing.
+EVENING_CHARGE_ENABLED = True
+
+# ---- One-breakdown-per-day scenario (strategist directive 23/08) -----------
+# Enabled per-run with the `--breakdown` CLI flag (off by default). When on,
+# EVERY day gets exactly one breakdown: a stationary stop whose duration is
+# drawn from a 0..BREAKDOWN_MAX_SECONDS PDF scaled by the day's power draw (see
+# core.options.DailyBreakdown). NO charging happens during it — pure lost time,
+# which pushes the finish later and can trigger the normal SR 2.22.6 late
+# penalty (carried into the next day like any late finish). Deterministic given
+# BREAKDOWN_SEED (each day seeded with the base seed + its index).
+BREAKDOWN_MAX_SECONDS = 3600.0     # 1 hour hard cap on a single day's breakdown
+BREAKDOWN_SEED = 20260823          # base RNG seed for reproducible breakdown draws
+
