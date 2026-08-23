@@ -447,6 +447,51 @@ def overnight_soc_gain(car: CarState, solar_provider, day_index: int,
     return gain_pct
 
 
+def evening_soc_gain(car: CarState, solar_provider, day_index: int,
+                     finish_abs_s: float, end_soc_pct: float | None = None) -> float:
+    """End-of-day charging gain: if the car FINISHES EARLY, the panel keeps
+    capturing solar from the finish moment until the official 17:00 close, and
+    that energy banks into the next day (strategist directive 23/08: "if we reach
+    early, use the rest of the time to charge, till 5pm").
+
+    Integrates real GHI over [finish_abs_s, day_finish_time_s(day_index)] at the
+    reduced parked idle draw (same convention as overnight_soc_gain). Returns the
+    SOC-% gained, capped so it never pushes the pack past its physical max. On the
+    final day (Day 8) there's no next day to bank into AND the timed finish is
+    15:00, so end-of-day charging is not modelled — returns 0. Returns 0 when the
+    day already finishes at/after the close (no spare time).
+    """
+    # No next day to bank into on the last day.
+    if day_index >= rc.N_RACE_DAYS - 1:
+        return 0.0
+    close_s = rc.day_finish_time_s(day_index)          # 17:00 on days 1-7
+    dur = close_s - float(finish_abs_s)
+    if dur <= 0.0:
+        return 0.0
+    parc_idle_w = getattr(rc, "PARC_FERME_IDLE_W", 10.0)
+    n_steps = max(1, int(dur / 900.0))                 # 15-min integration steps
+    dt = dur / n_steps
+    delta_wh = 0.0
+    for i in range(n_steps):
+        t_mid = float(finish_abs_s) + (i + 0.5) * dt
+        ghi = solar_provider.ghi_wm2(t_mid, 0.0)
+        p_net = car.array_area_m2 * car.array_efficiency * ghi - parc_idle_w
+        delta_wh += p_net * dt / 3600.0
+    stored = delta_wh * car.charge_eff if delta_wh >= 0 else delta_wh / car.discharge_eff
+    gain_pct = stored / car.battery_nominal_wh * 100.0
+    # Cap at the SAFE band, not the physical 100%. Charging every early-finish
+    # day to the ceiling would compound up the chain and park the pack near 100%
+    # for long stretches — exactly the pack-cooking / solar-clipping problem the
+    # strategist fought to remove. Banking up to SOC_SAFE_MAX_PCT keeps the free
+    # energy without re-creating that. (Raise the cap toward soc_max if you ever
+    # want full end-of-day charging back.)
+    if end_soc_pct is not None and gain_pct > 0.0:
+        safe_max = getattr(sc, "SOC_SAFE_MAX_PCT", float(car.soc_max_pct))
+        headroom = max(0.0, float(safe_max) - float(end_soc_pct))
+        gain_pct = min(gain_pct, headroom)
+    return max(0.0, gain_pct)
+
+
 def relaxed_loop_combos(plan: _DayPlan, t_window_s: float, t_stops_base_s: float,
                         loop_speed_ms: float, pre_attempt_stop_s: float):
     loops = plan.loops
