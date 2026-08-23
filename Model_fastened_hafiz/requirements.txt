@@ -1,0 +1,9 @@
+# Pinned to the versions the skeleton was tested against (Jul 2026).
+numpy>=2.0
+pandas>=2.2
+scipy>=1.14          # SLSQP (L2/L3)
+pyarrow>=17.0        # route parquet
+pvlib>=0.11          # clear-sky fallback + solar position cross-checks
+pytest>=8.0
+# optional (challenger backend; only if IPOPT wins the benchmark):
+# cyipopt

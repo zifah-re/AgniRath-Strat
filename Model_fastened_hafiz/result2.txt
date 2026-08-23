@@ -1,0 +1,1995 @@
+oute loaded (2 stage files, 1 loop files excluded)
+
+20:58:45 INFO main: Day 1: loaded 3 weather JSONs
+
+20:58:46 INFO main: Day 2: route loaded (2 stage files, 0 loop files excluded)
+
+20:58:46 INFO main: Day 2: loaded 2 weather JSONs
+
+20:58:46 INFO main: Day 4: route loaded (2 stage files, 1 loop files excluded)
+
+20:58:46 INFO main: Day 4: loaded 2 weather JSONs
+
+20:58:46 INFO main: Day 5: route loaded (2 stage files, 1 loop files excluded)
+
+20:58:46 INFO main: Day 5: loaded 3 weather JSONs
+
+20:58:46 INFO main: Day 6: route loaded (1 stage files, 1 loop files excluded)
+
+20:58:46 INFO main: Day 6: loaded 2 weather JSONs
+
+20:58:46 INFO main: Day 7: route loaded (2 stage files, 1 loop files excluded)
+
+20:58:46 WARNING main: Day 7: daytime avg GHI = 254 W/m² (below 400 floor) — blending with Gaussian clear-sky fallback
+
+20:58:46 INFO main: Day 7: loaded 3 weather JSONs
+
+20:58:46 INFO main: Day 8: route loaded (2 stage files, 0 loop files excluded)
+
+20:58:46 INFO main: Day 8: loaded 2 weather JSONs
+
+20:58:46 INFO main: Day 3 variants discovered: ['aryaman', 'prahlad']
+
+20:58:46 INFO main: ============================================================
+
+20:58:46 INFO main: RUNNING VARIANT: Day 3 = aryaman
+
+20:58:46 INFO main: ============================================================
+
+20:58:46 INFO main: Day 3 [aryaman]: route loaded (2 files)
+
+20:58:46 INFO main: Computing Tier 1 baseline for variant 'aryaman'...
+
+20:59:14 INFO optimizers.tier1: Day 8 ENERGY DIAG (v=43.7km/h, 557 segs, 278.3km): solar=+5275Wh idle=-64Wh regen_waste=-0Wh net=+2159Wh (+61.2% SOC) | slopes: |avg|=2.1% max=7.5% | GHI avg=615 | trailered=360 | loops=(0,)
+
+20:59:49 INFO optimizers.tier1: Day 7 ENERGY DIAG (v=40.9km/h, 684 segs, 341.9km): solar=+4838Wh idle=-84Wh regen_waste=-0Wh net=+1703Wh (+48.3% SOC) | slopes: |avg|=1.8% max=6.9% | GHI avg=434 | trailered=162 | loops=(0,)
+
+21:00:21 INFO optimizers.tier1: Day 6 ENERGY DIAG (v=37.1km/h, 620 segs, 310.0km): solar=+7867Wh idle=-84Wh regen_waste=-0Wh net=+3837Wh (+108.7% SOC) | slopes: |avg|=0.9% max=5.7% | GHI avg=694 | trailered=0 | loops=(0,)
+
+21:01:22 INFO optimizers.tier1: Day 5 ENERGY DIAG (v=34.9km/h, 584 segs, 292.0km): solar=+7354Wh idle=-84Wh regen_waste=-0Wh net=+3936Wh (+111.6% SOC) | slopes: |avg|=0.8% max=4.9% | GHI avg=699 | trailered=0 | loops=(0, 0)
+
+21:06:04 INFO optimizers.tier1: Day 4 ENERGY DIAG (v=31.1km/h, 521 segs, 260.3km): solar=+6895Wh idle=-84Wh regen_waste=-0Wh net=+4394Wh (+124.6% SOC) | slopes: |avg|=0.8% max=5.1% | GHI avg=621 | trailered=0 | loops=(0, 0)
+
+21:06:48 INFO optimizers.tier1: Day 3 ENERGY DIAG (v=27.5km/h, 460 segs, 230.0km): solar=+7175Wh idle=-84Wh regen_waste=-0Wh net=+5126Wh (+145.3% SOC) | slopes: |avg|=0.6% max=3.2% | GHI avg=636 | trailered=0 | loops=(0,)
+
+21:07:12 INFO optimizers.tier1: Day 2 ENERGY DIAG (v=36.2km/h, 605 segs, 302.5km): solar=+7585Wh idle=-84Wh regen_waste=-0Wh net=+5097Wh (+144.5% SOC) | slopes: |avg|=0.7% max=4.8% | GHI avg=675 | trailered=0 | loops=(0,)
+
+21:07:36 INFO optimizers.tier1: Day 1 ENERGY DIAG (v=32.3km/h, 476 segs, 238.3km): solar=+6717Wh idle=-74Wh regen_waste=-0Wh net=+3528Wh (+100.0% SOC) | slopes: |avg|=1.6% max=6.4% | GHI avg=710 | trailered=0 | loops=(0,)
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 1: start=100.0% end=35.5% +overnight=2.9% -> next=38.5%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 2: start=38.5% end=22.8% +overnight=3.6% -> next=26.4%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 3: start=26.4% end=32.1% +overnight=2.7% -> next=34.8%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 4: start=34.8% end=27.6% +overnight=1.5% -> next=29.0%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 5: start=29.0% end=21.7% +overnight=2.5% -> next=24.2%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 6: start=24.2% end=100.0% +overnight=1.5% -> next=100.0%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 7: start=100.0% end=27.4% +overnight=11.2% -> next=38.5%
+
+21:07:37 INFO optimizers.tier1: Tier1 Day 8: start=38.5% end=83.7% +overnight=0.0% -> next=83.7%
+
+21:07:37 INFO main: Using pre-computed Tier 1 baseline (skipping recomputation)
+
+21:07:37 INFO main: Tier2 it=0 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+
+21:07:37 INFO main: Tier2 it=0 s_center (start-of-day): ['D1=100.0%', 'D2=38.5%', 'D3=26.4%', 'D4=34.8%', 'D5=29.0%', 'D6=24.2%', 'D7=100.0%', 'D8=38.5%']
+
+21:07:37 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+
+day 0 combos:   0%|                                                                                                                 | 0/3 [00:00<?, ?it/s]21:09:55 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  137.6s                                                     | 0/3 [00:00<?, ?it/s]
+
+day 3 combos:   0%|                                                                                                                 | 0/3 [00:00<?, ?it/s]21:10:10 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  152.4s                                            | 1/3 [02:17<04:35, 137.67s/it]
+
+day 0 combos:  33%|██████████████████████████████████▋                                                                     | 1/3 [02:32<05:04, 152.37s/it]21:10:28 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  170.2s                                                   | 0/3 [00:00<?, ?it/s]
+
+Tier2 days:   0%|                                                                                                                   | 0/8 [00:00<?, ?it/s]21:10:31 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  36.0s                                                    | 0/3 [00:00<?, ?it/s]
+
+day 3 combos:  33%|██████████████████████████████████▋                                                                     | 1/3 [02:50<05:40, 170.18s/it]21:10:56 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  198.7s██████████                                   | 2/3 [02:53<01:17, 77.86s/it]
+
+                                                                                                                                                          21:10:59 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  49.6s                                                                          
+
+day 0 combos:  67%|██████████████████████████████████████████████████████████████████████                                   | 2/3 [03:21<01:31, 91.92s/it]21:11:11 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  39.8s█████████████████████████████████▊       | 14/15 [02:07<00:08,  8.33s/it]
+
+                                                                                                                                                          21:11:14 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  216.9s                                                   | 0/3 [00:00<?, ?it/s]
+
+                                                                                                                                                          21:11:21 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  52.9s                                                                       
+
+GA gens:  87%|█████████████████████████████████████████████████████████████████████████████████████████████▌              | 13/15 [02:12<00:19,  9.58s/it]21:11:21 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  224.0s                                            | 1/3 [03:36<07:13, 216.92s/it]
+
+day 3 combos:  67%|█████████████████████████████████████████████████████████████████████▎                                  | 2/3 [03:43<01:41, 101.20s/it]21:11:32 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  234.7s
+
+                                                                                                                                                          21:11:46 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  46.9s
+
+day 0 combos:   0%|                                                                                                                 | 0/3 [00:00<?, ?it/s]21:11:47 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  36.4s
+
+                                                                                                                                                          21:11:53 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  255.6s                                             | 1/3 [00:36<01:12, 36.44s/it]
+
+day 1 combos:  33%|██████████████████████████████████▋                                                                     | 1/3 [03:44<07:28, 224.01s/it]21:11:55 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  58.7s                                           | 1/3 [03:54<07:49, 234.70s/it]
+
+                                                                                                                                                          21:12:10 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  49.8s
+
+day 6 combos:  33%|██████████████████████████████████▋                                                                     | 1/3 [04:15<08:31, 255.62s/it]21:12:24 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  37.5s
+
+day 0 combos:  33%|███████████████████████████████████                                                                      | 1/3 [00:37<01:15, 37.51s/it]21:12:25 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  37.6s███████▎                                  | 2/3 [04:17<01:56, 116.47s/it]
+
+                                                                                                                                                          21:12:26 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  71.7s███████                                   | 2/3 [01:14<00:37, 37.12s/it]
+
+                                                                                                                                                          21:12:38 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  76.5s                                                   | 0/15 [00:00<?, ?it/s]
+
+                                                                                                                                                          21:12:47 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  36.1s█████▎                                  | 2/3 [04:48<02:11, 131.59s/it]
+
+                                                                                                                                                          21:12:54 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  81.3s
+
+day 3 combos:  33%|███████████████████████████████████                                                                      | 1/3 [00:36<01:12, 36.09s/it]21:12:57 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  62.2s                                          | 2/15 [00:21<02:15, 10.45s/it]
+
+                                                                                                                                                          21:13:03 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  38.1s                                         | 3/15 [00:29<01:56,  9.69s/it]
+
+day 1 combos:  67%|█████████████████████████████████████████████████████████████████████▎                                  | 2/3 [05:00<02:17, 137.29s/it]21:13:03 INFO optimizers.tier2: Tier2 day 2 done in 326.1s  (6 solves)                                                                                     
+
+                                                                                                                                                          21:13:11 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  47.1s                                                   | 0/3 [00:00<?, ?it/s]
+
+day 0 combos:  67%|██████████████████████████████████████████████████████████████████████                                   | 2/3 [01:24<00:43, 43.15s/it]21:13:36 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  49.3s
+
+                                                                                                                                                          21:13:37 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  70.4s                                         | 6/15 [00:54<01:17,  8.57s/it]
+
+day 3 combos:  67%|██████████████████████████████████████████████████████████████████████                                   | 2/3 [01:25<00:43, 43.92s/it]21:13:50 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  71.7s                                                   | 0/3 [00:00<?, ?it/s]
+
+                                                                                                                                                          21:13:50 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  52.7s                                                                         
+
+                                                                                                                                                          21:13:54 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  42.4s                                                  | 0/3 [00:00<?, ?it/s]
+
+21:13:54 INFO optimizers.tier2: Tier2 day 0 done in 376.3s  (6 solves)                                                                                    
+
+                                                                                                                                                          21:14:04 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  70.4s
+
+day 5 combos:   0%|                                                                                                                 | 0/3 [00:00<?, ?it/s]21:14:16 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  39.9s                                                                      
+
+                                                                                                                                                          21:14:16 INFO optimizers.tier2: Tier2 day 3 done in 398.9s  (6 solves)
+
+                                                                                                                                                          21:14:30 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  40.2s
+
+                                                                                                                                                          21:14:32 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  55.5s                                                                       
+
+                                                                                                                                                          21:14:36 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  45.7s                                           | 1/3 [00:55<01:51, 55.52s/it]
+
+Tier2 days:  38%|████████████████████████████████████████▏                                                                  | 3/8 [06:38<08:16, 99.29s/it]21:14:54 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  50.3s
+
+day 5 combos:  33%|███████████████████████████████████                                                                      | 1/3 [00:50<01:40, 50.34s/it]21:15:49 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  79.1s                                                                         
+
+                                                                                                                                                          21:15:58 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  82.3s███████                                   | 2/3 [01:38<00:48, 48.60s/it]
+
+                                                                                                                                                          21:15:59 INFO optimizers.tier2: Tier2 day 7 done in 501.2s  (6 solves)████████████████████                                   | 2/3 [01:59<01:03, 63.15s/it]
+
+                                                                                                                                                          21:16:03 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  90.6s
+
+                                                                                                                                                          21:16:10 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  256.8s█████████                                   | 2/3 [02:26<01:16, 76.18s/it]
+
+GA gens:   0%|                                                                    
+
+                                                 | 0/15 [00:00<?, ?it/s]
+
+GA gens:   7%|███████▎                                       21:16:35 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  100.1s4.34s/it]████████████████▎               
+
+day 5 combos:  67%|██████████████████████████████████████████████████████████████████████                                   | 2/3 [02:30<01:19, 79.60s/it]
+
+GA gens:  13%|██████████████▌         21:18:41 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  171.7s
+
+                                                                                                                                                          21:18:41 INFO optimizers.tier2: Tier2 day 1 done in 664.1s  (6 solves)                                                            | 3/15 [02:00<09:07, 45.63s/it]
+
+                                                                                                                                                          21:19:04 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  181.0s                                                                            
+
+GA gens:  33%|████████████████████████████████████▎                                                                        | 5/15 [02:41<05:01, 30.13s/it]21:19:04 INFO optimizers.tier2: Tier2 day 4 done in 686.8s  (6 solves)                                                                                           
+
+                                                                                                                                                          21:19:53 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  198.5s
+
+21:19:53 INFO optimizers.tier2: Tier2 day 5 done in 735.8s  (6 solves)                                                                                    
+
+                                                                                                                                                          21:21:17 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  307.4s
+
+day 6 combos:   0%|                                                                                                                       | 0/3 [00:00<?, ?it/s]21:22:25 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  68.1s                                                                                 
+
+day 6 combos:  33%|█████████████████████████████████████                                                                          | 1/3 [01:08<02:16, 68.08s/it]21:22:48 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  22.9s
+
+day 6 combos:  67%|██████████████████████████████████████████████████████████████████████████                                     | 2/3 [01:31<00:41, 41.52s/it]                                                           21:23:03 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  14.8s
+
+day 6 combos: 100%|██████████████████████████████████████████████████████████████████████████████████████████████                                                                                                                 21:23:03 INFO optimizers.tier2: Tier2 day 6 done in 925.9s  (3 solves)
+
+Tier2 days: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [15:25<00:00, 115.72s/it]
+
+21:23:03 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 4: 3 surrogate(s) populated████████████████████████████████████████████████████████
+
+21:23:03 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+
+21:23:03 INFO main: Tier2 Day 8: 3 surrogate(s) populated
+
+21:23:03 INFO main: trust-region it=0 drift=75.78% total=5066.9 km feasible=True
+
+21:23:03 INFO main: Tier2 it=1 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+
+21:23:03 INFO main: Tier2 it=1 s_center (start-of-day): ['D1=100.0%', 'D2=100.0%', 'D3=100.0%', 'D4=100.0%', 'D5=100.0%', 'D6=100.0%', 'D7=100.0%', 'D8=100.0%']
+
+21:23:03 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+
+day 0 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 1 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 2 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 3 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 4 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 5 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 6 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+day 7 combos:   0%|                                                                       | 0/3 [00:00<?, ?it/s]
+
+Tier2 days:   0%|                                                                         | 0/8 [00:00<?, ?it/s]
+
+GA gens:  60%|████████████████████████████████████████▏                          | 9/15 [01:05<00:42,  7.01s/it]
+
+GA gens:  53%|███████████████████████████████████▋                               | 8/15 [01:00<00:54,  7.72s/it]
+
+GA gens:  53%|███████████████████████████████████▋                               | 8/15 [01:04<00:55,  7.88s/it]
+
+GA gens:  40%|██████████████████████████▊                                        | 6/15 [00:58<01:26,  9.66s/it]
+
+GA gens:  40%|██████████████████████
+
+████▊                               
+
+         | 6/15 [00:56<01:27,  9.68s
+
+/it]
+
+GA gens:  40%|██████████████████████
+
+████▊                               
+
+         | 6/15 [00:59<01:26,  9.62s
+
+/it]
+
+GA gens:  40%|██████████████████████
+
+GA gens:  60%|██████████████████████
+
+██████████████████▏                 
+
+GA gens:  67%|██████████████████████
+
+██████████████████████              
+
+        | 10/15 [01:13<00:36,  7.28s
+
+/it]     | 5/15 [00:57<01:53, 11.33s
+
+/it]
+
+GA gens:  47%|██████████████████████
+
+█████████▎                          
+
+         | 7/15 [01:08<01:24, 10.60s
+
+/it]
+
+GA gens:  47%|██████████████████████
+
+█████████▎                          
+
+GA gens:  47%|██████████████████████
+
+GA gens:  47%|██████████████████████
+
+█████████▎                          
+
+GA gens:  60%|██████████████████████
+
+██████████████████▏                 
+
+         | 9/15 [01:13<00:50,  8.48s
+
+/it]
+
+GA gens:  73%|██████████████████████
+
+██████████████████████████▍         
+
+        | 11/15 [01:21<00:30,  7.66s
+
+/it]
+
+GA gens:  67%|██████████████████████
+
+██████████████████████              
+
+        | 10/15 [01:19<00:43,  8.76s
+
+/it]
+
+GA gens:  53%|██████████████████████
+
+GA gens:  67%|██████████████████████
+
+██████████████████████              
+
+        | 10/15 [01:22<00:43,  8.67s
+
+/it]
+
+GA gens:  53%|██████████████████████
+
+█████████████▋                      
+
+         | 8/15 [01:23<01:17, 11.07s
+
+/it]
+
+GA gens:  73%|██████████████████████
+
+██████████████████████████▍         
+
+GA gens:  80%|██████████████████████
+
+██████████████████████████████▊     
+
+        | 12/15 [01:29<00:23,  7.75s
+
+/it]
+
+GA gens:  73%|██████████████████████
+
+██████████████████████████▍         
+
+        | 11/15 [01:32<00:35,  8.84s
+
+/it]
+
+GA gens:  60%|██████████████████████
+
+██████████████████▏                 
+
+         | 9/15 [01:30<01:00, 10.00s
+
+/it]
+
+GA gens:  60%|██████████████████████
+
+██████████████████▏                 
+
+         | 9/15 [01:30<01:03, 10.61s
+
+/it]
+
+GA gens:  60%|██████████████████████
+
+██████████████████▏                 
+
+GA gens:  80%|██████████████████████
+
+██████████████████████████████▊     
+
+GA gens:  87%|██████████████████████
+
+███████████████████████████████████▏
+
+        | 13/15 [01:37<00:15,  7.82s
+
+/it]
+
+GA gens:  80%|██████████████████████
+
+██████████████████████████████▊     
+
+        | 12/15 [01:40<00:25,  8.54s
+
+/it]
+
+GA gens:  93%|██████████████████████
+
+████████████████████████████████████
+
+███▌    | 14/15 [01:44<00:07,  7.59s
+
+/it]██████████████████              
+
+GA gens:  87%|██████████████████████
+
+███████████████████████████████████▏
+
+        | 13/15 [01:42<00:16,  8.00s
+
+/it]
+
+GA gens:  67%|██████████████████████
+
+██████████████████████              
+
+        | 10/15 [01:41<00:50, 10.13s
+
+/it]     | 8/15 [01:37<01:25, 12.26s
+
+/it]
+
+GA gens:  67%|██████████████████████
+
+GA gens:  67%|███████████████████████
+
+GA gens:  87%|███████████████████████
+
+GA gens: 100%|███████████████████████
+
+█████████████████████████████████████
+
+██████| 15/15 [01:53<00:00,  7.87s/it
+
+]
+
+GA gens:  93%|███████████████████████
+
+█████████████████████████████████████
+
+                                     
+
+                                     
+
+                                     
+
+ 
+
+GA gens:  73%|███████████████████████
+
+█████████████████████████▍           
+
+      | 11/15 [01:48<00:38,  9.60s/it
+
+]
+
+GA gens:  73%|███████████████████████
+
+█████████████████████████▍           
+
+      | 11/15 [01:52<00:41, 10.41s/it
+
+]
+
+GA gens:  73%|███████████████████████
+
+█████████████████████████▍           
+
+      | 11/15 [01:52<00:43, 10.87s/it
+
+]
+
+GA gens:  93%|███████████████████████
+
+█████████████████████████████████████
+
+GA gens: 100%|███████████████████████
+
+█████████████████████████████████████
+
+██████| 15/15 [01:59<00:00,  8.07s/it
+
+                                     
+
+                                     
+
+                                     
+
+ 
+
+GA gens:  80%|███████████████████████
+
+█████████████████████████████▊       
+
+      | 12/15 [01:57<00:28,  9.42s/it
+
+]
+
+GA gens:  80%|███████████████████████
+
+█████████████████████████████▊       
+
+GA gens: 100%|███████████████████████
+
+█████████████████████████████████████
+
+██████| 15/15 [02:03<00:00,  7.97s/it
+
+                                     
+
+                                     
+
+                                     
+
+ 
+
+GA gens:  80%|███████████████████████
+
+█████████████████████████████▊       
+
+      | 12/15 [02:03<00:32, 10.76s/it
+
+]
+
+GA gens:  67%|███████████████████████
+
+█████████████████████                
+
+GA gens:  87%|███████████████████████
+
+██████████████████████████████████▏  
+
+GA gens:  87%|███████████████████████
+
+GA gens:  87%|███████████████████████                                                                           21:26:00 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  176.9s████████▏  
+
+      | 13/15 [02:12<00:20, 10.21s/it                                                                           21:26:07 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  184.0s
+
+day 0 combos:  33%|████████████████████▋                                         | 1/3 [03:03<06:07, 184.00s/it]21:26:36 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  213.2s██████▏  
+
+      | 13/15 [02:13<00:21, 10.59s/it                                                                           21:26:45 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  44.8s
+
+                                                                                                                21:27:03 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  55.2s████████████▋                                         | 1/3 [03:33<07:06, 213.17s/it]
+
+day 0 combos:  67%|█████████████████████████████████████████▎                    | 2/3 [03:59<01:48, 108.29s/it]21:27:05 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  242.0s███████████
+
+                                                                                                                21:27:13 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  249.4s                                                                                    
+
+                                                                                                                21:27:17 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  253.8s                                                                                      
+
+GA gens:  80%|████████████████████████████████████████████████████▊             | 12/15 [02:29<00:39, 13.20s/it]21:27:23 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  38.0s
+
+day 4 combos:  33%|████████████████████▋                                         | 1/3 [04:09<08:18, 249.43s/it]                                                     21:27:26 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  262.3s  | 1/3 [04:02<08:04, 242.02s/it]
+
+day 2 combos:   0%|                                                                                             21:27:34 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  57.2s█████████▋                                         | 1/3 [04:22<08:44, 262.36s/it]
+
+                                                                                                                21:27:53 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  50.8s
+
+day 0 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:28:02 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  38.8s| 2/3 [04:30<02:01, 121.45s/it]
+
+                                                                                                                                                                     21:28:15 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  70.1s
+
+day 2 combos:  33%|██████████████████████████████████████▋                                                      21:28:19 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  316.2s
+
+                                                                                                                21:28:30 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  55.9s
+
+                                                                                                                                                                     21:28:34 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  81.0s
+
+day 0 combos:  33%|██████████████████████████████████████▋                                                                             | 1/3 [00:40<01:20, 40.29s/it]21:28:43 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  40.5s| 1/3 [05:16<10:32, 316.19s/it]
+
+                                                                                                                                                                     21:28:45 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  79.6s3s
+
+day 2 combos:  67%|█████████████████████████████████████████████████████████████████████████████▎               21:28:47 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  90.0s████████████████████████████████▎                    | 2/3 [05:42<02:34, 154.94s/it]
+
+GA gens:   0%|                                                                                                                                | 0/15 [00:00<?, ?it/s]21:30:01 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  105.1s
+
+                                                                                                                                                                     21:30:02 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  91.9s
+
+                                                                                                                                                                     21:30:02 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  79.2s 2/3 [05:43<02:37, 157.53s/it]                      | 1/15 [00:11<02:37, 11.22s/it]
+
+                                                                                                                                                                     21:30:02 INFO optimizers.tier2: Tier2 day 2 done in 418.8s  (6 solves)                                                                  | 1/3 [01:31<03:03, 91.95s/it]
+
+                                                                                                                21:30:04 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  89.8s                                                                                                                   | 0/3 [00:00<?, ?it/s]
+
+day 0 combos:  67%|█████████████████████████████████████████████████████████████████████████████▎                                      | 2/3 [02:10<01:09, 69.52s/it]21:30:43 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  129.1s
+
+                                                                                                                                                                     21:31:52 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  186.5s
+
+day 4 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:32:06 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  199.0s                                                             | 0/3 [00:00<?, ?it/s]
+
+                                                                                                                                                                     21:32:10 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  128.4s
+
+                                                                                                                                                                     21:32:11 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  127.1s                                                   | 7/15 [02:06<02:22, 17.84s/it]
+
+21:32:11 INFO optimizers.tier2: Tier2 day 0 done in 547.7s  (6 solves)                                                                                               
+
+day 3 combos:  67%|████████████████████████████████████████████████████████████████████████████▋                21:32:16 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  135.2s
+
+                                                                                                                                                                     21:32:34 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  110.6s
+
+GA gens:  67%|███████████████████████████████████████████████████████████████████████████████▎                                       | 10/15 [03:36<02:03, 24.70s/it]21:32:54 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  43.5s
+
+day 4 combos:  33%|██████████████████████████████████████▎                                                                            | 1/3 [01:50<03:41, 110.58s/it]21:32:54 INFO optimizers.tier2: Tier2 day 3 done in 590.7s  (6 solves)
+
+Tier2 days:  25%|████████████████                                                | 2/8 [09:07<24:49, 248.24s/it]21:32:54 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  61.8s                                                                                                                                         
+
+                                                                                                                                                                     21:33:04 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  47.6s                                                      | 1/3 [01:01<02:03, 61.80s/it]
+
+                                                                                                                                                                     21:33:07 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  60.6s                                                                                    
+
+                                                                                                                                                                     21:33:24 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  50.2s
+
+Tier2 days:  38%|████████████████████████                                        | 3/8 [09:50<12:52, 154.54s/it]                                                     21:33:42 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  47.5s
+
+day 4 combos:  67%|█████████████████████████████████████████████████████████████████████████████▎                                      | 2/3 [02:40<01:15, 75.10s/it]21:33:43 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  39.4s██████████████▎                                      | 2/3 [01:49<00:53, 53.43s/it]
+
+                                                                                                                                                                     21:33:43 INFO optimizers.tier2: Tier2 day 7 done in 640.1s  (6 solves)
+
+                                                                                                                21:33:52 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  332.2s
+
+                                                                                                                21:33:55 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  47.9s
+
+GA gens:   7%|████████                                                                                                                | 1/15 [00:05<01:19,  5.66s/it]21:34:05 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  41.0s                                                                                  
+
+                                                                                                                                                                     21:34:05 INFO optimizers.tier2: Tier2 day 4 done in 662.0s  (6 solves)
+
+GA gens:  27%|████████████████████████████████                                                                                        | 4/15 [00:17<00:45,  4.17s/it]21:34:17 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  35.8s
+
+                                                                                                                                                                     21:34:18 INFO optimizers.tier2: Tier2 day 1 done in 674.3s  (6 solves)                                                                                                
+
+GA gens:  47%|████████████████████████████████████████████████████████                                                                | 7/15 [00:26<00:26,  3.29s/it]21:34:26 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  30.7s
+
+                                                                                                                                                                     21:34:26 INFO optimizers.tier2: Tier2 day 5 done in 682.7s  (6 solves)
+
+21:35:12 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  80.0s                                                                                     
+
+day 6 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:36:45 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  93.6s                                                                                      
+
+day 6 combos:  33%|██████████████████████████████████████▋                                                                             | 1/3 [01:33<03:07, 93.62s/it]21:36:56 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  11.1s| 6/8 [11:14<01:54, 57.08s/it]
+
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████▎                                      | 2/3 [01:44<00:45, 45.08s/it]21:37:08 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  11.2s
+
+21:37:08 INFO optimizers.tier2: Tier2 day 6 done in 844.4s  (3 solves)                                                                                               
+
+Tier2 days: 100%|████████████████████████████████████████████████████████████████| 8/8 [14:04<00:00, 105.54s/it]
+
+21:37:08 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+
+21:37:08 INFO main: Tier2 Day 8: 3 surrogate(s) populated█████████████████████████| 8/8 [14:04<00:00, 79.54s/it]
+
+21:37:08 INFO main: trust-region it=1 drift=35.47% total=5066.9 km feasible=True
+
+21:37:08 INFO main: Tier2 it=2 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+
+21:37:08 INFO main: Tier2 it=2 s_center (start-of-day): ['D1=100.0%', 'D2=96.6%', 'D3=98.6%', 'D4=100.0%', 'D5=100.0%', 'D6=100.0%', 'D7=100.0%', 'D8=64.5%']
+
+21:37:08 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+
+day 0 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 1 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 2 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 5 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 3 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 4 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+day 6 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+Tier2 days:   0%|                                                                                                                              | 0/8 [00:00<?, ?it/s]
+
+day 7 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+GA gens:  40%|████████████████████████████████████████████████                                                                        | 6/15 [01:56<02:19, 15.48s/it]
+
+GA gens:  33%|████████████████████████████████████████                                                                                | 5/15 [01:52<02:52, 17.21s/it]
+
+GA gens:  33%|████████████████████████████████████████                                                                                | 5/15 [01:55<03:01, 18.15s/it]
+
+GA gens:  27%|████████████████████████████████                                                                                        | 4/15 [01:43<04:02, 22.09s/it]
+
+GA gens:  27%|████████████████████████████████                                                                                        | 4/15 [01:51<04:17, 23.43s/it]
+
+GA gens:  20%|████████████████████████                                                                                                | 3/15 [01:39<06:04, 30.41s/it]
+
+GA gens:  27%|████████████████████████████████                                                                                        | 4/15 [01:52<04:16, 23.33s/it]
+
+GA gens:  20%|████████████████████████   
+
+.0%', 'D6=100.0%', 'D7=100.0%', 'D8=64.5%']
+
+21:37:08 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+
+day 0 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:41:10 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  241.9s                                                                | 0/3 [00:00<?, ?it/s]
+
+day 2 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:43:11 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  363.1s                                                              | 0/3 [00:00<?, ?it/s]
+
+day 2 combos:  33%|██████████████████████████████████████▎                                                                            | 1/3 [04:02<08:03, 241.95s/it]21:43:17 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  127.7s                                                              | 0/3 [00:00<?, ?it/s]
+
+day 6 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]21:43:18 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  370.7s                                                                | 0/8 [00:00<?, ?it/s]
+
+day 0 combos:  33%|██████████████████████████████████████▎                                                                            | 1/3 [06:10<12:21, 370.77s/it]21:44:26 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  437.8s                                                                                    
+
+                                                                                                                                                                     21:44:44 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  456.2s                                                                                      
+
+                                                                                                                                                                     21:45:41 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  143.2s███████████████████████████████████████████        | 14/15 [03:45<00:10, 10.63s/it]
+
+GA gens:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████        | 14/15 [03:41<00:09,  9.21s/it]
+
+day 4 combos:  33%|██████████████████████████████████████▎                                                                            | 1/3 [07:17<14:35, 437.87s/it]
+
+day 2 combos:   0%|                                                                                                                            | 0/3 [00:00<?, ?it/s]
+
+                                                                                                                                                                     
+
+                                                                                                                                                     21:46:08 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  169.7s
+
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████▋                                      | 2/3 [09:00<04:12, 252.50s/it]21:46:10 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  542.0s
+
+day 5 combos:  21:46:11 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  543.4s     
+
+                                  | 1/3 [09:02<18:
+
+day 1 combos:  33%|██████████████████████████████████████▎                                                         21:46:13 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  182.4s
+
+               21:46:39 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  57.7s███
+
+█████████████████████████████████████████████▋    
+
+                                  | 2/3 [09:05<04:
+
+day 2 combos:  33%|██████████████████████████████████████▋       21:46:52 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  127.9s<01
+
+:55, 57.68s/it]
+
+               21:47:06 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  160.8s
+
+day 7 combos:  21:47:35 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  627.0s▋    
+
+day 4 combos:  67%|███████████████████████████████
+
+█████████████████████████████████████████████▋    
+
+                                  | 2/3 [09:58<04:
+
+34, 274.90s/it]21:48:24 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  135.6s
+
+day 0 combos: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [11:16<00:                                                                                                                                                      day 0 combos:   0%|        | 0/3 [00:00<?, ?it/s]21:48:34 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  115.1s
+
+day 2 combos:  67%|██████████████████████████████████████████████21:48:47 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  153.9s
+
+:31, 91.54s/it]
+
+GA gens:   0%|            | 0/15 [00:00<?, ?it/s]
+
+day 3 combos: 100%|███████████████████████████████
+
+██████████████████████████████████████████████████
+
+██████████████████████████████████| 3/3 [11:39<0021:50:26 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  254.8s                   
+
+                                                  
+
+day 1 combos:  67%|████████████████████████████████████████████████████████████████████████████▋                                      | 2/3 [13:18<0621:51:00 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  290.5s
+
+GA gens:  13%|▌   | 2/15 [01:17<08:12, 37.92s/it]
+
+day 5 combos:  21:51:04 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  251.8s  
+
+                                  | 2/3 [13:52<06:
+
+34, 394.15s/it]   | 3/15 [02:29<10:43, 53.61s/it]
+
+                                                 21:51:26 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  171.5s█████████████████
+
+██████████████████████████████████████████████████
+
+██████████████████████████████████| 3/3 [13:56<00:
+
+day 2 combos: 100%|█████████████████████████████████████████████████████████████████████████████████
+
+██████████████████████████████████| 3/3 [05:44<00:
+
+                                                                 21:51:26 INFO optimizers.tier2: Tier2 day 2 done in 858.8s  (6 solves)               
+
+               
+
+               21:51:36 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  191.3s
+
+day 0 combos:  33%|▎| 1/3 [03:11<06:22, 191.31s/i21:52:20 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  313.7s                 
+
+                                                  
+
+                                | 1/8 [14:19<1:40:
+
+13, 859.05s/it]
+
+day 4 combos: 100%|███████████████████████████████
+
+█████████████████████████████████████████████████21:53:24 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  275.7s00:00<?, ?it/s] 
+
+                                                 21:54:39 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  183.1s
+
+day 0 combos:  67%|▋| 2/3 [06:14<03:06, 186.47s/i21:55:12 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  247.0s
+
+                                                 21:56:43 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  376.6s
+
+                                                 21:57:46 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  405.6s
+
+day 1 combos:   0%|                              21:58:38 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  314.2s          | 0/3 [00:00<?, ?it/s]
+
+                                                 21:58:56 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  395.3s
+
+GA gens:  33%|█▎  | 5/15 [04:05<08:23, 50.36s/it]21:59:10 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  271.3s
+
+21:59:10 INFO optimizers.tier2: Tier2 day 0 done in 1322.7s  (6 solves)                                                                          | 0/3 [00:00<?, ?it/s]
+
+day 4 combos:  33%|▎| 1/3 [06:35<13:10, 395.36s/i21:59:48 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  275.8s
+
+day 3 combos:  67%|▋| 2/3 [09:50<04:58, 298.44s/i22:01:47 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  303.6s
+
+day 7 combos:  33%|▎| 1/3 [04:07<08:14, 247.03s/i                                                                                                                      22:03:07 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  267.9s                                                   | 1/3 [05:03<10:07, 303.59s/it]
+
+GA gens:  73%|██▏| 11/15 [09:04<03:29, 52.41s/it]22:03:07 INFO optimizers.tier2: Tier2 day 3 done in 1559.1s  (6 solves)
+
+GA gens:  80%|██▍| 12/15 [10:04<02:43, 54.64s/it]                                                                                                                    22:03:09 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  201.5s
+
+Tier2 days:  25%|████████████████████████████▊   22:03:09 INFO optimizers.tier2: Tier2 day 7 done in 1561.8s  (6 solves)            | 2/8 [22:02<1:02:39, 626.58s/it]
+
+                                                                                                                                                                     22:03:44 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  356.6s
+
+                                                                                                                                                                       22:03:45 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  288.2s
+
+Tier2 days:  38%|████████████████████████████████22:04:46 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  178.9s  | 3/8 [25:59<37:21, 448.32s/it]
+
+day 5 combos:  33%|███████████████████████████████████████                                                                              | 1/3 [05:56<11:53, 356.58s/it]22:05:02 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  1046.9s████████████████                                       | 2/3 [08:02<03:50, 230.34s/it]
+
+GA gens:  13%|████████████████▎                                                                                                         | 2/15 [00:43<04:46, 22.05s/it]22:06:28 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  162.6s
+
+                                                 22:06:28 INFO optimizers.tier2: Tier2 day 4 done in 1760.1s  (6 solves)
+
+GA gens:  20%|████████████████████████▍                                                                                                 | 3/15 [01:05<04:22, 21.83s/it]22:06:45 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  181.4s
+
+GA gens:  33%|████████████████████████████████████████▋                                                                                 | 5/15 [01:35<02:57, 17.78s/it]22:07:21 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  153.8s████████████▋                                      | 2/3 [27:54<14:34, 874.14s/it]
+
+                                                                                                                                                                       22:07:21 INFO optimizers.tier2: Tier2 day 1 done in 1813.0s  (6 solves)                                                                                                 
+
+GA gens:  80%|████████████████████████████████████████████████████████████████████████████████████████████████▊                        | 12/15 [02:43<00:26,  9.00s/it]22:08:18 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  92.9s████████▏                                           | 5/8 [29:20<12:16, 245.65s/it]
+
+                                                                                                                                                                       22:08:18 INFO optimizers.tier2: Tier2 day 5 done in 1870.7s  (6 solves)
+
+22:09:10 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  247.9s                                                                                      
+
+day 6 combos:   0%|                                                                                                                              | 0/3 [00:00<?, ?it/s]22:10:51 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  100.6s                                                                                       
+
+day 6 combos:  33%|███████████████████████████████████████                                                                              | 1/3 [01:40<03:21, 100.56s/it]22:11:25 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  34.6s
+
+day 6 combos:  67%|██████████████████████████████████████████████████████████████████████████████▋                                       | 2/3 [02:15<01:01, 61.75s/it]
+
+                                                                                                         22:11:52 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  27.3s                        
+
+day 6 combos: 100%|███████████████████████████████████████████████████████████████████████████████████████                                                                                                          22:11:52 INFO optimizers.tier2: Tier2 day 6 done in 2084.8s  (3 solves)
+
+Tier2 days: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [34:44<00:00, 260.59s/it]
+
+22:11:53 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+
+22:11:53 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+
+22:11:53 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+
+22:11:53 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+
+22:11:53 INFO main: Tier2 Day 5: 3 surrogate(s) populated█████████████████████████████████████████████████
+
+22:11:53 INFO main: Tier2 Day 6: 3 surrogate(s) populatedt]
+
+22:11:53 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+
+22:11:53 INFO main: Tier2 Day 8: 3 surrogate(s) populated
+
+22:11:53 INFO main: trust-region it=2 drift=22.05% total=5066.9 km feasible=True
+
+22:11:53 INFO main: Tier2 it=3 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+
+22:11:53 INFO main: Tier2 it=3 s_center (start-of-day): ['D1=100.0%', 'D2=92.8%', 'D3=100.0%', 'D4=100.0%', 'D5=100.0%', 'D6=100.0%', 'D7=100.0%', 'D8=86.6%']
+
+22:11:53 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+
+day 0 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 1 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 2 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 3 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 4 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 5 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 6 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+day 7 combos:   0%|                                                                | 0/3 [00:00<?, ?it/s]
+
+Tier2 days:   0%|                                                                  | 0/8 [00:00<?, ?it/s]
+
+GA gens:   0%|                                                                    | 0/15 [00:00<?, ?it/s]
+
+GA gens:   0%|                                                                                            
+
+                                                                       | 0/15 [00:00<?, ?it/s]
+
+GA gens:   0%|                                                                                            
+
+                                                                       | 0/15 [00:00<?, ?it/s]
+
+GA gens:   0%|                                                                                            
+
+GA gens:   7%|████                                                        | 1/15 [00:11<02:36, 11.15s/it]
+
+GA gens:   0%|                                                                                            
+
+GA gens:   7%|██████████▎                                                                                                                                        
+
+GA gens:  13%|████████                                                    | 2/15 [00:22<02:27, 11.31s/it] 
+
+                                                                       | 0/15 [00:00<?, ?it/s]
+
+GA gens:   7%|██████████▎                                                                                                                                        
+
+        | 1/15 [00:16<03:43, 15.98s/it]                                | 0/15 [00:00<?, ?it/s]
+
+GA gens:   7%|██████████▎                                                                                                                                        
+
+GA gens:  20%|████████████                                                | 3/15 [00:33<02:13, 11.13s/it]                                                        
+
+        | 2/15 [00:29<03:08, 14.50s/it]                                                                                                                          
+
+        | 1/15 [00:17<04:09, 17.81s/it]
+
+GA gens:  13%|████████████████████▋                                                                                                                              
+
+GA gens:  27%|████████████████                                            | 4/15 [00:59<03:08, 17.12s/it]
+
+GA gens:  20%|███████████████████████████████                                                                                                                    
+
+        | 3/15 [01:00<04:20, 21.75s/it]
+
+GA gens:  20%|███████████████████████████████                                                                                                                    
+
+GA gens:  33%|████████████████████                                        | 5/15 [01:15<02:46, 16.64s/it]
+
+GA gens:  20%|███████████████████████████████                                                                                                                    
+
+GA gens:  27%|█████████████████████████████████████████▎                                                                                                         
+
+        | 4/15 [01:13<03:22, 18.40s/it]
+
+GA gens:  20%|███████████████████████████████                                                                                                                    
+
+GA gens:  40%|████████████████████████                                    | 6/15 [01:25<02:10, 14.47s/it]                                                        
+
+GA gens:  33%|███████████████████████████████████████████████████▋                                                                                               
+
+        | 5/15 [01:25<02:42, 16.23s/it]████████████████▎                                                                                                         
+
+        | 4/15 [01:15<03:29, 19.03s/it]██████                                                                                                                    
+
+        | 3/15 [01:11<04:54, 24.58s/it]
+
+GA gens:  33%|███████████████████████████████████████████████████▋                                                                                               
+
+GA gens:  47%|████████████████████████████                                | 7/15 [01:39<01:54, 14.34s/it]                                                        
+
+GA gens:  40%|██████████████████████████████████████████████████████████████                                                                                     
+
+        | 6/15 [01:42<02:26, 16.27s/it]
+
+GA gens:  40%|██████████████████████████████████████████████████████████████                                                                                     
+
+        | 6/15 [01:46<02:32, 16.90s/it]
+
+GA gens:  53%|████████████████████████████████                            | 8/15 [01:57<01:46, 15.24s/it]                                                        
+
+GA gens:  40%|██████████████████████████████████████████████████████████████                                                                                     
+
+GA gens:  60%|████████████████████████████████████                        | 9/15 [02:08<01:23, 13.93s/it]                                                        
+
+        | 7/15 [02:01<02:18, 17.31s/it]██████████████████████████▋                                                                                               
+
+GA gens:  47%|████████████████████████████████████████████████████████████████████████▎                                                                          
+
+        | 7/15 [02:04<02:19, 17.44s/it]
+
+GA gens:  33%|███████████████████████████████████████████████████▋                                                                                               
+
+GA gens:  67%|███████████████████████████████████████▎                   | 10/15 [02:22<01:10, 14.09s/it]                                                        
+
+        | 8/15 [02:18<02:00, 17.28s/it]█████████████████████████████████████                                                                                     
+
+GA gens:  53%|██████████████████████████████████████████████████████████████████████████████████▋                                                                
+
+        | 8/15 [02:22<02:03, 17.65s/it]
+
+GA gens:  53%|██████████████████████████████████████████████████████████████████████████████████▋                                                                
+
+GA gens:  73%|███████████████████████████████████████████▎               | 11/15 [02:37<00:57, 14.25s/it]
+
+GA gens:  60%|█████████████████████████████████████████████████████████████████████████████████████████████                                                      
+
+        | 9/15 [02:36<01:45, 17.54s/it]
+
+GA gens:  47%|████████████████████████████████████████████████████████████████████████▎                                                                          
+
+GA gens:  80%|███████████████████████████████████████████████▏           | 12/15 [02:51<00:42, 14.27s/it]██                                                      
+
+GA gens:  60%|█████████████████████████████████████████████████████████████████████████████████████████████                                                      
+
+        | 9/15 [02:42<01:49, 18.26s/it]███                                | 7/15 [02:23<02:42, 20.33s/it]
+
+GA gens:  67%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋                                            
+
+       | 10/15 [02:56<01:30, 18.14s/it]███████████████████████████████████████████████▎                                                                          
+
+GA gens:  87%|███████████████████████████████████████████████████▏       | 13/15 [03:05<00:28, 14.05s/it]                                                        
+
+GA gens:  67%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋                                            
+
+       | 10/15 [02:59<01:29, 17.97s/it]
+
+GA gens:  53%|████████████████████████████████                            | 8/15 [02:46<02:28, 21.23s/it]
+
+GA gens:  93%|███████████████████████████████████████████████████████    | 14/15 [03:17<00:13, 13.61s/it]█████████████████████▉                                  
+
+       | 11/15 [03:13<01:11, 17.87s/it]
+
+GA gens:  73%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████▉                                  
+
+       | 11/15 [03:16<01:10, 17.63s/it]
+
+                                                                                                         █████████████████████▉                                  
+
+       | 11/15 [03:14<01:10, 17.69s/it]
+
+GA gens:  80%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏                       
+
+       | 12/15 [03:31<00:53, 17.80s/it]
+
+GA gens:  80%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏                       
+
+       | 12/15 [03:33<00:52, 17.42s/it]██████████████▎                   | 10/15 [03:16<01:31, 18.22s/it]
+
+GA gens:  87%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍             
+
+       | 13/15 [03:45<00:33, 16.66s/it]
+
+GA gens:  87%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍             
+
+       | 13/15 [03:49<00:34, 17.03s/it]█████████████████████████████████████████████████████████████████████████████▋                                            
+
+GA gens:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋   
+
+       | 14/15 [03:58<00:15, 15.64s/it]████████████████████████████████████████████████████████████████████████████████████████████████████████████▍             
+
+       | 13/15 [03:48<00:34, 17.21s/it]
+
+GA gens:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋   
+
+       | 14/15 [04:04<00:16, 16.31s/it]
+
+GA gens: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+                                                                                                                                                                 
+
+                                       ██████████████████████▏           | 12/15 [03:58<00:58, 19.47s/it]22:16:53 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  300.3s
+
+GA gens: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+day 2 combos:  33%|██████████████████▎                                    | 1/3 [05:00<10:00, 300.40s/it]                                                        
+
+                                       ████████████████████████████████████████████████████████████████████████████████████████████████████████████▍             
+
+GA gens: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+                                                                                                                                                                 
+
+                                       
+
+GA gens:  87%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍             
+
+       | 13/15 [04:19<00:36, 18.12s/it]
+
+GA gens:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋   
+
+       | 14/15 [04:32<00:16, 16.49s/it]
+
+GA gens: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+███████| 15/15 [04:46<00:00, 15.82s/it]██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋   
+
+                                                                                                                                                                 
+
+                                       
+
+                                                                                                                 22:18:05 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  372.2s                                   
+
+day 0 combos:  33%|██████████████████▎                                    | 1/3 [06:12<12:24, 372.28s/it]22:18:10 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  76.9s████
+
+█████████
+
+                                      
+
+day 2 combos:  67%|██████████22:18:12 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  379.3s   
+
+                                      
+
+          
+
+                             22:18:21 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  388.1s   | 
+
+1/3 [06:19<12:38, 379.30s/it]
+
+                             22:18:38 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  405.1s
+
+day 7 combos:  33%|██████████22:18:50 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  40.2s██▎
+
+                                    | 
+
+1/3 [06:45<13:30, 405.13s/it]
+
+day 2 combos: 100%|███████████████████
+
+████████████████████████████████████| 
+
+                                     22:18:58 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  425.2s
+
+day 1 combos:  33%|██████████████████▎                             22:18:59 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  54.0s
+
+day 0 combos:  67%|████████████████████████████████████▋                  | 2/3 [07:06<03:05, 185.04s/it]22:19:03 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  430.0s
+
+                             22:19:08 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  56.4s
+
+day 5 combos:  33%|██████████████████▎
+
+                                    | 
+
+1/3 [07:10<14:20, 430.06s/it]22:19:22 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  61.3s  | 
+
+2/3 [07:15<03:09, 189.38s/it]
+
+                             22:19:28 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  37.2s
+
+                                     22:19:46 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  473.2s██████████████▋                  | 
+
+2/3 [07:29<03:16, 196.03s/it]
+
+                             22:19:50 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  51.0s
+
+day 0 combos: 100%|███████████████████████████████████████████████████████|                                                                             day 0 combos:   0%| | 0/3 [00:00<?, ?22:19:55 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  77.0s
+
+                             22:20:06 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  57.1s█
+
+█████████████████▋                  | 
+
+2/3 [08:02<03:32, 212.16s/it]
+
+day 3 combos: 100%|███████████████████
+
+████████████████████████████████████|22:20:07 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  39.1s combos:   0%| | 0/3 [00:00<?, ?
+
+                                     22:20:38 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  99.5s
+
+                             22:20:46 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  83.4s
+
+day 1 combos:  67%|████████████████████████████████████▋                  | 2/3 [08:45<03:53, 233.78s/it]
+
+                                     22:20:50 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  106.8s                                
+
+                                      
+
+loors (end-of-day targets): {1: '20.022:21:16 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  68.7s
+
+', 2: '20.0%', 3: '20.0%', 4:22:20:5722:21:16 INFO optimizers.tier2: Tier2 day 2 done in 563.5s  (6 solves)6.7s
+
+day 0 combos:  33%|▎| 1/3 [01:06<02:1██████████████████▋                  | 2/3 [08:57<03:59, 239.98s/it]22:21:17 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  71.0s                          
+
+                                     22:21:40 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  104.7s
+
+                                                                                                                                                                                 22:21:52 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  55.1s
+
+day 0 combos:  67%|▋| 2/3 [02:01<00:522:21:54 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  67.6s                                    | 0/3 [00:00<?, ?it/s]
+
+                      22:21:57 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=warm  130.4s
+
+Tier2 days:  12%|██████▉                                                | 1/8 [09:23<1:05:45, 563.60s/it]22:22:05 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  86.8s
+
+                                                                                                                                                                                 22:22:06 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  49.4s                                                                       | 0/3 [00:00<?, ?it/s]
+
+                                     22:22:13 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  83.1s
+
+day 7 combos:  33%|██████████████████████████████████████████████████▎                                                                                                    | 1/3 [22:22:29 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  49.2s:03<04:31, 271.70s/it]
+
+day 3 combos:  67%|▋| 2/3 [02:00<00:5                                                                                                                                            22:22:39 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  47.2s
+
+22:22:39 INFO optimizers.tier2: Tier2 day 0 done in 646.6s  (6 solves)                                                                             | 1/3 [00:49<01:38, 49.22s/it]
+
+                                                                                                         22:22:48 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  54.1s
+
+                      22:22:56 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  50.0s
+
+                                     22:22:56 INFO optimizers.tier2: Tier2 day 3 done in 663.8s  (6 solves)
+
+                                                                                                         22:22:58 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  53.5s
+
+                                                                                                                                                                                 22:23:13 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  43.8s                                                                | 1/3 [00:53<01:46, 53.47s/it]
+
+day 7 combos:  67%|████████████████████████████████████████████████████████████████████████████████████████████████████▋                                                  | 2/3 [22:23:17 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  64.2s
+
+day 4 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:33<00:46, 46.05s/it]22:23:20 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=warm  83.0s
+
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]22:23:29 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  40.6s
+
+day 5 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [01:04<02:08, 64.16s/it]
+
+                      22:23:29 INFO optimizers.tier2: Tier2 day 7 done in 696.2s  (6 solves)
+
+                                                                                                         22:23:45 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  46.4s                                                                                                
+
+                                                                                                                                                                                 22:23:55 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  42.6s█████████████████████▎                                          | 2/3 [01:39<00:49, 49.33s/it]
+
+day 7 combos: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [22:23:56 INFO optimizers.tier2: Tier2 day 4 done in 722.9s  (6 solves)                                                                                                             
+
+                                                                                                         22:24:01 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  44.1s
+
+Tier2 days:  50%|████████████████████████████▌                            | 4/8 [11:36<07:19, 109.93s/it]                                                                        22:24:11 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=warm  51.6s
+
+day 6 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:51<01:43, 51.58s/it]22:24:20 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  35.1s
+
+day 5 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:48<00:52, 52.38s/it]22:24:20 INFO optimizers.tier2: Tier2 day 1 done in 747.1s  (6 solves)                                                                                                            
+
+Tier2 days:  62%|████████████████████████████████████▎                     | 5/8 [12:02<03:59, 79.92s/it]22:24:28 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  26.7s
+
+                                                                                                                                                                                 22:24:28 INFO optimizers.tier2: Tier2 day 5 done in 755.3s  (6 solves)
+
+                                                                                                         22:24:34 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  22.3s
+
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:13<00:34, 34.34s/it]22:24:45 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  11.3s
+
+22:24:45 INFO optimizers.tier2: Tier2 day 6 done in 772.2s  (6 solves)                                                                                                           
+
+Tier2 days: 100%|██████████████████████████████████████████████████████████| 8/8 [12:52<00:00, 96.52s/it]
+
+22:24:45 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 3: 3 surrogate(s) populated██████████▊       | 7/8 [12:35<00:43, 43.72s/it]
+
+22:24:45 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+
+22:24:45 INFO main: Tier2 Day 8: 3 surrogate(s) populated██████████████████| 8/8 [12:52<00:00, 35.17s/it]
+
+22:24:45 INFO main: trust-region it=3 drift=13.42% total=5066.9 km feasible=True
+
+22:24:45 INFO main: Extracting exact profile for Day 0...
+
+22:25:08 INFO main: Extracting exact profile for Day 1...                                                                                                                        
+
+22:25:36 INFO main: Extracting exact profile for Day 2...                                                                                                                        
+
+22:25:55 INFO main: Extracting exact profile for Day 3...                                                                                                                        
+
+22:26:23 INFO main: Extracting exact profile for Day 4...                                                                                                                        
+
+22:26:52 INFO main: Extracting exact profile for Day 5...                                                                                                                        
+
+22:27:25 INFO main: Extracting exact profile for Day 6...                                                                                                                        
+
+22:27:58 INFO main: Extracting exact profile for Day 7...    
+22:28:14 INFO main: ============================================================                                                                                                 
+22:28:14 INFO main: RUNNING VARIANT: Day 3 = prahlad
+22:28:14 INFO main: ============================================================
+22:28:14 INFO main: Day 3 [prahlad]: route loaded (3 files)
+22:28:14 INFO main: Computing Tier 1 baseline for variant 'prahlad'...
+22:28:45 INFO optimizers.tier1: Day 8 ENERGY DIAG (v=43.7km/h, 557 segs, 278.3km): solar=+5275Wh idle=-64Wh regen_waste=-0Wh net=+2159Wh (+61.2% SOC) | slopes: |avg|=2.1% max=7.5% | GHI avg=615 | trailered=360 | loops=(0,)
+22:30:28 INFO optimizers.tier1: Day 7 ENERGY DIAG (v=40.9km/h, 684 segs, 341.9km): solar=+4838Wh idle=-84Wh regen_waste=-0Wh net=+1703Wh (+48.3% SOC) | slopes: |avg|=1.8% max=6.9% | GHI avg=434 | trailered=162 | loops=(0,)
+22:32:31 INFO optimizers.tier1: Day 6 ENERGY DIAG (v=37.1km/h, 620 segs, 310.0km): solar=+7867Wh idle=-84Wh regen_waste=-0Wh net=+3837Wh (+108.7% SOC) | slopes: |avg|=0.9% max=5.7% | GHI avg=694 | trailered=0 | loops=(0,)
+22:33:47 INFO optimizers.tier1: Day 5 ENERGY DIAG (v=34.9km/h, 584 segs, 292.0km): solar=+7354Wh idle=-84Wh regen_waste=-0Wh net=+3936Wh (+111.6% SOC) | slopes: |avg|=0.8% max=4.9% | GHI avg=699 | trailered=0 | loops=(0, 0)
+22:44:50 INFO optimizers.tier1: Day 4 ENERGY DIAG (v=31.1km/h, 521 segs, 260.3km): solar=+6895Wh idle=-84Wh regen_waste=-0Wh net=+4394Wh (+124.6% SOC) | slopes: |avg|=0.8% max=5.1% | GHI avg=621 | trailered=0 | loops=(0, 0)
+22:47:06 INFO optimizers.tier1: Day 3 ENERGY DIAG (v=27.5km/h, 460 segs, 230.0km): solar=+7213Wh idle=-84Wh regen_waste=-0Wh net=+5273Wh (+149.5% SOC) | slopes: |avg|=0.6% max=3.2% | GHI avg=634 | trailered=0 | loops=(0,)
+22:48:12 INFO optimizers.tier1: Day 2 ENERGY DIAG (v=36.2km/h, 605 segs, 302.5km): solar=+7585Wh idle=-84Wh regen_waste=-0Wh net=+5097Wh (+144.5% SOC) | slopes: |avg|=0.7% max=4.8% | GHI avg=675 | trailered=0 | loops=(0,)
+22:50:13 INFO optimizers.tier1: Day 1 ENERGY DIAG (v=32.3km/h, 476 segs, 238.3km): solar=+6717Wh idle=-74Wh regen_waste=-0Wh net=+3528Wh (+100.0% SOC) | slopes: |avg|=1.6% max=6.4% | GHI avg=710 | trailered=0 | loops=(0,)
+22:50:18 INFO optimizers.tier1: Tier1 Day 1: start=100.0% end=35.5% +overnight=2.9% -> next=38.5%
+22:50:18 INFO optimizers.tier1: Tier1 Day 2: start=38.5% end=22.8% +overnight=3.6% -> next=26.4%
+22:50:18 INFO optimizers.tier1: Tier1 Day 3: start=26.4% end=32.1% +overnight=2.7% -> next=34.8%
+22:50:18 INFO optimizers.tier1: Tier1 Day 4: start=34.8% end=27.6% +overnight=1.5% -> next=29.0%
+22:50:18 INFO optimizers.tier1: Tier1 Day 5: start=29.0% end=21.7% +overnight=2.5% -> next=24.2%
+22:50:18 INFO optimizers.tier1: Tier1 Day 6: start=24.2% end=100.0% +overnight=1.5% -> next=100.0%
+22:50:18 INFO optimizers.tier1: Tier1 Day 7: start=100.0% end=27.4% +overnight=11.2% -> next=38.5%
+22:50:18 INFO optimizers.tier1: Tier1 Day 8: start=38.5% end=83.7% +overnight=0.0% -> next=83.7%
+22:50:18 INFO main: Using pre-computed Tier 1 baseline (skipping recomputation)
+22:50:18 INFO main: Tier2 it=0 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+22:50:18 INFO main: Tier2 it=0 s_center (start-of-day): ['D1=100.0%', 'D2=38.5%', 'D3=26.4%', 'D4=34.8%', 'D5=29.0%', 'D6=24.2%', 'D7=100.0%', 'D8=38.5%']
+22:50:18 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+day 0 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]22:53:48 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  209.8s                                                                          | 0/3 [00:00<?, ?it/s]
+day 2 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]22:54:21 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  243.2s                                                                          | 0/3 [00:00<?, ?it/s]
+day 0 combos:  33%|█████████████████████████████████████████▋                                                                                   | 1/3 [04:03<08:06, 243.28s/it]22:54:34 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  46.2s                                                                         | 0/3 [00:00<?, ?it/s]
+day 6 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]22:54:49 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  270.9s                                                                        | 0/3 [00:00<?, ?it/s]
+day 2 combos:  67%|███████████████████████████████████████████████████████████████████████████████████▎                                         | 2/3 [04:16<01:53, 113.65s/it]22:55:07 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  288.6s                                                                                                
+                                                                                                                                                                               22:55:20 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  59.0s                                                                | 1/3 [04:31<09:01, 270.98s/it]
+day 0 combos:  67%|███████████████████████████████████████████████████████████████████████████████████▎                                         | 2/3 [05:02<02:14, 134.90s/it]22:55:29 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  54.8s█████████████████████████████████████████████████████▍        | 14/15 [03:07<00:15, 15.21s/it]
+                                                                                                                                                                               22:55:57 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  338.7s                                                                                              
+day 2 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]22:56:02 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  344.2s                                                                 | 1/3 [04:48<09:37, 288.66s/it]
+GA gens:  93%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍        | 14/15 [03:35<00:15, 15.19s/it]22:56:37 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  378.7s                                                                 | 1/3 [05:44<11:28, 344.20s/it]
+day 4 combos:  33%|█████████████████████████████████████████▋                                                                                   | 1/3 [05:38<11:17, 338.72s/it]22:57:10 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  140.7s
+                                                                                                                                                                               22:57:31 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  121.0s
+                                                                                                                                                                               22:57:48 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  147.5s████████████████████▎                                         | 2/3 [06:51<03:14, 194.39s/it]
+day 0 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]22:57:56 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  169.4s
+                                                                                                                                                                               22:58:25 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  487.0s
+                                                                                                                                                                               22:58:41 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  70.3s
+                                                                                                                                                                               22:58:48 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  165.5s
+day 2 combos:  67%|████████████████████████████████████████████████████████████████████████████████████                                          | 2/3 [03:11<01:31, 91.29s/it]22:58:51 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  174.5s███████████████████▎                                         | 2/3 [08:29<03:59, 239.17s/it]
+day 6 combos:  33%|█████████████████████████████████████████▋                                                                                   | 1/3 [08:07<16:14, 487.02s/it]22:58:56 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  68.3s
+day 0 combos:  33%|██████████████████████████████████████████                                                                                    | 1/3 [01:08<02:16, 68.30s/it]22:59:02 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  112.3s
+day 4 combos:  67%|███████████████████████████████████████████████████████████████████████████████████▎                                         | 2/3 [08:33<04:02, 242.19s/it]22:59:26 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  169.0s                                                                      | 0/15 [00:00<?, ?it/s]
+                                                                                                                                                                               22:59:41 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  104.4s                                                                       | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                               22:59:47 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  65.5s
+                                                                                                                                                                               22:59:48 INFO optimizers.tier2: Tier2 day 2 done in 569.6s  (6 solves)█████████████████████████████████▎                                         | 2/3 [09:07<04:15, 255.48s/it]
+                                                                                                                                                                               23:00:01 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  64.1s                                                               | 2/15 [00:30<03:20, 15.40s/it]
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████████████                                          | 2/3 [02:12<01:05, 65.91s/it]
+day 7 combos:   0%|                                                                                                                                      | 0/3 [00:00<?, ?it/s]
+
+
+
+
+Tier2 days:  12%|███████████████▋                                                                                                             | 1/8 [09:29<1:06:26, 569.49s/it]
+GA gens:  27%|██████████████████████████████████
+▋                                               
+                               23:00:36 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  93.2s
+GA gens:  33%|██████████████████████████████████
+█████████▎                                    
+         22:11:52 INFO optimizers.tier2:   day 6
+day 3 combos:  33%|█████████████████████████████
+█████████████                                   
+                                                
+ | 1/3 [01:33<03:06, 93.23s/it]23:00:42 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  110.6s
+
+
+
+GA gens:  47%|██████████████████████████████████
+day 4 combos: 100%|█████████████████████████████
+████████████████████████████████████████████████
+███████████████████████████████████████████████23:00:45 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  117.4s:00<?, ?it/s] 
+                                                
+day 1 combos: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+                                                                                                                                                
+day 1 combos:   0%|      | 0/3 [00:00<?, ?it/s]
+
+                               23:00:57 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  75.5s
+
+
+
+GA gens:  53%|██████████████████████████████████
+███████████████████████████████████▎            
+                                                
+| 8/15 [02:05<01:38, 14.09s/it]23:01:04 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  63.0s                              
+day 0 combos: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████                                                                                                                                                23:01:04 INFO optimizers.tier2: Tier2 day 0 done in 645.8s  (6 solves)
+
+
+
+                               23:01:13 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  106.5s
+
+
+Tier2 days:  25%|███████████████████████████████
+▊                                               
+                                                
+day 5 combos: 100%|█████████████████████████████
+day 5 combos:   0%|      | 0/3 [00:00<?, ?it/s]█                                                                                                                               23:01:35 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  58.8s
+                                                                                                                                                                               23:02:00 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  77.7s
+                                               23:02:01 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  63.1s
+day 3 combos:  67%|████████████████████████████████████████████████████████████████████████████████████                                          | 2/3 [02:32<01:13, 73.03s/it]23:02:02 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  76.0s
+                                                                                                                                                                               23:02:14 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  61.6s
+day 5 combos:  33%|▎| 1/3 [01:01<02:03, 61.66s/23:02:36 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  61.1s           | 11/15 [02:37<00:48, 12.03s/it]
+                                                                                                                                                                               23:02:36 INFO optimizers.tier2: Tier2 day 3 done in 738.1s  (6 solves)███████████████████████████████████████████████████████████████████▍        | 14/15 [03:10<00:11, 11.41s/it]
+day 7 combos:  67%|████████████████████████████████████████████████████████████████████████████████████                                          | 2/3 [02:18<01:08, 68.24s/it]23:03:00 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  59.3s                                                                                               
+                                                                                                                                                                               23:03:00 INFO optimizers.tier2: Tier2 day 7 done in 761.8s  (6 solves)
+                                                                                                                                                                               23:03:07 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  67.1s
+                                               23:03:13 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  71.2s
+                                               23:03:26 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  71.9s
+day 5 combos:  67%|▋| 2/3 [02:13<01:07, 67.73s/23:03:33 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  307.9s                | 3/8 [12:18<16:09, 193.96s/it]
+                                                                                                                                                                                 23:04:03 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  55.4s
+                                               23:04:03 INFO optimizers.tier2: Tier2 day 4 done in 824.8s  (6 solves)
+GA gens:  13%|█████████████████▌                                                                                                                  | 2/15 [00:18<01:58,  9.09s/it]23:04:10 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  56.5s
+                                               23:04:10 INFO optimizers.tier2: Tier2 day 1 done in 831.6s  (6 solves)
+                                                                                                                                                  | 3/15 [00:24<01:31,  7.65s/it]23:04:18 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  51.9s
+23:04:18 INFO optimizers.tier2: Tier2 day 5 done in 840.3s  (6 solves)
+GA gens:  33%|████████████████████████████████████████████                                                                                        | 5/15 [00:34<01:00,  6.03s/it]23:04:49 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  76.1s
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:05:24 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  35.0s                                                                                                  
+day 6 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:34<01:09, 34.97s/it]23:05:36 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  11.8s███████████████████████████████                                | 6/8 [13:51<02:21, 70.76s/it]
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [00:46<00:21, 21.32s/it]23:05:48 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  11.7s
+23:05:48 INFO optimizers.tier2: Tier2 day 6 done in 929.5s  (3 solves)                                                                                                           
+Tier2 days: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [15:29<00:00, 116.16s/it]
+23:05:48 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+23:05:48 INFO main: Tier2 Day 8: 3 surrogate(s) populated████████████████████████████████████████████████████████████████████████████████████████| 8/8 [15:29<00:00, 62.80s/it]
+23:05:48 INFO main: trust-region it=0 drift=75.78% total=5066.9 km feasible=True
+23:05:48 INFO main: Tier2 it=1 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+23:05:48 INFO main: Tier2 it=1 s_center (start-of-day): ['D1=100.0%', 'D2=100.0%', 'D3=100.0%', 'D4=100.0%', 'D5=100.0%', 'D6=100.0%', 'D7=98.6%', 'D8=100.0%']
+23:05:48 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]
+day 1 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:08:59 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  191.2s                                                                            | 0/3 [00:00<?, ?it/s]
+day 0 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [03:11<06:22, 191.22s/it]23:09:25 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  216.9s                                                                          | 0/3 [00:00<?, ?it/s]
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:09:25 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  46.4s                                                                           | 0/3 [00:00<?, ?it/s]
+Tier2 days:   0%|                                                                                                                                          | 0/8 [00:00<?, ?it/s]23:09:52 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  244.3s                                                                                                  
+day 2 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [03:37<01:37, 97.70s/it]23:09:57 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  249.1s                                                                                                
+GA gens: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 15/15 [02:38<00:00, 10.59s/it]23:09:58 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  58.8s                                                                                                 
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [04:10<01:53, 113.32s/it]23:10:09 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  44.3s                                                                 | 1/3 [04:09<08:18, 249.07s/it]
+                                                                                                                                                                                 23:10:16 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  267.9s                                                                   | 1/3 [04:04<08:08, 244.34s/it]
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:10:30 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  65.6s                                                               | 1/3 [04:27<08:55, 267.93s/it]
+                                                                                                                                                                                 23:10:33 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  285.5s
+                                                                                                                                                                                 23:10:42 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  32.3s
+day 3 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [04:42<02:07, 127.88s/it]23:10:56 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  57.8s
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:11:00 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  68.0s                                                                  | 1/3 [04:45<09:30, 285.46s/it]
+                                                                                                                                                                                 23:11:02 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  314.6s
+                                                                                                                                                                                 23:11:13 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  31.4s
+                                                                                                                                                                                 23:11:19 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  82.0s
+day 2 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:03<00:31, 31.83s/it]23:11:32 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  61.9s████████████████████▋                                          | 2/3 [05:12<02:20, 140.66s/it]
+day 6 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [05:14<10:29, 314.60s/it]23:11:39 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  43.0s██████████████████████▋                                          | 2/3 [05:31<02:30, 150.85s/it]
+day 0 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:42<01:25, 43.00s/it]23:11:44 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  88.8s
+day 3 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:11:46 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  32.8s█████████████████████▋                                          | 2/3 [05:56<02:42, 162.60s/it]
+                                                                                                                                                                                 23:11:47 INFO optimizers.tier2: Tier2 day 2 done in 359.0s  (6 solves)                                                                             | 1/15 [00:09<02:17,  9.85s/it]
+                                                                                                                                                                                 23:12:02 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  89.1s
+                                                                                                                                                                                 23:12:03 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  62.3s                                                                 | 2/15 [00:22<02:31, 11.65s/it]
+                                                                                                                                                                                 23:12:15 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  42.1s
+day 7 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:12:18 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  39.5s██████████████████████▋                                          | 2/3 [06:14<02:49, 169.97s/it]
+day 0 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:22<00:40, 40.96s/it]23:12:36 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  76.8s                                                                | 3/15 [00:35<02:23, 11.93s/it]
+day 3 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:42<01:24, 42.14s/it]23:13:22 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  67.2s                                                                                             
+                                                                                                                                                                                 23:13:26 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  83.6s                                                                          | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                                 23:13:28 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  103.1s                                                                | 5/15 [00:58<01:57, 11.80s/it]
+day 7 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [01:23<02:47, 83.65s/it]23:13:42 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  83.6s                                                                         | 0/3 [00:00<?, ?it/s]
+23:13:42 INFO optimizers.tier2: Tier2 day 0 done in 474.2s  (6 solves)                                                                                                           
+GA gens:  60%|███████████████████████████████████████████████████████████████████████████████▏                                                    | 9/15 [02:04<01:45, 17.50s/it]23:14:18 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  135.7s
+day 5 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:15:19 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  162.6s
+                                                                                                                                                                                 23:15:36 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  133.6s
+                                                                                                                                                                                 23:15:36 INFO optimizers.tier2: Tier2 day 3 done in 588.5s  (6 solves)                                                                             | 1/3 [02:42<05:25, 162.66s/it]
+Tier2 days:  25%|████████████████████████████████▎                                                                                                | 2/8 [07:54<21:33, 215.56s/it]23:15:39 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  132.7s████████████████████████████                                   | 11/15 [02:54<01:25, 21.29s/it]
+                                                                                                                                                                                 23:15:42 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  133.6s█████████████████████████████████████████████▌                 | 13/15 [03:52<00:51, 25.59s/it]
+day 7 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [03:36<01:52, 112.56s/it]23:16:20 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  121.0s                                                                | 1/3 [02:13<04:27, 133.62s/it]
+day 5 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [02:01<04:02, 121.02s/it]23:16:31 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  72.1s
+Tier2 days:  38%|████████████████████████████████████████████████▍                                                                                | 3/8 [09:48<14:06, 169.29s/it]23:16:31 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  52.2s
+                                                                                                                                                                                 23:16:32 INFO optimizers.tier2: Tier2 day 7 done in 643.9s  (6 solves)██████████████████████████████████▋                                          | 2/3 [03:54<01:49, 109.44s/it]
+                                                                                                                                                                                 23:16:41 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  59.1s                                                                                                
+                                                                                                                                                                                 23:16:57 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  354.7s████████████████████████▎                                          | 2/3 [03:12<01:29, 89.86s/it]
+                                                                                                                                                                                 23:17:07 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  47.4s
+day 5 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [02:48<01:17, 77.72s/it]23:17:12 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  41.6s
+GA gens:   7%|████████▊                                                                                                                           | 1/15 [00:05<01:22,  5.91s/it]23:17:13 INFO optimizers.tier2: Tier2 day 4 done in 684.9s  (6 solves)
+day 6 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [11:09<05:38, 338.22s/it]23:17:21 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  40.3s                                                                                               
+GA gens:  20%|██████████████████████████▍                                                                                                         | 3/15 [00:16<01:06,  5.58s/it]23:17:21 INFO optimizers.tier2: Tier2 day 1 done in 693.5s  (6 solves)                                                                                                            
+                                                                                                                                                                                 23:17:36 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  28.5s
+23:17:36 INFO optimizers.tier2: Tier2 day 5 done in 707.9s  (6 solves)                                                                                                           
+                                                                                                                                                                                 23:17:56 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  59.2s███████████████████▎                                                | 5/8 [11:24<04:42, 94.26s/it]
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:18:30 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  33.7s                                                                                                  
+day 6 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:33<01:07, 33.71s/it]23:18:43 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  12.8s████████████████████████████████▌                                | 6/8 [11:33<02:10, 65.15s/it]
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [00:46<00:21, 21.39s/it]23:18:55 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  12.2s
+23:18:55 INFO optimizers.tier2: Tier2 day 6 done in 787.3s  (3 solves)                                                                                                           
+Tier2 days: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [13:07<00:00, 98.40s/it]
+23:18:55 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+23:18:55 INFO main: Tier2 Day 8: 3 surrogate(s) populated██████████████████████████████████████████████████████████████████████████████████████████| 8/8 [13:07<00:00, 58.38s/it]
+23:18:55 INFO main: trust-region it=1 drift=31.01% total=5066.9 km feasible=True
+23:18:55 INFO main: Tier2 it=2 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+23:18:55 INFO main: Tier2 it=2 s_center (start-of-day): ['D1=100.0%', 'D2=100.0%', 'D3=100.0%', 'D4=95.7%', 'D5=100.0%', 'D6=100.0%', 'D7=100.0%', 'D8=69.0%']
+23:18:55 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:21:26 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  151.5s                                                                            | 0/3 [00:00<?, ?it/s]
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:22:07 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  192.3s                                                                            | 0/3 [00:00<?, ?it/s]
+day 0 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [03:12<06:24, 192.33s/it]23:22:08 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  41.0s                                                                           | 0/3 [00:00<?, ?it/s]
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:22:14 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  198.8s                                                                          | 0/3 [00:00<?, ?it/s]
+day 2 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [03:12<01:26, 86.55s/it]23:22:35 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  219.7s                                                                                                  
+                                                                                                                                                                                 23:22:43 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  228.4s                                                                 | 1/3 [03:18<06:37, 198.78s/it]
+                                                                                                                                                                                 23:22:50 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  42.1s██████████████████████████████████████████████▌                 | 13/15 [02:10<00:19,  9.96s/it]
+GA gens:  93%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▎        | 14/15 [02:09<00:09,  9.01s/it]23:22:58 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  242.5s                                                                                                  
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:23:05 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  58.0s                                                                  | 1/3 [04:02<08:05, 242.52s/it]
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [04:10<01:53, 113.32s/it]23:23:15 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  61.2s
+                                                                                                                                                                                 23:23:15 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  260.4s
+                                                                                                                                                                                 23:23:33 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  43.6s██████████████████████▋                                          | 2/3 [04:20<01:57, 117.88s/it]
+                                                                                                                                                                                 23:23:44 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  69.5s
+day 2 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [00:43<01:27, 43.62s/it]23:24:05 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  59.4s                                                                 | 1/3 [04:20<08:40, 260.39s/it]
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:24:09 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  314.4s
+                                                                                                                                                                                 23:24:11 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  87.5s
+                                                                                                                                                                                 23:24:15 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  41.3s██████████████████████▋                                          | 2/3 [04:49<02:11, 131.41s/it]
+                                                                                                                                                                                 23:24:16 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  60.7s
+day 2 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:25<00:42, 42.30s/it]23:24:28 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  90.2s
+                                                                                                                                                                                 23:25:26 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  130.8s█████████████████████▋                                          | 2/3 [05:32<02:32, 152.96s/it]
+                                                                                                                                                                                 23:25:39 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  93.4s
+day 0 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [01:33<03:07, 93.50s/it]23:25:46 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  121.8s
+                                                                                                                                                                                 23:26:09 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  113.5s████████████████████▋                                          | 2/3 [06:31<03:04, 184.17s/it]
+                                                                                                                                                                                 23:26:09 INFO optimizers.tier2: Tier2 day 2 done in 434.1s  (6 solves)                                                                             | 2/15 [00:58<06:58, 32.23s/it]
+                                                                                                                                                                                 23:26:14 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  117.5s
+                                                                                                                                                                                 23:28:27 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  256.0s                                                                        | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                                 23:29:13 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  214.1s                                                                | 1/3 [01:57<03:55, 117.59s/it]
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [05:07<02:44, 164.53s/it]23:29:37 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  229.9s
+                                                                                                                                                                                 23:29:58 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  330.6s                                                                | 3/15 [01:48<08:02, 40.21s/it]
+                                                                                                                                                                                 23:30:14 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  240.8s                                                                      | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                                 23:31:02 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  335.4s                                                                | 7/15 [04:41<05:43, 42.95s/it]
+                                                                                                                                                                                 23:31:52 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  204.9s███████████████████▋                                          | 2/3 [05:58<03:10, 190.08s/it]
+                                                                                                                                                                                 23:32:27 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  194.7s█▍                                                             | 8/15 [05:18<04:47, 41.13s/it]
+23:32:28 INFO optimizers.tier2: Tier2 day 0 done in 812.8s  (6 solves)                                                                                                           
+                                                                                                                                                                                 23:33:00 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  203.6s
+GA gens:  60%|███████████████████████████████████████████████████████████████████████████████▏                                                    | 9/15 [05:53<03:54, 39.04s/it]23:33:42 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  207.7s
+GA gens:  73%|████████████████████████████████████████████████████████████████████████████████████████████████                                   | 11/15 [07:19<02:43, 40.78s/it]23:33:43 INFO optimizers.tier2: Tier2 day 3 done in 887.5s  (6 solves)
+GA gens:  80%|████████████████████████████████████████████████████████████████████████████████████████████████████████▊                          | 12/15 [07:49<01:52, 37.51s/it]23:33:48 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  229.0s                                                                                               
+Tier2 days:  25%|████████████████████████████████▎                                                                                                | 2/8 [13:32<40:09, 401.51s/it]23:34:28 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  205.6s                                                                | 1/3 [03:49<07:37, 229.00s/it]
+                                                                                                                                                                                 23:35:53 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  172.2s█████████████████████████████████████████████████████▎        | 14/15 [09:00<00:36, 36.48s/it]
+                                                                                                                                                                                 23:35:53 INFO optimizers.tier2: Tier2 day 7 done in 1018.3s  (6 solves)
+day 5 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [03:25<06:51, 205.63s/it]23:35:57 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  244.8s
+                                                                                                                                                                                 23:36:48 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  180.2s                                                                                               
+day 4 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [07:29<03:48, 228.49s/it]23:38:05 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  217.5s████████████████████▋                                          | 2/3 [06:49<03:20, 200.45s/it]
+                                                                                                                                                                                 23:38:15 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=ga  845.5s
+GA gens:   0%|                                                                                                                                            | 0/15 [00:00<?, ?it/s]23:39:00 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  182.7s
+day 5 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [07:03<03:32, 212.69s/it]23:39:00 INFO optimizers.tier2: Tier2 day 4 done in 1205.3s  (6 solves)
+GA gens:  20%|██████████████████████████▍                                                                                                         | 3/15 [00:52<03:14, 16.24s/it]23:39:39 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  170.0s
+day 6 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [19:20<10:26, 626.92s/it]23:39:39 INFO optimizers.tier2: Tier2 day 1 done in 1243.6s  (6 solves)                                                                                                           
+GA gens:  40%|████████████████████████████████████████████████████▊                                                                               | 6/15 [01:26<01:54, 12.70s/it]23:40:16 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  130.1s
+                                                                                                                                                                                 23:40:16 INFO optimizers.tier2: Tier2 day 5 done in 1280.6s  (6 solves)
+23:41:20 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=ga  184.7s                                                                                                
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:42:55 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=ga  95.1s                                                                                                  
+day 6 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [01:35<03:10, 95.09s/it]23:43:07 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  11.8s███████████████████████████████▊                                | 6/8 [20:43<04:47, 143.73s/it]
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:46<00:46, 46.12s/it]23:43:18 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  11.4s
+23:43:18 INFO optimizers.tier2: Tier2 day 6 done in 1463.3s  (3 solves)                                                                                                          
+Tier2 days: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [24:23<00:00, 182.90s/it]
+23:43:18 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 3: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+23:43:18 INFO main: Tier2 Day 8: 3 surrogate(s) populated█████████████████████████████████████████████████████████████████████████████████████████| 8/8 [24:23<00:00, 132.34s/it]
+23:43:18 INFO main: trust-region it=2 drift=7.60% total=5066.9 km feasible=True
+23:43:18 INFO main: Tier2 it=3 alpha_floors (end-of-day targets): {1: '20.0%', 2: '20.0%', 3: '20.0%', 4: '20.0%', 5: '20.0%', 6: '20.0%', 7: '20.0%', 8: '20.0%', 9: '20.0%'}
+23:43:18 INFO main: Tier2 it=3 s_center (start-of-day): ['D1=100.0%', 'D2=95.5%', 'D3=100.0%', 'D4=100.0%', 'D5=100.0%', 'D6=100.0%', 'D7=97.3%', 'D8=76.6%']
+23:43:18 INFO optimizers.tier2: Tier2: sampling 8 days with 8 threads
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:46:13 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(0,)  method=ga  174.3s                                                                            | 0/3 [00:00<?, ?it/s]
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:47:58 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(7,)  method=warm  105.6s                                                                          | 0/3 [00:00<?, ?it/s]
+day 2 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [02:54<05:48, 174.30s/it]23:48:06 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(0,)  method=ga  287.4s                                                                            | 0/3 [00:00<?, ?it/s]
+day 0 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [04:47<09:34, 287.38s/it]23:48:20 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(0, 0)  method=ga  301.7s                                                                          | 0/3 [00:00<?, ?it/s]
+Tier2 days:   0%|                                                                                                                                          | 0/8 [00:00<?, ?it/s]23:48:39 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(0,)  method=ga  320.2s                                                                                                  
+                                                                                                                                                                                 23:49:44 INFO optimizers.tier2:   day 2  SOC=25.0%  reps=(14,)  method=warm  105.3s                                                                                               
+                                                                                                                                                                                 23:50:18 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 0)  method=ga  419.5s                                                                 | 1/3 [05:01<10:03, 301.83s/it]
+day 2 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:50:26 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(7,)  method=warm  140.5s                                                                                                
+day 0 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [07:07<03:20, 200.98s/it]23:50:45 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(0,)  method=ga  446.5s                                                                   | 1/3 [06:59<13:59, 419.58s/it]
+                                                                                                                                                                                 23:50:56 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(11, 2)  method=warm  155.5s                                                              | 1/3 [07:26<14:53, 446.51s/it]
+                                                                                                                                                                                 23:51:11 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(0,)  method=ga  472.8s
+                                                                                                                                                                                 23:51:17 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(6,)  method=warm  157.8s
+                                                                                                                                                                                 23:51:29 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(0,)  method=warm  104.8s█████████████████████▋                                          | 2/3 [07:37<03:35, 215.88s/it]
+day 5 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [07:52<15:45, 472.88s/it]23:52:16 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(0,)  method=ga  537.2s
+day 2 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [01:44<03:29, 104.82s/it]23:52:46 INFO optimizers.tier2:   day 0  SOC=25.0%  reps=(14,)  method=warm  140.0s
+day 0 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:53:18 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(7,)  method=warm  108.7s█████████████████████▋                                          | 2/3 [07:58<03:44, 224.83s/it]
+                                                                                                                                                                                 23:53:32 INFO optimizers.tier2:   day 3  SOC=25.0%  reps=(2, 22)  method=warm  155.6s
+day 2 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [03:33<01:47, 107.23s/it]23:53:45 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(0, 8)  method=warm  206.9s
+                                                                                                                                                                                 23:53:55 INFO optimizers.tier2:   day 7  SOC=25.0%  reps=(13,)  method=warm  158.1s
+                                                                                                                                                                                 23:54:24 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(7,)  method=warm  219.4s██████████████████████▋                                          | 2/3 [10:26<04:54, 294.62s/it]
+                                                                                                                                                                                 23:54:46 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(0,)  method=warm  119.1s█████████████████████▋                                          | 2/3 [11:06<05:13, 313.06s/it]
+day 0 combos:  33%|██████████████████████████████████████████▎                                                                                    | 1/3 [01:59<03:58, 119.14s/it]23:54:58 INFO optimizers.tier2:   day 2  SOC=100.0%  reps=(14,)  method=warm  99.8s
+                                                                                                                                                                                 23:54:58 INFO optimizers.tier2: Tier2 day 2 done in 700.0s  (6 solves)                                                                                      | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                                 23:55:01 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(10,)  method=warm  229.3s
+                                                                                                                                                                                 23:55:10 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(0, 0)  method=warm  97.6s
+                                                                                                                                                                                 23:55:36 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(0,)  method=warm  99.9s
+day 5 combos:  67%|████████████████████████████████████████████████████████████████████████████████████▋                                          | 2/3 [11:42<05:29, 329.66s/it]23:55:37 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(10,)  method=warm  200.7s
+Tier2 days:  12%|███████████████▉                                                                                                               | 1/8 [11:39<1:21:39, 699.91s/it]23:55:42 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(7,)  method=warm  56.4s                                                                  | 1/3 [01:37<03:15, 97.70s/it]
+day 0 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [02:55<01:22, 82.30s/it]23:55:45 INFO optimizers.tier2:   day 4  SOC=25.0%  reps=(4, 5)  method=warm  119.9s
+                                                                                                                                                                                 23:56:04 INFO optimizers.tier2:   day 1  SOC=25.0%  reps=(14,)  method=warm  99.0s                                                                  | 1/3 [01:39<03:19, 99.96s/it]
+day 4 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:56:04 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(11, 2)  method=warm  54.6s                                                                       | 0/3 [00:00<?, ?it/s]
+                                                                                                                                                                                 23:56:27 INFO optimizers.tier2:   day 5  SOC=25.0%  reps=(20,)  method=warm  86.5s
+                                                                                                                                                                                 23:56:32 INFO optimizers.tier2:   day 0  SOC=100.0%  reps=(14,)  method=warm  49.7s
+23:56:32 INFO optimizers.tier2: Tier2 day 0 done in 793.6s  (6 solves)                                                                                                           
+day 5 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:56:36 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(6,)  method=warm  59.9s                                                                                                
+                                                                                                                                                                                 23:56:50 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(0,)  method=warm  45.8s
+                                                                                                                                                                                 23:56:53 INFO optimizers.tier2:   day 3  SOC=100.0%  reps=(2, 22)  method=warm  48.3s                                                               | 1/3 [00:45<01:31, 45.79s/it]
+                                                                                                                                                                                 23:56:53 INFO optimizers.tier2: Tier2 day 3 done in 814.4s  (6 solves)
+Tier2 days:  25%|████████████████████████████████▎                                                                                                | 2/8 [13:13<34:19, 343.25s/it]23:56:53 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 0)  method=warm  68.1s█████████████████████▎                                          | 2/3 [02:39<01:16, 76.46s/it]
+                                                                                                                                                                                 23:57:04 INFO optimizers.tier2:   day 6  SOC=25.0%  reps=(21,)  method=warm  87.7s                                                                                                
+day 6 combos:   0%|                                                                                                                                        | 0/3 [00:00<?, ?it/s]23:57:16 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(0,)  method=warm  48.3s
+                                                                                                                                                                                 23:57:18 INFO optimizers.tier2:   day 7  SOC=100.0%  reps=(13,)  method=warm  42.6s
+Tier2 days:  38%|████████████████████████████████████████████████▍                                                                                | 3/8 [13:34<16:20, 196.05s/it]23:57:18 INFO optimizers.tier2: Tier2 day 7 done in 840.0s  (6 solves)                                                                              | 1/3 [00:48<01:36, 48.27s/it]
+                                                                                                                                                                                 23:57:37 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(7,)  method=warm  46.9s
+                                                                                                                                                                                 23:57:37 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(0, 8)  method=warm  43.7s█████████████████████▎                                          | 2/3 [01:32<00:46, 46.48s/it]
+                                                                                                                                                                                 23:58:05 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(0,)  method=warm  60.4s                                                                                                
+day 6 combos:  33%|██████████████████████████████████████████▋                                                                                     | 1/3 [01:00<02:00, 60.38s/it]23:58:06 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(10,)  method=warm  50.3s
+Tier2 days:  50%|████████████████████████████████████████████████████████████████▌                                                                | 4/8 [13:59<08:35, 128.76s/it]23:58:19 INFO optimizers.tier2:   day 4  SOC=100.0%  reps=(4, 5)  method=warm  42.4s
+                                                                                                                                                                                 23:58:20 INFO optimizers.tier2: Tier2 day 4 done in 901.2s  (6 solves)███████████████████████████████████▎                                          | 2/3 [01:38<00:49, 49.50s/it]
+                                                                                                                                                                                 23:58:22 INFO optimizers.tier2:   day 1  SOC=100.0%  reps=(14,)  method=warm  45.4s
+                                                                                                                                                                                 23:58:22 INFO optimizers.tier2: Tier2 day 1 done in 903.8s  (6 solves)                                                                                                            
+                                                                                                                                                                                 23:58:38 INFO optimizers.tier2:   day 5  SOC=100.0%  reps=(20,)  method=warm  31.5s
+                                                                                                                                                                                 23:58:38 INFO optimizers.tier2: Tier2 day 5 done in 919.3s  (6 solves)
+Tier2 days:  62%|████████████████████████████████████████████████████████████████████████████████▋                                                | 5/8 [15:01<05:13, 104.37s/it]23:58:39 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(10,)  method=warm  34.3s                                                                                               
+day 6 combos:  67%|█████████████████████████████████████████████████████████████████████████████████████▎                                          | 2/3 [01:34<00:45, 45.06s/it]23:58:51 INFO optimizers.tier2:   day 6  SOC=100.0%  reps=(21,)  method=warm  11.6s
+23:58:51 INFO optimizers.tier2: Tier2 day 6 done in 932.5s  (6 solves)                                                                                                           
+Tier2 days: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 8/8 [15:32<00:00, 116.55s/it]
+23:58:51 INFO main: Tier2 Day 1: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 2: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 3: 3 surrogate(s) populated█████████████████████████████████████████████████████████████████████████▊                | 7/8 [15:19<00:52, 52.04s/it]
+23:58:51 INFO main: Tier2 Day 4: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 5: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 6: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 7: 3 surrogate(s) populated
+23:58:51 INFO main: Tier2 Day 8: 3 surrogate(s) populated██████████████████████████████████████████████████████████████████████████████████████████| 8/8 [15:32<00:00, 39.66s/it]
+23:58:51 INFO main: trust-region it=3 drift=4.51% total=5066.9 km feasible=True
+23:58:51 INFO main: Extracting exact profile for Day 0...
+23:59:28 INFO main: Extracting exact profile for Day 1...                                                                                                                        
+00:00:02 INFO main: Extracting exact profile for Day 2...                                                                                                                        
+00:00:21 INFO main: Extracting exact profile for Day 3...                                                                                                                        
+00:00:45 INFO main: Extracting exact profile for Day 4...                                                                                                                        
+00:01:13 INFO main: Extracting exact profile for Day 5...                                                                                                                        
+00:01:43 INFO main: Extracting exact profile for Day 6...                                                                                                                        
+00:02:12 INFO main: Extracting exact profile for Day 7...                                                                                                                        
+                                                                                                                                                                                 
+======================================================================
+OPTIMIZATION COMPLETE — ALL DAY 3 VARIANTS
+======================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Day 3 variant: ARYAMAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Converged:  False
+  Feasible:   True
+  Iterations: 4
+  Total Expected Distance (DP planning estimate): 5066.9 km
+
+  ────────────────────────────────────────────────────────────────────────────────
+    DAY │ ROUTE                          │      KM │ LOOPS │  SOC START→END │   ETA │  TRAILER
+  ────────────────────────────────────────────────────────────────────────────────
+      1 │ Johannesburg → Rustenburg      │  238.2 │    14 │ 100.0% →  95.3% │ 15:34 │        —
+      2 │ Rustenburg → Zeerust           │  301.7 │    14 │  99.2% →  99.7% │ 14:55 │        —
+      3 │ Zeerust → Vryburg              │  212.6 │    14 │  98.5% → 100.0% │ 13:37 │        —
+      4 │ Vryburg → Upington             │  260.3 │    24 │ 100.0% →  99.7% │ 13:47 │        —
+      5 │ Upington → Springbok           │  293.0 │     9 │ 100.0% → 100.0% │ 15:37 │        —
+      6 │ Springbok → Van Rhynsdorp      │  310.5 │    20 │ 100.0% → 100.0% │ 14:58 │        —
+      7 │ Van Rhynsdorp → Clanwilliam    │  261.0 │    21 │ 100.0% →  69.5% │ 16:00 │   80.9km
+      8 │ Clanwilliam → Cape Town        │   98.2 │    13 │ 100.0% → 100.0% │ 12:57 │  180.0km
+  ────────────────────────────────────────────────────────────────────────────────
+  Total Expected Distance (driven, trailered km excluded): 1975.5 km
+  Total trailered (NOT counted toward distance above): 260.9 km
+
+  ══════════════════════════════════════════════════════════════════
+  DETAILED DAILY STRATEGY
+  ══════════════════════════════════════════════════════════════════
+
+  ── Day 1: Johannesburg → Rustenburg ──
+  1) Distance: 238.2 km | Loops: rustenburg_loop×14
+  2) End-of-day SOC: 95.3%
+  3) SOC curve (approx): 100% → 99% → 99% → 98% → 98% → 97% → 96% → 96% → 95%
+  4) Solar input: 6516 Wh total
+  5) Motor energy: 2731 Wh | Battery drain: 166 Wh (4.7%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 09:00
+  8) ETA: 15:34 (drive time 06:34)
+  9) Trailered: none
+      Speed: avg 47.0 km/h, min 22.0, max 81.0
+
+  ── Day 2: Rustenburg → Zeerust ──
+  1) Distance: 301.7 km | Loops: blind_loop_placeholder×14
+  2) End-of-day SOC: 99.7%
+  3) SOC curve (approx): 99% → 99% → 99% → 100% → 100%
+  4) Solar input: 7625 Wh total
+  5) Motor energy: 4046 Wh | Battery drain: -16 Wh (-0.5%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 14:55 (drive time 06:55)
+  9) Trailered: none
+      Speed: avg 54.8 km/h, min 18.0, max 80.0
+
+  ── Day 3: Zeerust → Vryburg ──
+  1) Distance: 212.6 km | Loops: blind_loop_placeholder×14
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 99% → 99% → 99% → 100% → 100%
+  4) Solar input: 7237 Wh total
+  5) Motor energy: 3327 Wh | Battery drain: -52 Wh (-1.5%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 13:37 (drive time 05:37)
+  9) Trailered: none
+      Speed: avg 59.5 km/h, min 19.0, max 108.0
+
+  ── Day 4: Vryburg → Upington ──
+  1) Distance: 260.3 km | Loops: postmasburg_loop2×2, postmasburg_loop1×22
+  2) End-of-day SOC: 99.7%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 6965 Wh total
+  5) Motor energy: 3695 Wh | Battery drain: 12 Wh (0.3%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 13:47 (drive time 05:47)
+  9) Trailered: none
+      Speed: avg 56.8 km/h, min 29.0, max 89.0
+
+  ── Day 5: Upington → Springbok ──
+  1) Distance: 293.0 km | Loops: upington_loop1×4, upington_loop2×5
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 8128 Wh total
+  5) Motor energy: 3082 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 15:37 (drive time 07:37)
+  9) Trailered: none
+      Speed: avg 47.7 km/h, min 14.0, max 91.0
+
+  ── Day 6: Springbok → Van Rhynsdorp ──
+  1) Distance: 310.5 km | Loops: springbok_loop×20
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 7806 Wh total
+  5) Motor energy: 4808 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 14:58 (drive time 06:58)
+  9) Trailered: none
+      Speed: avg 58.4 km/h, min 27.0, max 81.0
+
+  ── Day 7: Van Rhynsdorp → Clanwilliam ──
+  1) Distance: 261.0 km | Loops: vanrhynsdorp_loop×21
+  2) End-of-day SOC: 69.5%
+  3) SOC curve (approx): 100% → 93% → 86% → 80% → 73%
+  4) Solar input: 4946 Wh total
+  5) Motor energy: 3669 Wh | Battery drain: 1078 Wh (30.5%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 16:00 (drive time 08:00)
+  9) Trailered: 80.9 km (809 segments) — no power in/out
+      Speed: avg 59.8 km/h, min 28.0, max 102.0
+
+  ── Day 8: Clanwilliam → Cape Town ──
+  1) Distance: 98.2 km | Loops: ceres_loop×13
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 5910 Wh total
+  5) Motor energy: 1344 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 12:57 (drive time 04:57)
+  9) Trailered: 180.0 km (1800 segments) — no power in/out
+      Speed: avg 55.4 km/h, min 22.0, max 110.0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Day 3 variant: PRAHLAD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Converged:  True
+  Feasible:   True
+  Iterations: 4
+  Total Expected Distance (DP planning estimate): 5066.9 km
+
+  ────────────────────────────────────────────────────────────────────────────────
+    DAY │ ROUTE                          │      KM │ LOOPS │  SOC START→END │   ETA │  TRAILER
+  ────────────────────────────────────────────────────────────────────────────────
+      1 │ Johannesburg → Rustenburg      │  238.2 │    14 │ 100.0% →  95.0% │ 15:14 │        —
+      2 │ Rustenburg → Zeerust           │  301.7 │    14 │ 100.0% →  99.8% │ 14:55 │        —
+      3 │ Zeerust → Vryburg              │  216.7 │    14 │ 100.0% → 100.0% │ 12:51 │        —
+      4 │ Vryburg → Upington             │  260.3 │    24 │ 100.0% → 100.0% │ 13:56 │        —
+      5 │ Upington → Springbok           │  293.0 │     9 │  99.8% → 100.0% │ 14:33 │        —
+      6 │ Springbok → Van Rhynsdorp      │  310.5 │    20 │ 100.0% → 100.0% │ 15:09 │        —
+      7 │ Van Rhynsdorp → Clanwilliam    │  261.0 │    21 │  95.0% →  62.2% │ 15:48 │   80.9km
+      8 │ Clanwilliam → Cape Town        │   98.2 │    13 │  78.5% → 100.0% │ 13:09 │  180.0km
+  ────────────────────────────────────────────────────────────────────────────────
+  Total Expected Distance (driven, trailered km excluded): 1979.6 km
+  Total trailered (NOT counted toward distance above): 260.9 km
+
+  ══════════════════════════════════════════════════════════════════
+  DETAILED DAILY STRATEGY
+  ══════════════════════════════════════════════════════════════════
+
+  ── Day 1: Johannesburg → Rustenburg ──
+  1) Distance: 238.2 km | Loops: rustenburg_loop×14
+  2) End-of-day SOC: 95.0%
+  3) SOC curve (approx): 100% → 99% → 99% → 98% → 97% → 97% → 96% → 96% → 95%
+  4) Solar input: 6516 Wh total
+  5) Motor energy: 2753 Wh | Battery drain: 177 Wh (5.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 09:00
+  8) ETA: 15:14 (drive time 06:14)
+  9) Trailered: none
+      Speed: avg 48.0 km/h, min 31.0, max 69.0
+
+  ── Day 2: Rustenburg → Zeerust ──
+  1) Distance: 301.7 km | Loops: blind_loop_placeholder×14
+  2) End-of-day SOC: 99.8%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 7625 Wh total
+  5) Motor energy: 4650 Wh | Battery drain: 6 Wh (0.2%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 14:55 (drive time 06:55)
+  9) Trailered: none
+      Speed: avg 61.9 km/h, min 27.0, max 92.0
+
+  ── Day 3: Zeerust → Vryburg ──
+  1) Distance: 216.7 km | Loops: blind_loop_placeholder×14
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 7237 Wh total
+  5) Motor energy: 3041 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 12:51 (drive time 04:51)
+  9) Trailered: none
+      Speed: avg 56.6 km/h, min 33.0, max 104.0
+
+  ── Day 4: Vryburg → Upington ──
+  1) Distance: 260.3 km | Loops: postmasburg_loop2×2, postmasburg_loop1×22
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 6965 Wh total
+  5) Motor energy: 3582 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 13:56 (drive time 05:56)
+  9) Trailered: none
+      Speed: avg 56.1 km/h, min 26.0, max 97.0
+
+  ── Day 5: Upington → Springbok ──
+  1) Distance: 293.0 km | Loops: upington_loop1×4, upington_loop2×5
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 8128 Wh total
+  5) Motor energy: 3487 Wh | Battery drain: -8 Wh (-0.2%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 14:33 (drive time 06:33)
+  9) Trailered: none
+      Speed: avg 54.1 km/h, min 27.0, max 80.0
+
+  ── Day 6: Springbok → Van Rhynsdorp ──
+  1) Distance: 310.5 km | Loops: springbok_loop×20
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 100% → 100% → 100% → 100% → 100%
+  4) Solar input: 7806 Wh total
+  5) Motor energy: 4819 Wh | Battery drain: 0 Wh (0.0%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 15:09 (drive time 07:09)
+  9) Trailered: none
+      Speed: avg 57.8 km/h, min 12.0, max 111.0
+
+  ── Day 7: Van Rhynsdorp → Clanwilliam ──
+  1) Distance: 261.0 km | Loops: vanrhynsdorp_loop×21
+  2) End-of-day SOC: 62.2%
+  3) SOC curve (approx): 95% → 88% → 80% → 73% → 66%
+  4) Solar input: 4946 Wh total
+  5) Motor energy: 3645 Wh | Battery drain: 1157 Wh (32.8%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 15:48 (drive time 07:48)
+  9) Trailered: 80.9 km (809 segments) — no power in/out
+      Speed: avg 56.7 km/h, min 25.0, max 96.0
+
+  ── Day 8: Clanwilliam → Cape Town ──
+  1) Distance: 98.2 km | Loops: ceres_loop×13
+  2) End-of-day SOC: 100.0%
+  3) SOC curve (approx): 78% → 82% → 85% → 88% → 91% → 94% → 97% → 100%
+  4) Solar input: 5910 Wh total
+  5) Motor energy: 1154 Wh | Battery drain: -760 Wh (-21.5%)
+  6) Stall risk: None
+  7) Start strategy: Normal start at 08:00
+  8) ETA: 13:09 (drive time 05:09)
+  9) Trailered: 180.0 km (1800 segments) — no power in/out
+      Speed: avg 47.6 km/h, min 13.0, max 89.0
+
+======================================================================
+00:02:29 INFO main: Saved strategy → C:\Users\hafiz\OneDrive\Documents\Agnirath\AgniRath-Strat\Model\output\strategy_aryaman.json
+00:02:29 INFO main: Saved strategy → C:\Users\hafiz\OneDrive\Documents\Agnirath\AgniRath-Strat\Model\output\strategy_prahlad.json
+00:02:29 INFO main: All variant results saved to C:\Users\hafiz\OneDrive\Documents\Agnirath\AgniRath-Strat\Model\output/
+trust_region.py: tier2.py: singleday.py: go ahead and fix the codes for me
+
+This is a huge, precise finding — let me confirm it fully before proposing the fix, because it explains literally every symptom you listed in one shot.
+
+Ran 2 commands, viewed a file
+
+This confirms it completely — and it reveals something important: the "loop-stop solar credit" machinery is already fully built in forward_sim.py (someone clearly started this fix), waiting for route.seg_type to contain loop_ rows — but nothing ever produces those rows, because loop .save files are unconditionally excluded from route construction. Let me check the current route.py interface before I build the splice, since it's evolved since I last touched it:
+
+Ran 4 commands, viewed 3 files
+
+Now I understand the architecture precisely — _DayPlan's own docstring confirms loops are meant to be driven between Stage 1 and Stage 2, not appended at the end. Let me check the loop file → named loop matching data (since some days have 2 named loops but only 1 loop file, per the log), then implement the splice properly.
+
+Edited 16 files, viewed 10 files, ran 9 commands · 12 notes
+
+I hit the tool-use limit mid-implementation — here's exactly where things stand, and it's a real, substantive fix, so it's worth being precise about what's done vs. what's left.
+
+The root cause (confirmed, not guessed)
+
+Every symptom you listed — 5066 km, motor energy/solar/drain not adding up, low average speed, overcharging, "loops genuinely fucked up" — traces to one bug: loops_committed in singleday.solve() was only ever used to subtract mandatory stop-time (5 min × reps) from the day's time budget. It was never used to actually extend the simulated route — the physics (forward_sim.py) only ever integrated the base Stage 1 + Stage 2 distance, regardless of whether the plan said 0 loops or 20.
+
+Meanwhile, Tier 3's DP allocator sums dist = base_km + reps × loop_km purely as bookkeeping, never checked against real simulated distance. So the optimizer got unlimited free reported distance for loop reps it never physically drove — explaining why it kept picking reps=(14,), (20,), (22,) (free win, no real cost), why the "planning estimate" (5066 km) diverged wildly from "driven" (1975 km), and why average speed stayed low/SOC stayed high on the actual simulated portion — there was still no reward for going faster in the one thing that was real.
+
+I also found the fix is half-built already: forward_sim.py has fully-working loop-stop solar-credit logic waiting on seg_type containing loop_ rows — but nothing ever produced those rows, since loop .save files were unconditionally excluded from route construction. Someone clearly started this fix and didn't finish wiring it.
+
+What I've implemented (syntax-verified, not yet run)
+
+trust_region.py: loads each named loop's real terrain/speed-limit geometry from its .save file (previously discarded), matched to plan.loops by closest real distance (handles the case — confirmed in your data — where a day has 2 named loops but only 1 geometry file, e.g. Day 4's postmasburg_loop2 has a file, postmasburg_loop1 doesn't and gracefully falls back, logged explicitly).
+
+tier2.py: threaded this data through sample_all_days → sample_day → _sweep_one_offset → singleday.solve().
+
+singleday.py: new _build_route_with_loops() — splices real loop legs between Stage 1 and Stage 2 (matching _DayPlan's own documented driving order), once per committed rep, with small separators so the existing stop-solar-credit fires once per rep, not once for the whole block. This makes loop reps cost real energy, time, and distance for the first time.
+
+What's not done yet
+
+Haven't verified the full file imports cleanly end-to-end (only checked syntax on tier2/trust_region so far, singleday.py's latest edit unverified).
+
+dist_done_km mid-day-replan interaction with the splice is a known simplification — not fully worked through for the case where a day is partially driven AND has committed loops.
+
+Haven't re-run the pipeline — this needs a real test run to confirm the 5066 km number collapses to something sane and that runtime doesn't blow up now that high-rep combos are actually expensive to simulate (which is expected and correct, but will change which combos survive Tier 2's feasibility check).
+
+Say the word and I'll finish verification, run a final syntax/import pass, and package the updated files.
+
+You're right to be alarmed — 5066 km is not a data artifact, it's a real architectural bug, and I found the exact smoking gun in the singleday.py you just gave me. Good news: several things I flagged as still-open last time have actually been fixed since (I'll confirm those), and I've now written the actual fix for the loop bug rather than just describing it — that other Claude session's diagnosis (doc 36) was correct, but its fix never landed in the file you pasted, so I finished it myself.
+
+Confirmed fixed since last check (no action needed)
+
+Regen cap, stop-time solar charging, unplanned stop budget (old item #3) — singleday.py's allowed_time_s now subtracts CONTROL_STOP_DURATION_S + UNPLANNED_STOP_BUDGET_S + n_loops*(LOOP_STOP_DURATION_S+LOOP_TURNAROUND_S), and DayEvaluator passes regen_cap_w/cs_taken/stop durations into forward_sim (whose comment confirms it credits parked solar for the same windows). Done.
+
+solar_underutil_j (old item #7) — genuinely wired into _build_objective now: -final_soc_pct + SOLAR_UNDERUTIL_WEIGHT * solar_underutil_j/3600. This is real progress on the overcharging complaint — it penalizes solar the battery couldn't absorb within a day. Done, though see caveat below.
+
+Day 3 shared-baseline (old item 4a) — trust_region.py now computes tier1.guess_baseline() inside the per-variant loop, using each variant's real Day 3 data. Done.
+
+The real bug: loops never touch the simulation
+
+In singleday.solve(), loops_committed is used for exactly one thing:
+
+python
+
+n_loops = len(loops_committed) if loops_committed else 0 allowed_time_s = (...) - n_loops * (LOOP_STOP_DURATION_S + LOOP_TURNAROUND_S)
+
+That's it. It never appears anywhere near seg_start_m, n_segments, or the route passed into forward_sim. The simulator only ever integrates Stage 1 + Stage 2 — regardless of whether the plan says 0 loop reps or 20.
+
+Meanwhile tier3.py's DP scores each combo as dist = base_km + reps × loop_km and picks whichever combo maximizes that. Since extra reps are free in the simulation (zero real energy or time cost, only a small stop-time subtraction), the DP has every incentive to pick absurd rep counts — this is exactly why you got (14,), (20,), (22,) reps and a 5066 km total that bears no relation to what was physically simulated. It also explains the low average speeds: real driving stayed cheap and slow because the "free" loop distance was doing all the heavy lifting in the objective, so there was never pressure to actually go faster on the real portion.
+
+This also explains your solar/motor/drain mismatch, partially. "Solar input: 6516 Wh" comes from a separate rough estimate (_estimate_solar_input_wh, full-day GHI × array specs, ignoring trailering and actual driven time) — it's not the same number that fed the real physics. "Motor energy: 2753 Wh" is real (forward_sim's integrated value). These were never meant to reconcile, and I've now fixed that by making the report prefer the real simulated solar_energy_wh when available, matching what was already done for motor energy.
+
+What I built
+
+singleday.py — new _splice_loops() / _synthetic_loop_leg(), called at the top of solve(). It builds the actual simulated route as Stage 1 → loop rep 1 → loop rep 2 → ... → Stage 2 (matching _DayPlan's documented order), using each loop's real terrain/speed-limit geometry when available, or a flat full-speed fallback when a loop has no dedicated .save file (confirmed to happen — e.g. Postmasburg's second loop variant). Every rep now costs real simulated time and energy, bounded by the same constraints as the rest of the day.
+
+trust_region.py — new _parse_route_file() (factored out of _load_route so loop files reuse identical parsing), _load_loop_geometries() (loads and name-matches each plan loop to its .save file, with the Day-3-variant case handled correctly using each variant's own filtered file list), and full plumbing of loop_geoms_by_day through optimize() and extract_final_profiles(). Also swapped the reported "Solar input" to prefer the real profiles[d]["solar_energy_wh"].
+
+tier2.py — threaded loop_geoms through sample_all_days → sample_day → _sweep_one_offset → singleday.solve().
+
+Created 2 files
+
+Fixed singleday.py with real loop-splice implementation
+
+Fixed tier2.py threading loop_geoms through to singleday.solve()
+
+ the current file is result2.txt
+
+this should not take much time most of it i have already fixed so fix this also please

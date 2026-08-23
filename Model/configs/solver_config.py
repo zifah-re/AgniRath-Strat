@@ -54,22 +54,48 @@ DP_BASE_PLANNING_SPEED_KMH = 65.0   # strategist directive (21/08): the car
                                     # base time at the speed the car actually
                                     # drives keeps the loop budget honest.
 
-# ---- Sustainable cruise cap (strategist directive 21/08) -------------------
-# The car's INSTANTANEOUS physical ceiling (car.v_max_ms, ~90 km/h) is not a
-# speed it can hold: motor thermals, efficiency roll-off and driver endurance
-# make anything above the low-70s unsustainable over a full race day. Once the
-# breakdown-time governor was removed from the objective, the optimizer was
-# free to chase that 90 km/h ceiling and settled around ~78 — physically
-# unrealistic for this car. This is a HARD per-segment cap on the L2 target
-# speed (applied on top of the route speed-limit and the car v_max), chosen so
-# the day-average lands in the strategist's 60-70 km/h sweet spot: with normal
-# terrain/turn slow-downs pulling the mean below the cap, a 70 cap yields a
-# ~67-68 average on energy-rich days and less when solar/SOC bind. The optimizer still
-# WANTS to reach the cap (minimize time, spend solar on distance/loops), it just
-# can't exceed a pace the car can actually hold. Lower this if telemetry shows
-# the true sustainable cruise is slower; raise it if the car proves it can hold
-# more.
-SUSTAINABLE_CRUISE_KMH = 70.0
+# ---- Speed band: hard ceiling + soft comfort penalty (directive 22/08) ------
+# UPDATED 22/08 after the strategist clarified: the 60-70 target was the
+# *average*, NOT a hard instantaneous cap. The car CAN touch ~85 km/h briefly;
+# it just must not be *encouraged* to live up there. So the old single hard cap
+# at 70 is replaced by a two-part scheme that keeps the day-AVERAGE in 60-70
+# while allowing short bursts to 85 only when they genuinely pay off:
+#
+#   1) V_MAX_HARD_KMH — the absolute ceiling the optimizer may never exceed
+#      (bounds ub, on top of route speed-limit and car v_max). This is the
+#      "only if needed" ceiling.
+#   2) A soft, convex speed penalty added to the L2 objective (in singleday):
+#        * gentle above CRUISE_COMFORT_KMH  — keeps the normal cruise in-band so
+#          the average stays ~65-68 instead of drifting up to the ceiling;
+#        * steep above CRUISE_SOFT_CAP_KMH  — makes anything above ~75 expensive,
+#          so the car only reaches 75-85 when the time saved (fitting a loop,
+#          meeting the cutoff/SOC) outweighs the penalty.
+#   The penalty is a smooth function of the per-segment target speed, so SLSQP
+#   still has clean gradients and convergence is unaffected.
+#
+# Net effect: normal driving sits in the 60-70 average band with a ~75 soft
+# ceiling; 75-85 is available but rare and self-limiting. Raise the weights to
+# pull the average down / discourage high speed harder; lower them to let the
+# car use its top end more freely.
+V_MAX_HARD_KMH = 85.0            # absolute instantaneous ceiling ("if needed")
+CRUISE_SOFT_CAP_KMH = 75.0       # normal ceiling — steep penalty above this
+CRUISE_COMFORT_KMH = 70.0        # free-cruise centre — gentle penalty above this
+# Penalty weights: equivalent seconds of objective cost per (km/h above the
+# threshold)². CRUISE_COMFORT is set at ~70 so the free-cruise optimum lands
+# right where the old hard-70 cap put it (segments settle ~71, day-average
+# ~65-68, comfortably in 60-70) — i.e. the great round-4 results are preserved,
+# just no longer pinned to a wall — while the steep soft-cap term keeps 75-85
+# rare and self-limiting, reached only when a loop/cutoff/SOC makes it worth it.
+SPEED_COMFORT_PENALTY_WEIGHT = 3.0    # gentle zone (> CRUISE_COMFORT_KMH)
+SPEED_SOFTCAP_PENALTY_WEIGHT = 30.0   # steep zone (> CRUISE_SOFT_CAP_KMH)
+
+# ---- Trailer / tow logistics ----------------------------------------------
+# Speed the tow vehicle moves the car through trailered stretches (mandatory
+# trailering on Day 7 Stage 2 / Day 8 Stage 1, plus any red-flag safety zones).
+# The car draws/stores NO energy while trailered (inert cargo), but this time
+# IS counted into the day's ETA, so the value matters. Strategist-set (22/08):
+# keep 80 km/h (a conservative highway tow) rather than 90.
+TRAILER_TOW_SPEED_KMH = 80.0
 
 # Future-SOC value discount in the Tier 3 allocator (0 < d <= 1). The DP's
 # value-to-go term rewards ending a day with high SOC (more options tomorrow),
@@ -184,3 +210,29 @@ NOWCAST_INTERVAL_S = 30 * 60      # intra-day nowcast pulls (MPC only)
 # optimizer minimizes is flat). Breakdown is now a REPORTED risk, not a governor
 # on speed. Set True only if you deliberately want the risk-averse behaviour.
 INCLUDE_BREAKDOWN_IN_TIME = False
+
+# PERFORMANCE knob (safe): when the deterministic objective does NOT fold
+# breakdown into the clock (INCLUDE_BREAKDOWN_IN_TIME = False) and this run is
+# deterministic (rng is None), the per-substep BreakdownModel calls compute a
+# value that is then discarded — pure wasted work (~one Python call pair per
+# substep, thousands of substeps per candidate, across every GA/SLSQP eval).
+# Setting this True skips those calls entirely in exactly that case. It changes
+# NO optimization result; the only visible effect is that the *reported*
+# total_breakdown_s diagnostic reads 0 for deterministic runs (the risk figure
+# only means something on the stochastic scenario/robustness runs anyway, which
+# pass an rng and are never skipped). Left False here so the baseline model's
+# reporting is unchanged; the hardware-fastened build flips it True.
+SKIP_BREAKDOWN_WHEN_UNUSED = False
+
+# PERFORMANCE knob (hardware-fastened build): Tier 2 samples the days in
+# parallel. The baseline uses THREADS, which the GIL throttles because
+# forward_sim's integrator is a Python loop — so multi-core scaling is poor
+# (only scipy's compiled SLSQP releases the GIL). Setting this True switches the
+# day-level fan-out to PROCESSES (ProcessPoolExecutor), giving true multi-core
+# scaling: on an 8-16 core machine the Tier 2 phase — the dominant cost — drops
+# roughly in proportion to min(n_days, cores). All the objects that cross the
+# process boundary (Route, CarState, the spline/KDTree weather providers, the
+# loop-geometry DataFrames) are picklable, so results are identical; only the
+# wall-clock changes. Left False in the baseline (thread path, unchanged); the
+# fastened build flips it True. See Model_fastened_hafiz/README_PERF.md.
+TIER2_USE_PROCESS_POOL = False
