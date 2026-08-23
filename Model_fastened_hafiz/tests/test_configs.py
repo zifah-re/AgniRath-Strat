@@ -50,7 +50,15 @@ class TestRoute:
         assert rc.N_RACE_DAYS == 8
 
     def test_blind_placeholder_is_mean_of_released_loops(self):
-        released = [22.6, 21.0, 14.0, 62.0, 34.0, 18.2, 16.5, 21.8]
+        # Mean of GENUINELY released loop lengths — i.e. every day's loops
+        # except the half-blind Day 2, whose loop is only a probable survey and
+        # is intentionally excluded from the placeholder (see race_config).
+        released = [
+            km
+            for i, d in enumerate(rc.DAY_ROUTE_NOTES)
+            if d["loops"] and i != rc.HALF_BLIND_DAY_INDEX
+            for (_, km) in d["loops"]
+        ]
         assert rc.BLIND_LOOP_PLACEHOLDER_KM == pytest.approx(
             sum(released) / len(released))
 

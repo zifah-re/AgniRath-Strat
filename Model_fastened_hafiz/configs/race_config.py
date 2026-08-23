@@ -224,8 +224,13 @@ DAY_ROUTE_NOTES = [
          start="Boiketlong Hall (Sasolburg)",
          control_stop="Rustenburg Highschool",
          finish="Swartruggens Dam"),
-    # day 2 — HALF BLIND: loop unknown until Golden Envelope (SR 2.21)
-    dict(stage1_km=71.5, loops=None, stage2_km=231.0,
+    # day 2 — HALF BLIND: official loop still arrives via Golden Envelope (SR
+    # 2.21), but the team has surveyed a PROBABLE Day-2 loop ("Day 2 Loop"
+    # placemark, ~9.1 km) whose geometry file
+    # (SSC ROUTE FINAL_Day 2 Half Blind_Day 2 Loop.kml.save) is now in
+    # data/processed/. Wire it in as a real loop so the model plans Day 2 with
+    # it; swap the km / geometry file if the envelope differs on the day.
+    dict(stage1_km=71.5, loops=[("day2_loop", 9.1)], stage2_km=231.0,
          start="Swartruggens Dam", control_stop="Zeerust Highschool",
          finish="Kameelboom Lodge (Vryburg)"),
     # day 3 — FULL BLIND: everything unknown until Golden Envelope (SR 2.21)
@@ -269,9 +274,12 @@ assert len(DAY_ROUTE_NOTES) == N_RACE_DAYS
 
 # Placeholder length for unknown blind-day loops = mean of released loop
 # lengths (Plan v3 §8 L1; notes doc idea v). Recomputed here so it tracks
-# any route-note corrections automatically.
+# any route-note corrections automatically. The Day-2 loop is only a PROBABLE
+# survey (half-blind day), not an officially released loop, so it is excluded
+# from this mean — the placeholder must reflect genuinely released loops only.
 _released_loop_lengths = [
-    km for d in DAY_ROUTE_NOTES if d["loops"]
+    km for i, d in enumerate(DAY_ROUTE_NOTES)
+    if d["loops"] and i != HALF_BLIND_DAY_INDEX
     for (_, km) in d["loops"]
 ]
 BLIND_LOOP_PLACEHOLDER_KM = sum(_released_loop_lengths) / len(_released_loop_lengths)

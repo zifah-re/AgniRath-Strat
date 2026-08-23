@@ -120,15 +120,22 @@ def _day_items(data: dict):
 # ===========================================================================
 
 def _stage_ordered(day: dict) -> list:
-    """Stages in route order, tolerant of either the list or the keyed form."""
+    """Stages in canonical driving order (stage1 -> loop -> stage2), tolerant of
+    either the list or the keyed form.
+
+    The optimizer's ``stages`` list is *supposed* to be in route order, but in
+    practice it can arrive shuffled (e.g. stage2 emitted before stage1), which
+    made the dashboard draw the day back-to-front. We therefore always re-sort
+    by the canonical order using each stage's own ``stage`` tag; anything with
+    an unrecognised tag is kept, appended after the known stages in its original
+    relative order (stable sort)."""
     if isinstance(day.get("stages"), list) and day["stages"]:
-        return day["stages"]
-    out = []
-    for k in _ORDER:
-        s = day.get(k)
-        if s:
-            out.append(s)
-    return out
+        stages = list(day["stages"])
+    else:
+        stages = [s for k in _ORDER for s in (day.get(k),) if s]
+    rank = {name: i for i, name in enumerate(_ORDER)}
+    stages.sort(key=lambda s: rank.get(s.get("stage", ""), len(_ORDER)))
+    return stages
 
 
 def _day_figure(day_idx0: int, day: dict):
@@ -155,7 +162,7 @@ def _day_figure(day_idx0: int, day: dict):
     ]
 
     offset_km = 0.0
-    boundaries = []   # cumulative km where each stage starts (for shading)
+    boundaries = []   # (start_km, span_km, name) — for shading, in true order
     for s in stages:
         name = s.get("stage", "stage1")
         color = _STAGE_COLOR.get(name, "#6b7280")
@@ -166,16 +173,27 @@ def _day_figure(day_idx0: int, day: dict):
             # stage's summary distance so later stages line up.
             offset_km += _num(s.get("distance_km"))
             continue
-        xd = [offset_km + _num(v) for v in d]
-        boundaries.append((offset_km, name, s))
+        # Place this stage's trace on the shared cumulative axis. The trace's
+        # own distance axis is the source of truth for its width: advance the
+        # running offset by the trace SPAN (last - first), never by the summary
+        # `distance_km`. When the two disagreed (rounding, a loop's per-rep vs
+        # total km, a clipped trace) the old code left the next stage starting
+        # at the wrong x, so consecutive stages visibly overlapped or gapped.
+        d0 = _num(d[0])
+        span_km = _num(d[-1]) - d0
+        if span_km <= 0:                       # degenerate trace — fall back
+            span_km = _num(s.get("distance_km"))
+        xd = [offset_km + (_num(v) - d0) for v in d]
+        boundaries.append((offset_km, span_km, name))
         legend_shown = False
         for key, r, c in metrics:
             y = tr.get(key) or []
             if not y:
                 continue
+            m = min(len(xd), len(y))           # defensive: keep x/y aligned
             fig.add_trace(
                 go.Scatter(
-                    x=xd, y=y, mode="lines",
+                    x=xd[:m], y=y[:m], mode="lines",
                     line=dict(color=color, width=2),
                     name=_STAGE_LABEL.get(name, name),
                     legendgroup=name, showlegend=(not legend_shown),
@@ -183,7 +201,7 @@ def _day_figure(day_idx0: int, day: dict):
                                    "%{x:.1f} km<br>%{y:.1f}<extra></extra>")),
                 row=r, col=c)
             legend_shown = True
-        offset_km += _num(s.get("distance_km"))
+        offset_km += span_km
 
     # Comfort/target reference lines on the velocity plot.
     total_km = offset_km
@@ -193,11 +211,11 @@ def _day_figure(day_idx0: int, day: dict):
             line=dict(color="#ef4444", dash=dash, width=1),
             showlegend=False, hoverinfo="skip"), row=1, col=1)
 
-    # Light shading + label per stage across all panels.
-    for (start_km, name, s) in boundaries:
-        width_km = _num(s.get("distance_km"))
+    # Light shading per stage across all panels, using the SAME span the curve
+    # was drawn with so the band lines up exactly under its stage.
+    for (start_km, span_km, name) in boundaries:
         for r, c in ((1, 1), (1, 2), (2, 1), (2, 2)):
-            fig.add_vrect(x0=start_km, x1=start_km + width_km,
+            fig.add_vrect(x0=start_km, x1=start_km + span_km,
                           fillcolor=_STAGE_COLOR.get(name, "#6b7280"),
                           opacity=0.05, line_width=0, row=r, col=c)
 
@@ -413,6 +431,12 @@ def build_dashboard_html(json_path: str | pathlib.Path,
     with open(out_html, "w", encoding="utf-8") as f:
         f.write(html)
     return str(out_html)
+
+
+# NOTE: the "career stats / memory" page does NOT live here. It belongs in the
+# real dashboard app (Dashboard/main.py), which owns the run "memory" (its
+# Saves/ folder) and serves it at the /stats route. This module stays focused
+# on rendering ONE strategy run's per-day, per-stage view.
 
 
 # ===========================================================================
