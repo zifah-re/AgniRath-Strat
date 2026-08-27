@@ -1,5 +1,7 @@
 """
 optimizers/hierarchical/trust_region.py — coarse-to-fine driver loop.
+python -m optimizers.trust_region --variant aryaman/prahlad
+remove --variant for both
 """
 
 from __future__ import annotations
@@ -1727,6 +1729,39 @@ if __name__ == "__main__":
                 json.dump(_dump, _f, indent=2, default=str)
             logger.info("dumped stages -> %s", os.environ["AGNIRATH_DUMP_STAGES"])
         sys.exit(0)
+
+    # ------------------------------------------------------------------ #
+    # FEATURE: --variant restricts this cold-start run to a single Day 3
+    # route variant instead of always looping over every discovered one.
+    # Skips the other variant's Tier-1 baseline + full optimize() pass
+    # entirely, which is the expensive part (~1 wall-clock unit/variant),
+    # so isolating one variant during iterative tuning avoids burning
+    # time re-solving a variant you're not looking at.
+    #
+    #   python -m optimizers.trust_region --variant aryaman
+    #   python -m optimizers.trust_region --variant prahlad
+    #   python -m optimizers.trust_region                    # both (default)
+    #
+    # Uses the same lightweight _flag() sys.argv reader as the
+    # resolve/resolve-intraday subcommands above (kept consistent rather
+    # than introducing argparse, which doesn't compose cleanly with the
+    # '"resolve" in sys.argv[1:]' style subcommand dispatch used here).
+    _variant_choice = _flag("--variant", str, "both").lower()
+    if _variant_choice not in ("prahlad", "aryaman", "both"):
+        logger.error(
+            "--variant must be one of: prahlad, aryaman, both (got %r)",
+            _variant_choice)
+        sys.exit(2)
+    if _variant_choice != "both":
+        if _variant_choice not in day3_variants:
+            logger.error(
+                "--variant %s requested but no matching Day 3 route files "
+                "were discovered (found: %s)",
+                _variant_choice, list(day3_variants.keys()))
+            sys.exit(2)
+        day3_variants = {_variant_choice: day3_variants[_variant_choice]}
+        logger.info("Restricting cold-start run to Day 3 variant: %s",
+                    _variant_choice)
 
     all_results = {}
 
