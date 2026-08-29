@@ -1,3 +1,4 @@
+# singleday.py
 import json
 from datetime import datetime, date, time
 from zoneinfo import ZoneInfo
@@ -81,7 +82,7 @@ def calc_stationary_charge(start_ts, end_ts, coord, heading, alt, solar_obj):
     return (energy_wh / BATTERY_WH) * 100.0
 
 # ----------------- ROUTE DISCRETIZATION ----------------- #
-def resample_stage_1km(profile_dict):
+def resample_stage(profile_dict, dx=10.0):
     d_orig = np.array(profile_dict['Distance']) * 1000.0
     coords = np.array(profile_dict['Coordinates'])
     headings = np.array(profile_dict['Headings'])
@@ -102,27 +103,27 @@ def resample_stage_1km(profile_dict):
     gradients = gradients[unique_idx]
 
     total_dist = d_orig[-1]
-    n_km = int(np.floor(total_dist / 1000.0))
-    d_1km = np.arange(n_km) * 1000.0
+    n_segments = int(np.floor(total_dist / dx))
+    d_sim = np.arange(n_segments) * dx
 
-    lats = np.interp(d_1km, d_orig, coords[:, 0])
-    lons = np.interp(d_1km, d_orig, coords[:, 1])
-    h = np.interp(d_1km, d_orig, headings)
-    alt = np.interp(d_1km, d_orig, altitudes)
-    grad = np.interp(d_1km, d_orig, gradients) / 100.0
+    lats = np.interp(d_sim, d_orig, coords[:, 0])
+    lons = np.interp(d_sim, d_orig, coords[:, 1])
+    h = np.interp(d_sim, d_orig, headings)
+    alt = np.interp(d_sim, d_orig, altitudes)
+    grad = np.interp(d_sim, d_orig, gradients) / 100.0
 
     return {
         'coords': np.column_stack((lats, lons)),
         'headings': h,
         'altitudes': alt,
         'gradients': grad,
-        'n_segments': n_km
+        'n_segments': n_segments
     }
 
 def build_day_route(s1_profile, loop_profile, s2_profile, n_loops):
-    s1 = resample_stage_1km(s1_profile)
-    loop = resample_stage_1km(loop_profile) if (n_loops > 0 and loop_profile) else None
-    s2 = resample_stage_1km(s2_profile) if s2_profile else None
+    s1 = resample_stage(s1_profile)
+    loop = resample_stage(loop_profile) if (n_loops > 0 and loop_profile) else None
+    s2 = resample_stage(s2_profile) if s2_profile else None
 
     coords = [s1['coords']]
     headings = [s1['headings']]
@@ -158,29 +159,39 @@ def build_day_route(s1_profile, loop_profile, s2_profile, n_loops):
     }
 
 # ----------------- SIMULATION & OPTIMIZER ----------------- #
-def simulate_day_fast(v_arr, route, start_time_ts, soc_start, precomputed_p_solar, precomputed_stop_gains, solar_obj, eod_cutoff_ts):
-    n = route['n_segments']
-    dx = 1000.0
-    dt_drive = dx / v_arr
+def simulate_day_fast(v_opt_arr, route, start_time_ts, soc_start, precomputed_p_solar, precomputed_stop_gains, solar_obj, eod_cutoff_ts):
+    n_sim = route['n_segments']
+    dx = 10.0
+    RATIO = 100
+    
+    v_sim = np.repeat(v_opt_arr, RATIO)[:n_sim]
+    
+    dt_drive = dx / v_sim
     times = start_time_ts + np.cumsum(dt_drive) + np.cumsum(route['delays'])
     
     grad = route['gradients']
-    f_drag = 0.5 * AIR_DENSITY * CDA_M2 * (v_arr ** 2)
+    f_drag = 0.5 * AIR_DENSITY * CDA_M2 * (v_sim ** 2)
     f_roll = MASS_KG * G_MS2 * CRR * (1.0 - (grad ** 2) / 2.0)
     f_grav = MASS_KG * G_MS2 * grad
-    p_mech = (f_drag + f_roll + f_grav) * v_arr
+    p_mech = (f_drag + f_roll + f_grav) * v_sim
 
     p_drivetrain = np.where(p_mech >= 0, p_mech / MOTOR_EFF, p_mech * REGEN_EFF)
     p_elec = precomputed_p_solar - p_drivetrain - P_AUX
     d_soc_drive = (p_elec * dt_drive) / (BATTERY_WH * 3600.0) * 100.0
 
-    soc = np.zeros(n)
-    curr_soc = soc_start
-    for i in range(n):
-        curr_soc += d_soc_drive[i]
-        if precomputed_stop_gains[i] > 0:
-            curr_soc = min(SOC_MAX, curr_soc + precomputed_stop_gains[i])
-        soc[i] = curr_soc
+    soc = np.empty(n_sim)
+    stop_idx = np.flatnonzero(precomputed_stop_gains > 0)
+    base = soc_start
+    start_idx = 0
+    for j in stop_idx:
+        seg_csum = np.cumsum(d_soc_drive[start_idx:j + 1])
+        soc[start_idx:j + 1] = base + seg_csum
+        soc[j] = min(SOC_MAX, soc[j] + precomputed_stop_gains[j])
+        base = soc[j]
+        start_idx = j + 1
+    if start_idx < n_sim:
+        seg_csum = np.cumsum(d_soc_drive[start_idx:n_sim])
+        soc[start_idx:n_sim] = base + seg_csum
 
     final_soc = soc[-1]
     finish_t = times[-1]
@@ -191,30 +202,92 @@ def simulate_day_fast(v_arr, route, start_time_ts, soc_start, precomputed_p_sola
 
     return final_soc, finish_t, soc, p_mech
 
+def simulate_day_fast_batch(V, route, start_time_ts, soc_start, precomputed_p_solar, precomputed_stop_gains, solar_obj, eod_cutoff_ts):
+
+    V = np.atleast_2d(V)
+    B, n_opt = V.shape
+    n_sim = route['n_segments']
+    dx = 10.0
+    RATIO = 100
+
+    v_sim = np.repeat(V, RATIO, axis=1)[:, :n_sim]
+
+    dt_drive = dx / v_sim
+    times = start_time_ts + np.cumsum(dt_drive, axis=1) + np.cumsum(route['delays'])[None, :]
+
+    grad = route['gradients'][None, :]
+    f_drag = 0.5 * AIR_DENSITY * CDA_M2 * (v_sim ** 2)
+    f_roll = MASS_KG * G_MS2 * CRR * (1.0 - (grad ** 2) / 2.0)
+    f_grav = MASS_KG * G_MS2 * grad
+    p_mech = (f_drag + f_roll + f_grav) * v_sim
+
+    p_drivetrain = np.where(p_mech >= 0, p_mech / MOTOR_EFF, p_mech * REGEN_EFF)
+    p_elec = precomputed_p_solar[None, :] - p_drivetrain - P_AUX
+    d_soc_drive = (p_elec * dt_drive) / (BATTERY_WH * 3600.0) * 100.0
+
+    soc = np.empty((B, n_sim))
+    stop_idx = np.flatnonzero(precomputed_stop_gains > 0)
+    base = np.full(B, soc_start, dtype=float)
+    start_idx = 0
+    for j in stop_idx:
+        seg_csum = np.cumsum(d_soc_drive[:, start_idx:j + 1], axis=1)
+        soc[:, start_idx:j + 1] = base[:, None] + seg_csum
+        soc[:, j] = np.minimum(SOC_MAX, soc[:, j] + precomputed_stop_gains[j])
+        base = soc[:, j]
+        start_idx = j + 1
+    if start_idx < n_sim:
+        seg_csum = np.cumsum(d_soc_drive[:, start_idx:n_sim], axis=1)
+        soc[:, start_idx:n_sim] = base[:, None] + seg_csum
+
+    final_soc = soc[:, -1].copy()
+    finish_t = times[:, -1]
+
+    for b in range(B):
+        if finish_t[b] < eod_cutoff_ts:
+            evening_gain = calc_stationary_charge(
+                finish_t[b], eod_cutoff_ts,
+                route['coords'][-1], route['headings'][-1], route['altitudes'][-1],
+                solar_obj
+            )
+            final_soc[b] = min(SOC_MAX, final_soc[b] + evening_gain)
+
+    return final_soc, finish_t, soc
+
+def _fd_perturbation_batch(v):
+
+    steps = np.sqrt(np.finfo(float).eps) * np.maximum(1.0, np.abs(v))
+    V = np.tile(v, (len(v) + 1, 1))
+    V[1:, :] += np.diag(steps)
+    return V, steps
+
 def optimize_single_day(route, start_time_ts, soc_start, target_eod_soc, v_guess_kmh, solar_obj, eod_cutoff_ts, speed_limits=None, w1=1.0, w2=0.1, w3=2.0):
-    n = route['n_segments']
+    n_sim = route['n_segments']
+    RATIO = 100
+    n_opt = int(np.ceil(n_sim / RATIO))
+    
     v_guess_ms = v_guess_kmh / 3.6
-    x0 = np.full(n, v_guess_ms)
+    x0 = np.full(n_opt, v_guess_ms)
 
     # PRECOMPUTE SOLAR TO UNBLOCK SLSQP
-    dt_baseline = 1000.0 / x0
+    v_sim_baseline = np.repeat(x0, RATIO)[:n_sim]
+    dt_baseline = 10.0 / v_sim_baseline
     times_baseline = start_time_ts + np.cumsum(dt_baseline) + np.cumsum(route['delays'])
     baseline_p_solar = get_solar_power(times_baseline, route['coords'], route['headings'], route['altitudes'], solar_obj)
     
-    stop_gains = np.zeros(n)
-    for i in range(n):
+    stop_gains = np.zeros(n_sim)
+    for i in range(n_sim):
         if route['delays'][i] > 0:
             stop_gains[i] = calc_stationary_charge(times_baseline[i], times_baseline[i] + route['delays'][i], route['coords'][i], route['headings'][i], route['altitudes'][i], solar_obj)
 
-    v_upper_bounds = np.full(n, V_MAX_MS)
+    v_upper_bounds = np.full(n_opt, V_MAX_MS)
     if speed_limits is not None:
         v_upper_bounds = np.minimum(v_upper_bounds, np.array(speed_limits) / 3.6)
-    bounds = [(V_MIN_MS, v_upper_bounds[i]) for i in range(n)]
+    bounds = [(V_MIN_MS, v_upper_bounds[i]) for i in range(n_opt)]
 
     v_low = 50.0 / 3.6
     v_high = 75.0 / 3.6
 
-    T_ref = n * (1000.0 / v_guess_ms) 
+    T_ref = n_opt * (1000.0 / v_guess_ms) 
     V_ref_sq = v_guess_ms ** 2 
 
     def objective(v):
@@ -224,36 +297,72 @@ def optimize_single_day(route, start_time_ts, soc_start, target_eod_soc, v_guess
         
         return 10000*(j_time + j_smooth + j_band)
 
+    def objective_grad(v):
+
+        grad_time = w1 * (-1000.0 / v ** 2) / T_ref
+
+        diff = v[1:] - v[:-1]
+        grad_smooth = np.zeros_like(v)
+        grad_smooth[:-1] += -2.0 * diff
+        grad_smooth[1:] += 2.0 * diff
+        grad_smooth *= w2 / V_ref_sq
+
+        grad_band = w3 / V_ref_sq * (
+            2.0 * np.maximum(0.0, v - v_high) - 2.0 * np.maximum(0.0, v_low - v)
+        )
+
+        return 10000.0 * (grad_time + grad_smooth + grad_band)
+
     def eq_soc(v):
         final_soc, _, _, _ = simulate_day_fast(v, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
         return final_soc - target_eod_soc
+
+    def jac_eq_soc(v):
+        V, steps = _fd_perturbation_batch(v)
+        final_soc, _, _ = simulate_day_fast_batch(V, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+        return (final_soc[1:] - final_soc[0]) / steps
 
     def ineq_finish_time(v):
         _, finish_t, _, _ = simulate_day_fast(v, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
         return eod_cutoff_ts - finish_t
 
+    def jac_ineq_finish_time(v):
+        V, steps = _fd_perturbation_batch(v)
+        _, finish_t, _ = simulate_day_fast_batch(V, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+        return -(finish_t[1:] - finish_t[0]) / steps
+
     def ineq_soc_min(v):
         _, _, soc_history, _ = simulate_day_fast(v, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
         return np.min(soc_history) - SOC_MIN
 
-    constraints = [{'type': 'ineq', 'fun': eq_soc}, {'type': 'ineq', 'fun': ineq_finish_time}, {'type': 'ineq', 'fun': ineq_soc_min}]
+    def jac_ineq_soc_min(v):
+        V, steps = _fd_perturbation_batch(v)
+        _, _, soc_hist = simulate_day_fast_batch(V, route, start_time_ts, soc_start, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+        min_soc = np.min(soc_hist, axis=1)
+        return (min_soc[1:] - min_soc[0]) / steps
+
+    constraints = [
+        {'type': 'ineq', 'fun': eq_soc, 'jac': jac_eq_soc},
+        {'type': 'ineq', 'fun': ineq_finish_time, 'jac': jac_ineq_finish_time},
+        {'type': 'ineq', 'fun': ineq_soc_min, 'jac': jac_ineq_soc_min},
+    ]
 
     pbar = tqdm(total=50, desc="SLSQP Iterations", unit="iter")
 
     def progress_tracker(xk):
         pbar.update(1)
-        # Optional: Watch the solver push the speed up in real-time
         current_mean_kmh = np.mean(xk) * 3.6
         pbar.set_postfix({'Mean Speed': f"{current_mean_kmh:.1f} km/h"})
 
     res = minimize(
         objective, 
         x0, 
+        jac=objective_grad,
         method='SLSQP', 
         bounds=bounds, 
         constraints=constraints, 
         options={'ftol': 1e-3, 'maxiter': 50, 'disp': False},
-        callback=progress_tracker  # <--- Injects the progress bar
+        callback=progress_tracker
     )
     
     pbar.close()
@@ -264,7 +373,7 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
     eod_cutoff_ts = datetime.combine(race_date, time(EOD_CUTOFF_HOUR, 0), tzinfo=SA_TZ).timestamp()
     full_route = build_day_route(s1_profile, loop_profile, s2_profile, manual_target_loops)
 
-    k_curr = int(np.floor(current_km))
+    k_curr = int(np.floor(current_km * 100))
     k_curr = min(k_curr, full_route['n_segments'] - 1)
 
     rem_route = {
@@ -276,17 +385,33 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
         'n_segments': full_route['n_segments'] - k_curr
     }
 
-    print(f"Re-solving from km {current_km:.1f} ({rem_route['n_segments']} km left) | Target Loops: {manual_target_loops}")
+    print(f"Re-solving from km {current_km:.1f} ({rem_route['n_segments'] / 100:.1f} km left) | Target Loops: {manual_target_loops}")
 
     res, baseline_p_solar, stop_gains = optimize_single_day(rem_route, current_time_ts, current_soc, target_eod_soc, v_guess_kmh, solar_obj, eod_cutoff_ts)
 
     if res.success or res.status == 9:
         opt_v_ms = res.x
         opt_v_kmh = opt_v_ms * 3.6
-        final_soc, finish_t, soc_history, p_mech = simulate_day_fast(opt_v_ms, rem_route, current_time_ts, current_soc, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+        
+        # --- 1D Error Diffusion (Smart Quantization) ---
+        quantized_kmh = np.zeros_like(opt_v_kmh)
+        carry_error = 0.0
+        for i in range(len(opt_v_kmh)):
+            target = opt_v_kmh[i] + carry_error
+            quantized_kmh[i] = np.round(target)
+            carry_error = target - quantized_kmh[i]
+            
+        quantized_ms = quantized_kmh / 3.6
+        
+        # Run final simulation using the quantized integer speeds
+        final_soc, finish_t, soc_history, p_mech = simulate_day_fast(quantized_ms, rem_route, current_time_ts, current_soc, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
 
-        # --- NEW: Calculate exact timestamps for every kilometer ---
-        dt_drive = 1000.0 / opt_v_ms
+        # Stretch the quantized 1km speeds to match the 10m physics array for the dashboard
+        quantized_kmh_sim = np.repeat(quantized_kmh, 100)[:rem_route['n_segments']]
+        quantized_ms_sim = np.repeat(quantized_ms, 100)[:rem_route['n_segments']]
+
+        # Calculate exact timestamps for the high-res dashboard
+        dt_drive = 10.0 / quantized_ms_sim
         times = current_time_ts + np.cumsum(dt_drive) + np.cumsum(rem_route['delays'])
 
         save_dir = Path("Fallback Model/velocity_profiles")
@@ -295,21 +420,21 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
         
         np.savez(
             save_path, 
-            speeds_kmh=opt_v_kmh, 
+            speeds_kmh=quantized_kmh_sim, 
             soc=soc_history, 
             power_w=p_mech, 
             start_km=current_km,
-            times=times,                  # Exporting time array
-            eod_cutoff_ts=eod_cutoff_ts,  # Exporting impound deadline
-            final_soc=final_soc           # Exporting SoC after idle charging
+            times=times,                  
+            eod_cutoff_ts=eod_cutoff_ts,  
+            final_soc=final_soc           
         )
 
         finish_str = datetime.fromtimestamp(finish_t, tz=SA_TZ).strftime("%H:%M:%S")
-        print(f"Re-solve Succeeded! Finish Time: {finish_str} | Final EoD SoC: {final_soc:.2f}% | Avg Speed: {np.mean(opt_v_kmh):.2f} km/h")
-        return opt_v_kmh
+        print(f"Re-solve Succeeded! Finish Time: {finish_str} | Final EoD SoC: {final_soc:.2f}% | Avg Speed: {np.mean(quantized_kmh):.2f} km/h")
+        return quantized_kmh
     else:
         print(f"Re-solve Failed: {res.message}")
-        return np.full(rem_route['n_segments'], v_guess_kmh)
+        return np.full(int(np.ceil(rem_route['n_segments'] / 100)), v_guess_kmh)
 
 if __name__ == "__main__":
     DAY_NO = 2 
@@ -364,7 +489,7 @@ if __name__ == "__main__":
 optimized_speeds = resolve(
         current_km=0.0,
         current_time_ts=start_time_ts,
-        current_soc=current_soc,
+        current_soc=82.0,
         s1_profile=s1_profile,
         loop_profile=loop_profile,
         s2_profile=s2_profile,
