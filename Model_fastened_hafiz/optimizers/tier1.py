@@ -355,9 +355,18 @@ def evaluate_day(car: CarState, route, plan: _DayPlan, reps: tuple[int, ...],
 
     # Stationary Solar capture (Control Stop + Unplanned)
     base_km = plan.stage1_km + plan.stage2_km
-    t_cs = t0_s + ((base_km / 2.0 * 1000.0) / max(v_base_ms, 1e-6) if base_km > 0 else 0.0)
+    # Stationary Solar capture (Control Stop + Unplanned)
+    # FIX: the control stop sits at the END OF STAGE 1, not at the midpoint
+    # of Stage 1 + Stage 2 combined. The old `base_km/2` formula assumed a
+    # symmetric split and was wrong on every day with an asymmetric one
+    # (e.g. Day 6: 310 km Stage 1 / 0 km Stage 2 -> it thought the stop was
+    # at 155 km instead of 310 km), which fed the wrong time-of-day into the
+    # GHI lookup and systematically under-credited (or on late/early-arrival
+    # days, could even flip negative) the 30-min charging stop. This now
+    # mirrors the loop-credit's own (correct) t_loop calc a few lines below.
+    t_cs = t0_s + ((plan.stage1_km * 1000.0) / max(v_base_ms, 1e-6) if plan.stage1_km > 0 else 0.0)
     p_cs = (car.array_area_m2 * car.array_efficiency *
-            solar_provider.ghi_wm2(t_cs, route_offset_km + base_km / 2) - car.p_idle_w)
+            solar_provider.ghi_wm2(t_cs, route_offset_km + plan.stage1_km) - car.p_idle_w)
 
     cs_duration = (0.0 if (is_today and cs_taken) else rc.CONTROL_STOP_DURATION_S)
     total_stop_s = cs_duration + rc.UNPLANNED_STOP_BUDGET_S
