@@ -211,7 +211,7 @@ def optimize_single_day(route, start_time_ts, soc_start, target_eod_soc, v_guess
         v_upper_bounds = np.minimum(v_upper_bounds, np.array(speed_limits) / 3.6)
     bounds = [(V_MIN_MS, v_upper_bounds[i]) for i in range(n)]
 
-    v_low = 60.0 / 3.6
+    v_low = 50.0 / 3.6
     v_high = 75.0 / 3.6
 
     T_ref = n * (1000.0 / v_guess_ms) 
@@ -252,13 +252,12 @@ def optimize_single_day(route, start_time_ts, soc_start, target_eod_soc, v_guess
         method='SLSQP', 
         bounds=bounds, 
         constraints=constraints, 
-        options={'ftol': 1e-6, 'maxiter': 50, 'disp': False},
+        options={'ftol': 1e-3, 'maxiter': 50, 'disp': False},
         callback=progress_tracker  # <--- Injects the progress bar
     )
     
     pbar.close()
 
-    res = minimize(objective, x0, method='SLSQP', bounds=bounds, constraints=constraints, options={'ftol': 1e-3, 'maxiter': 50, 'disp': False})
     return res, baseline_p_solar, stop_gains
 
 def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, s2_profile, loops_completed, manual_target_loops, target_eod_soc, v_guess_kmh, solar_obj, race_date, day_no):
@@ -282,8 +281,13 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
     res, baseline_p_solar, stop_gains = optimize_single_day(rem_route, current_time_ts, current_soc, target_eod_soc, v_guess_kmh, solar_obj, eod_cutoff_ts)
 
     if res.success or res.status == 9:
-        opt_v_kmh = res.x * 3.6
-        final_soc, finish_t, soc_history, p_mech = simulate_day_fast(res.x, rem_route, current_time_ts, current_soc, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+        opt_v_ms = res.x
+        opt_v_kmh = opt_v_ms * 3.6
+        final_soc, finish_t, soc_history, p_mech = simulate_day_fast(opt_v_ms, rem_route, current_time_ts, current_soc, baseline_p_solar, stop_gains, solar_obj, eod_cutoff_ts)
+
+        # --- NEW: Calculate exact timestamps for every kilometer ---
+        dt_drive = 1000.0 / opt_v_ms
+        times = current_time_ts + np.cumsum(dt_drive) + np.cumsum(rem_route['delays'])
 
         save_dir = Path("Fallback Model/velocity_profiles")
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -294,7 +298,10 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
             speeds_kmh=opt_v_kmh, 
             soc=soc_history, 
             power_w=p_mech, 
-            start_km=current_km
+            start_km=current_km,
+            times=times,                  # Exporting time array
+            eod_cutoff_ts=eod_cutoff_ts,  # Exporting impound deadline
+            final_soc=final_soc           # Exporting SoC after idle charging
         )
 
         finish_str = datetime.fromtimestamp(finish_t, tz=SA_TZ).strftime("%H:%M:%S")
@@ -320,7 +327,7 @@ if __name__ == "__main__":
     }
 
     START_SOCS = [95.0, 82.0, 63.0, 53.0, 67.0, 67.0, 53.0, 53.0]
-    V_GUESSES = [70.0, 60.0, 60.0, 55.0, 60.0, 55.0, 55.0, 50.0]
+    V_GUESSES = [70.0, 57.0, 60.0, 55.0, 60.0, 55.0, 55.0, 50.0]
 
     race_date = DAYWISE_FILES[day_str]["date"]
     s1_name = DAYWISE_FILES[day_str]["s1"]
@@ -362,8 +369,8 @@ optimized_speeds = resolve(
         loop_profile=loop_profile,
         s2_profile=s2_profile,
         loops_completed=0,
-        manual_target_loops=3,
-        target_eod_soc=53.0,
+        manual_target_loops=10,
+        target_eod_soc=63.0,
         v_guess_kmh=V_GUESSES[DAY_NO - 1],
         solar_obj=solar_obj,
         race_date=race_date,
