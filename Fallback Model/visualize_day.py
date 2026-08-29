@@ -1,3 +1,4 @@
+# visualize_day.py
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -26,8 +27,8 @@ def main():
     eod_cutoff_ts = float(data['eod_cutoff_ts'])
     final_soc = float(data['final_soc'])
 
-    # 2. Create arrays for plotting
-    distance = start_km + np.arange(len(speeds))
+    # 2. Create arrays for plotting (multiplied by 0.01 to match 10m physics resolution)
+    distance = start_km + np.arange(len(speeds)) * 0.01
     
     # Build SoC & Time arrays (Append idle charging tail if finished early)
     finish_t = times[-1]
@@ -53,7 +54,7 @@ def main():
     # Top: Velocity Profile (vs Distance)
     axes[0].plot(distance, speeds, color='dodgerblue', linewidth=2)
     axes[0].axhline(y=75, color='red', linestyle='--', alpha=0.5, label='Ideal Ceiling (75 km/h)')
-    axes[0].axhline(y=50, color='orange', linestyle='--', alpha=0.5, label='Floor (50 km/h)') # Fixed mismatch between y=50 and the old 60 label
+    axes[0].axhline(y=50, color='orange', linestyle='--', alpha=0.5, label='Floor (50 km/h)')
     axes[0].set_ylabel('Speed (km/h)')
     axes[0].set_title('Optimized Velocity Profile')
     axes[0].legend(loc='upper right')
