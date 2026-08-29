@@ -692,13 +692,13 @@ def plot_soc_profile(optimal_v, optimal_n):
     plt.show()
 
 def run_joint_optimization():
-    speed_bounds = [(45, 75)] * 16
+    speed_bounds = [(50, 75)] * 16
     loop_bounds = [(1, 10)] * 8  
     bounds = speed_bounds + loop_bounds
     integrality = [True] * 24
 
     v_init = [65, 60, 60, 55, 60, 55, 55, 55, 60, 55, 55, 50, 55, 50, 50, 50]
-    n_init = [6, 4, 3, 5, 3, 2, 1, 1]
+    n_init = [7, 9, 5, 10, 5, 2, 2, 2]
     x0_guess = np.array(v_init + n_init)
 
     max_generations = 100
@@ -729,7 +729,7 @@ def run_joint_optimization():
     optimal_v = [(int(best_x[i]), int(best_x[i + 1])) for i in range(0, 16, 2)]
     optimal_n = [int(val) for val in best_x[16:]]
 
-    x_all, _, min_soc, day_end_times, overtime_sec, max_pwr = stitchAllDays(optimal_n, optimal_v)
+    x_all, y_all, min_soc, day_end_times, overtime_sec, max_pwr = stitchAllDays(optimal_n, optimal_v)
     best_dist = float(x_all[-1][-1])
 
     print("\n--- Thermal & Slope-Aware Optimization Complete ---")
@@ -739,7 +739,7 @@ def run_joint_optimization():
     print("Optimal Schedule (SAST Local Times):")
     for day in range(8):
         end_time_str = datetime.fromtimestamp(day_end_times[day], tz=SA_TZ).strftime("%H:%M:%S SAST")
-        print(f"  Day {day+1}: Loops = {optimal_n[day]}, Stage Speeds = {optimal_v[day]} km/h | Finish Time: {end_time_str}")
+        print(f"  Day {day+1}: Start SoC: {y_all[day][0]} |Loops = {optimal_n[day]}, Stage Speeds = {optimal_v[day]} km/h | Finish Time: {end_time_str} | Finish SoC: {y_all[day][-1]}")
 
     return optimal_v, optimal_n, best_dist
 
