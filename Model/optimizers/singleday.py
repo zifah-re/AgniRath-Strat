@@ -187,7 +187,26 @@ def _splice_loops(route: Route, loop_geoms: dict | None,
         # assumption is exactly what crashed on Day 6).
         row = blocks[-1].iloc[[-1]].copy()
         row["distance_m"] = at_m
-        row["seg_type"] = "stage1"  # non-loop, resets the contiguous-zone flag
+        # BUGFIX: this used to be tagged plain "stage1" so forward_sim's
+        # in_loop_zone flag (which gates the per-rep loop-stop solar credit)
+        # correctly resets between reps. But _coarse_stage() in
+        # trust_region.py buckets ANYTHING starting with "stage1" into the
+        # reporting/plotting "stage1" stage — so with N committed reps, N-1
+        # of these single-point separator rows got swept into the "stage1"
+        # trace even though they sit deep inside (or after) the loop zone,
+        # scattered every ~1 loop-length apart. That corrupted the "stage1"
+        # stage's reported distance_km (it could read ~2x the real Stage 1
+        # length) and interleaved stray, unrelated-time-of-day solar_w
+        # samples into what should be a smooth morning ramp — the exact
+        # "extra peak before/after the stop" artifact reported against the
+        # dashboard's irradiance-vs-distance curve.
+        # Fix: tag it "loop_separator" instead — _coarse_stage() already
+        # buckets anything starting with "loop" as "loop" for reporting, so
+        # this now correctly reports as part of the loop stage. forward_sim's
+        # loop_stop_here test explicitly excludes "loop_separator" (see
+        # simulator/forward_sim.py) so the per-rep credit-reset behavior is
+        # unchanged — only the reporting bucket moves.
+        row["seg_type"] = "loop_separator"
         return row
 
     for name, km in loops_committed:
