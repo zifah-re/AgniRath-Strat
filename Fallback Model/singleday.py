@@ -11,19 +11,19 @@ from solar_table import SolarIrradiance
 from tqdm import tqdm
 
 # ----------------- CONSTANTS ----------------- #
-MASS_KG = 300.0
+MASS_KG = 320.0
 G_MS2 = 9.81
 CRR = 0.007
 CDA_M2 = 0.16
 AIR_DENSITY = 1.2
-ARRAY_AREA_M2 = 5.95
-ARRAY_EFFICIENCY = 0.18
+ARRAY_AREA_M2 = 5.78
+ARRAY_EFFICIENCY = 0.21
 PANEL_TILT = 4.0
 ALBEDO = 0.2
 
 MOTOR_EFF = 0.95
 REGEN_EFF = 0.70
-P_AUX = 50.0
+P_AUX = 5.0
 
 BATTERY_WH = 588.0 * 6
 SOC_MIN = 20.0

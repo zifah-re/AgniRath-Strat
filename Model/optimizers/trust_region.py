@@ -554,6 +554,10 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             alpha_next_day_pct=alpha_next,
             loops_committed=loops_committed,
             loop_geoms=loop_geoms,
+            # Real per-variant Stage-1 distance (0.0 for Day 3 Aryaman) —
+            # tells singleday._splice_loops() whether this day genuinely
+            # starts with the loop or just had its single file mistagged.
+            stage1_km=nom_plan.stage1_km,
             penalty_stoppage_s=carryover_penalty_s,
         )
 
