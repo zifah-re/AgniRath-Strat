@@ -867,13 +867,28 @@ def get_live_car_gps():
 async def stats_logs():
     return {"logs": stats_memory.available_logs()}
 
+@app.post("/api/stats/upload")
+async def stats_upload(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith((".jsonl", ".json")):
+        raise HTTPException(status_code=400, detail="Please select a JSONL telemetry log.")
+    try:
+        return stats_memory.upload_file(file.filename, await file.read())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+@app.delete("/api/stats/logs/{log_id}")
+async def stats_remove_log(log_id: str):
+    if not stats_memory.remove_uploaded(log_id):
+        raise HTTPException(status_code=404, detail="Uploaded log not found")
+    return {"success": True}
+
 @app.post("/api/stats/load")
 async def stats_load(request: Request):
     body = await request.json()
-    names = body.get("filenames", [])
-    if not isinstance(names, list):
-        raise HTTPException(status_code=400, detail="filenames must be a list")
-    return stats_memory.load_runs(names)
+    ids = body.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids must be a list")
+    return stats_memory.load_runs(ids)
 
 @app.get("/api/stats/data")
 async def stats_data():
