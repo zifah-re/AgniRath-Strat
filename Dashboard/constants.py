@@ -121,17 +121,17 @@ INVALID_CELL_MV = 10_000.0
 # ==========================================
 # CONSTANTS FOR MPC.PY
 # ==========================================
-MASS = 300.0          # Total car + driver mass (kg)
+MASS = 320.0          # Total car + driver mass (kg)
 CDA = 0.16            # Aerodynamic drag area (Cd * A)
 CRR = 0.007           # Rolling resistance coefficient
 RHO = 1.2             # Air density (kg/m^3)
 G = 9.81              # Gravity (m/s^2)
 
-SOLAR_AREA = 5.95     # m^2
-SOLAR_EFF = 0.18      # 18%
+SOLAR_AREA = 5.78    # m^2
+SOLAR_EFF = 0.21     # 18%
 MOTOR_EFF = 0.95      # 95%
 REGEN_EFF = 0.70      # 70%
-POWER_LOSS = 70.0
+POWER_LOSS = 5.0
 PANEL_TILT = 4
 ALBEDO = 0.2
 
