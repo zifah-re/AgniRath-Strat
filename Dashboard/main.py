@@ -1,4 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, UploadFile, File
+from pydantic import BaseModel
+from stats_memory import stats_memory
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -532,6 +534,10 @@ async def update_processor(queue: asyncio.Queue):
                         rx_dt = datetime.now().astimezone()
                 else:
                     rx_dt = datetime.now().astimezone()
+                # Independent Statistics/Memory capture. Never mutates current_data.
+                if '_rx_time' not in pdata:
+                    pdata = {**pdata, '_rx_time': rx_dt.isoformat()}
+                stats_memory.add_live_packet(pdata)
                 if tracker_state['current_soc_percentage'] is None:
                     tracker_state['current_soc_percentage'] = get_initial_soc(metric['Pack_Voltage'])
                     #initial_soc_percentage=get_initial_soc(metric['Pack_Voltage'])
@@ -857,6 +863,37 @@ def get_live_car_gps():
             }
         ]
     }
+@app.get("/api/stats/logs")
+async def stats_logs():
+    return {"logs": stats_memory.available_logs()}
+
+@app.post("/api/stats/load")
+async def stats_load(request: Request):
+    body = await request.json()
+    names = body.get("filenames", [])
+    if not isinstance(names, list):
+        raise HTTPException(status_code=400, detail="filenames must be a list")
+    return stats_memory.load_runs(names)
+
+@app.get("/api/stats/data")
+async def stats_data():
+    return stats_memory.build()
+
+@app.post("/api/stats/live/start")
+async def stats_live_start():
+    stats_memory.start_live()
+    return {"success": True}
+
+@app.post("/api/stats/live/stop")
+async def stats_live_stop():
+    stats_memory.stop_live()
+    return {"success": True}
+
+@app.post("/api/stats/live/clear")
+async def stats_live_clear():
+    stats_memory.clear_live()
+    return {"success": True}
+
 @app.get("/")
 async def root():
     index_path = os.path.join(frontend_dir, "index.html")
