@@ -152,7 +152,7 @@ def run(args: argparse.Namespace) -> None:
 
     strategies = {}
     for variant in args.variant:
-        path = f"{args.json_dir}/strategy_{variant}_fixed.json"
+        path = f"{args.json_dir}/strategy_{variant}_final.json"
         try:
             strategies[variant] = load_strategy(path)
             _log(f"loaded {path}")
