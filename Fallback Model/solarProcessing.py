@@ -18,7 +18,7 @@ DATES={
 }
 
 folder = Path(r'Fallback Model\Solar')
-output_folder = Path(r'Fallback Model\Solar_Processed')
+output_folder = Path(r'Fallback Model\Solar_real')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 
@@ -28,10 +28,12 @@ def extractSolarData(json_file):
   return data
 
 
-def trimSolarData(solar_data, start_time=time(6, 0,tzinfo=SA_TZ), end_time=time(17, 0,tzinfo=SA_TZ)):
+def trimSolarData(solar_data, day, start_time=time(6, 0,tzinfo=SA_TZ), end_time=time(18, 0,tzinfo=SA_TZ)):
   trimmed_data = []
+  start_time=datetime.combine(DATES[day],start_time,tzinfo=SA_TZ)
+  end_time=datetime.combine(DATES[day],end_time,tzinfo=SA_TZ)
   for entry in solar_data:
-    entry_time = datetime.fromisoformat(entry['period_end']).time()
+    entry_time = datetime.fromisoformat(entry['period_end'])
     if start_time <= entry_time <= end_time:
       trimmed_data.append(entry)
   return trimmed_data
@@ -83,9 +85,9 @@ for json_file in folder.glob('*.jsonl'):
     stage_point_data = item['data']
     day=re.search(r"Day [1-8]",json_file.name).group(0)
     if 'Day 1' in file_name:
-      mean_data = meanSolar(stage_point_data, day, time(9, 0,tzinfo=SA_TZ))
+      mean_data = trimSolarData(stage_point_data, day, time(9, 0,tzinfo=SA_TZ))
     else:
-      mean_data = meanSolar(stage_point_data, day)
+      mean_data = trimSolarData(stage_point_data, day)
 
     output_data.append({
         'lat': stage_point_lat,

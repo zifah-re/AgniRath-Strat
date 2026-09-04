@@ -416,7 +416,7 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
 
         save_dir = Path("Fallback Model/velocity_profiles")
         save_dir.mkdir(parents=True, exist_ok=True)
-        save_path = save_dir / f"optimized_day_{day_no}.npz"
+        save_path = save_dir / f"optimized_day_resolve{day_no}.npz"
         
         np.savez(
             save_path, 
@@ -437,7 +437,7 @@ def resolve(current_km, current_time_ts, current_soc, s1_profile, loop_profile, 
         return np.full(int(np.ceil(rem_route['n_segments'] / 100)), v_guess_kmh)
 
 if __name__ == "__main__":
-    DAY_NO = 2 
+    DAY_NO = 2
     day_str = f"Day {DAY_NO}"
 
     DAYWISE_FILES = {
@@ -451,8 +451,8 @@ if __name__ == "__main__":
         "Day 8": {"date":date(2026,9,17),"s1": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 1 Clanwilliam to Ceres","l":"2026 Sasol Solar Challenge Route (Publish)_Day 8_Ceres Loop","s2":"2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 2 Ceres to Paarl"}
     }
 
-    START_SOCS = [95.0, 82.0, 63.0, 53.0, 67.0, 67.0, 53.0, 53.0]
-    V_GUESSES = [70.0, 57.0, 60.0, 55.0, 60.0, 55.0, 55.0, 50.0]
+    START_SOCS = [95.0, 64.0, 59.0, 53.0, 67.0, 67.0, 53.0, 53.0]
+    V_GUESSES = [70.0, 61.0, 60.0, 55.0, 60.0, 55.0, 55.0, 50.0]
 
     race_date = DAYWISE_FILES[day_str]["date"]
     s1_name = DAYWISE_FILES[day_str]["s1"]
@@ -487,15 +487,15 @@ if __name__ == "__main__":
         print(f"Morning charge complete. Starting day with SoC: {current_soc:.2f}%")
 
 optimized_speeds = resolve(
-        current_km=0.0,
+        current_km=200.0,
         current_time_ts=start_time_ts,
-        current_soc=82.0,
+        current_soc=25.0,
         s1_profile=s1_profile,
         loop_profile=loop_profile,
         s2_profile=s2_profile,
-        loops_completed=0,
-        manual_target_loops=10,
-        target_eod_soc=63.0,
+        loops_completed=9,
+        manual_target_loops=9,
+        target_eod_soc=74.0,
         v_guess_kmh=V_GUESSES[DAY_NO - 1],
         solar_obj=solar_obj,
         race_date=race_date,

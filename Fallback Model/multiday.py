@@ -701,7 +701,7 @@ def run_joint_optimization():
     n_init = [7, 9, 5, 10, 5, 2, 2, 2]
     x0_guess = np.array(v_init + n_init)
 
-    max_generations = 100
+    max_generations = 120
     pbar = tqdm(total=max_generations, desc="Joint Optimization (v & n)", unit="gen")
 
     def callback(xk, convergence):

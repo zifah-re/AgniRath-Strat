@@ -10,7 +10,7 @@ def main():
     SA_TZ = ZoneInfo("Africa/Johannesburg") # Defined the timezone variable
     
     # 1. Load the data
-    file_path = f"Fallback Model/velocity_profiles/optimized_day_{DAY_NO}.npz"
+    file_path = f"Fallback Model/velocity_profiles/optimized_day_resolve{DAY_NO}.npz"
     try:
         data = np.load(file_path)
     except FileNotFoundError:

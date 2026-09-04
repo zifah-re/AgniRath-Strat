@@ -48,7 +48,7 @@ if __name__=="__main__":
     parser.add_argument("--output-dir", default=r"Solar", help="Directory to save plots (default: current dir)")
     args = parser.parse_args()
 
-    paths = args.files or sorted(glob.glob("Fallback Model\\Saves\\2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop.kml.save"))
+    paths = args.files or sorted(glob.glob("Fallback Model\\Saves\\*.kml.save"))
     if not paths:
         print("No KML save files found. Pass file paths or run from the folder containing them.")
         sys.exit(1)
