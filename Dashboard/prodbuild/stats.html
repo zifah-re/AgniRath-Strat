@@ -1,0 +1,1763 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>AgniRath Statistics</title>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:#111827;
+    color:#e5e7eb;
+    font-family:Inter,system-ui,Arial,sans-serif;
+}
+
+.top{
+    padding:18px 28px;
+    background:#172033;
+    border-bottom:1px solid #374151;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.top a{
+    color:#93c5fd;
+    text-decoration:none;
+}
+
+.wrap{
+    max-width:1700px;
+    margin:auto;
+    padding:24px;
+}
+
+.panel,
+.card{
+    background:#182235;
+    border:1px solid #344155;
+    border-radius:14px;
+    padding:18px;
+}
+
+.panel{
+    margin-bottom:20px;
+}
+
+.toolbar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+}
+
+.btn{
+    border:0;
+    border-radius:8px;
+    padding:10px 15px;
+    background:#2563eb;
+    color:white;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.btn.alt{
+    background:#374151;
+}
+
+.btn.red{
+    background:#b91c1c;
+}
+
+.hidden{
+    display:none;
+}
+
+.logs{
+    margin-top:15px;
+    display:grid;
+    gap:8px;
+}
+
+.log{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:11px;
+    background:#111827;
+    border-radius:8px;
+}
+
+.log small{
+    color:#94a3b8;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(
+        auto-fit,
+        minmax(200px,1fr)
+    );
+    gap:14px;
+    margin:20px 0;
+}
+
+.value{
+    font-size:1.7rem;
+    font-weight:800;
+    margin-top:8px;
+}
+
+.label{
+    color:#94a3b8;
+    font-size:.85rem;
+    text-transform:uppercase;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(
+        2,
+        minmax(0,1fr)
+    );
+    gap:18px;
+}
+
+.chart{
+    height:360px;
+    position:relative;
+}
+
+.chart canvas{
+    width:100%!important;
+    height:100%!important;
+}
+
+.table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table td,
+.table th{
+    padding:10px;
+    border-bottom:1px solid #334155;
+    text-align:left;
+}
+
+.status{
+    color:#86efac;
+}
+
+.hint{
+    color:#94a3b8;
+    font-size:.9rem;
+}
+
+.boundaries{
+    font-size:.85rem;
+    color:#cbd5e1;
+    margin-top:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.boundary{
+    background:#111827;
+    border:1px solid #334155;
+    padding:6px 8px;
+    border-radius:7px;
+}
+
+.error{
+    margin-top:10px;
+    color:#fca5a5;
+}
+
+.day-badge{
+    background:#1e3a5f;
+    border:1px solid #3b82f6;
+    border-radius:7px;
+    padding:7px 10px;
+    font-weight:700;
+}
+
+@media(max-width:900px){
+
+    .grid{
+        grid-template-columns:1fr;
+    }
+
+    .wrap{
+        padding:14px;
+    }
+
+    .top{
+        padding:14px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="top">
+
+    <div>
+        <b>📊 AgniRath Memory & Statistics</b>
+
+        <div
+            id="state"
+            class="status"
+        >
+            STATIC MEMORY
+        </div>
+    </div>
+
+    <a href="/">
+        ← Back to Live Dashboard
+    </a>
+
+</div>
+
+
+<div class="wrap">
+
+    <!-- ===================================================== -->
+    <!-- FILE LOADING -->
+    <!-- ===================================================== -->
+
+    <div class="panel">
+
+        <h2>Historical Run Memory</h2>
+
+        <p class="hint">
+            Choose local JSONL logs. Every selected run must belong
+            to the same calendar day, determined from
+            <code>_rx_time</code> in its first valid row.
+            Runs are ordered using that same first-row timestamp.
+        </p>
+
+        <div class="toolbar">
+
+            <button
+                class="btn"
+                onclick="picker.click()"
+            >
+                Choose local log files
+            </button>
+
+            <input
+                id="picker"
+                class="hidden"
+                type="file"
+                accept=".jsonl,.json"
+                multiple
+                onchange="uploadFiles(this.files)"
+            >
+
+            <button
+                class="btn"
+                onclick="loadSelected()"
+            >
+                Load selected runs
+            </button>
+
+            <button
+                class="btn alt"
+                onclick="startLive()"
+            >
+                Start live session
+            </button>
+
+            <button
+                class="btn alt"
+                onclick="stopLive()"
+            >
+                Stop live
+            </button>
+
+            <button
+                class="btn red"
+                onclick="clearLive()"
+            >
+                Clear live
+            </button>
+
+            <span
+                id="loadedDay"
+                class="day-badge hidden"
+            ></span>
+
+        </div>
+
+        <div
+            id="error"
+            class="error"
+        ></div>
+
+        <div
+            class="logs"
+            id="logs"
+        >
+            <div class="hint">
+                No files selected yet.
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- CARDS -->
+    <!-- ===================================================== -->
+
+    <div
+        class="cards"
+        id="cards"
+    ></div>
+
+
+    <!-- ===================================================== -->
+    <!-- GRAPHS -->
+    <!-- ===================================================== -->
+
+    <div class="grid">
+
+        <div class="panel">
+
+            <h3>
+                Cumulative Energy Received
+            </h3>
+
+            <p class="hint">
+                Sum of MPPT A, B, C and D output powers,
+                integrated over actual packet timestamps.
+            </p>
+
+            <div class="chart">
+                <canvas id="energyIn"></canvas>
+            </div>
+
+            <div
+                class="boundaries"
+                id="energyInBounds"
+            ></div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3>
+                Cumulative Energy Lost
+            </h3>
+
+            <p class="hint">
+                Motor power when available; otherwise the dashboard's
+                Bus Voltage × Bus Current calculation.
+            </p>
+
+            <div class="chart">
+                <canvas id="energyOut"></canvas>
+            </div>
+
+            <div
+                class="boundaries"
+                id="energyOutBounds"
+            ></div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3>
+                Cumulative Distance
+            </h3>
+
+            <p class="hint">
+                Vehicle velocity integrated between actual
+                velocity samples.
+            </p>
+
+            <div class="chart">
+                <canvas id="distance"></canvas>
+            </div>
+
+            <div
+                class="boundaries"
+                id="distanceBounds"
+            ></div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3>
+                Vehicle Velocity
+            </h3>
+
+            <p class="hint">
+                Real vehicle velocity. Missing velocity packets
+                are not converted into zero.
+            </p>
+
+            <div class="chart">
+                <canvas id="velocity"></canvas>
+            </div>
+
+            <div
+                class="boundaries"
+                id="velocityBounds"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ===================================================== -->
+    <!-- INDIVIDUAL RUNS -->
+    <!-- ===================================================== -->
+
+    <div class="panel">
+
+        <h2>
+            Individual Runs
+        </h2>
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th>Actual start</th>
+                    <th>Actual end</th>
+                    <th>Distance</th>
+                    <th>Solar gained</th>
+                    <th>Energy lost</th>
+                    <th>Max speed</th>
+                </tr>
+            </thead>
+
+            <tbody
+                id="runRows"
+            ></tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<script type="module">
+
+/*
+    THIS IS THE SAME CHART.JS SETUP PATTERN USED
+    BY THE EXISTING SVELTE DASHBOARD.
+
+    The previous V3 only imported Chart and did not
+    register the required components.
+*/
+
+import {
+    C as Chart,
+    a as CategoryScale,
+    L as LinearScale,
+    P as PointElement,
+    b as LineElement,
+    c as Title,
+    p as Tooltip,
+    d as Legend,
+    e as Filler
+}
+from "./_app/immutable/chunks/DHTsbXwT.js";
+
+
+Chart.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
+
+
+/* ============================================================
+   STATE
+============================================================ */
+
+let stats = null;
+
+const picker =
+    document.getElementById("picker");
+
+const charts = {};
+
+
+/* ============================================================
+   FORMATTING
+============================================================ */
+
+const fmt = (
+    value,
+    digits = 2
+) => {
+
+    return Number(
+        value || 0
+    ).toLocaleString(
+        undefined,
+        {
+            maximumFractionDigits:
+                digits
+        }
+    );
+};
+
+
+const duration = (
+    seconds
+) => {
+
+    seconds = Math.round(
+        seconds || 0
+    );
+
+    const hours =
+        Math.floor(
+            seconds / 3600
+        );
+
+    const minutes =
+        Math.floor(
+            seconds % 3600 / 60
+        );
+
+    const remainingSeconds =
+        seconds % 60;
+
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+};
+
+
+const formatTime = (
+    epochMilliseconds
+) => {
+
+    return new Date(
+        epochMilliseconds
+    ).toLocaleTimeString(
+        [],
+        {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        }
+    );
+};
+
+
+const formatShortTime = (
+    epochMilliseconds
+) => {
+
+    return new Date(
+        epochMilliseconds
+    ).toLocaleTimeString(
+        [],
+        {
+            hour: "2-digit",
+            minute: "2-digit"
+        }
+    );
+};
+
+
+const formatDateTime = (
+    value
+) => {
+
+    return new Date(
+        value
+    ).toLocaleString();
+};
+
+
+/* ============================================================
+   API
+============================================================ */
+
+async function api(
+    url,
+    options
+) {
+
+    const response =
+        await fetch(
+            url,
+            options
+        );
+
+    const body =
+        await response.json()
+        .catch(
+            () => ({
+                detail:
+                    response.statusText
+            })
+        );
+
+    if (!response.ok) {
+
+        throw new Error(
+            body.detail
+            || body.error
+            || response.statusText
+        );
+    }
+
+    return body;
+}
+
+
+function escapeHtml(
+    value
+) {
+
+    return String(value)
+        .replace(
+            /[&<>"']/g,
+            character => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            })[character]
+        );
+}
+
+
+function setError(
+    message = ""
+) {
+
+    document.getElementById(
+        "error"
+    ).textContent = message;
+}
+
+
+/* ============================================================
+   FILE UPLOAD
+============================================================ */
+
+async function uploadFiles(
+    files
+) {
+
+    setError("");
+
+    for (
+        const file of files
+    ) {
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            "file",
+            file
+        );
+
+        try {
+
+            await api(
+                "/api/stats/upload",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+        } catch (
+            error
+        ) {
+
+            setError(
+                `${file.name}: ${error.message}`
+            );
+        }
+    }
+
+    picker.value = "";
+
+    await fetchLogs();
+}
+
+
+async function fetchLogs() {
+
+    const data =
+        await api(
+            "/api/stats/logs"
+        );
+
+    const root =
+        document.getElementById(
+            "logs"
+        );
+
+    if (
+        !data.logs.length
+    ) {
+
+        root.innerHTML = `
+            <div class="hint">
+                No local files added yet.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    root.innerHTML =
+        data.logs.map(
+            log => `
+
+            <div class="log">
+
+                <span>
+
+                    <input
+                        type="checkbox"
+                        value="${escapeHtml(log.id)}"
+                    >
+
+                    <b>
+                        ${escapeHtml(
+                            log.filename
+                        )}
+                    </b>
+
+                    <br>
+
+                    <small>
+
+                        First valid row:
+                        ${formatDateTime(
+                            log.start_time
+                        )}
+
+                        · Date:
+                        ${escapeHtml(
+                            log.date
+                        )}
+
+                        ·
+                        ${log.packet_count.toLocaleString()}
+                        packets
+
+                        ·
+                        ${duration(
+                            log.duration_seconds
+                        )}
+
+                    </small>
+
+                </span>
+
+
+                <button
+                    class="btn red"
+                    onclick="cancelFile(
+                        '${escapeHtml(log.id)}'
+                    )"
+                >
+                    Cancel
+                </button>
+
+            </div>
+
+        `
+        ).join("");
+}
+
+
+async function cancelFile(
+    id
+) {
+
+    await api(
+        "/api/stats/logs/"
+        + encodeURIComponent(id),
+        {
+            method: "DELETE"
+        }
+    );
+
+    await fetchLogs();
+
+    await refresh();
+}
+
+
+/* ============================================================
+   LOAD RUNS
+============================================================ */
+
+async function loadSelected() {
+
+    setError("");
+
+    const selected =
+        [
+            ...document.querySelectorAll(
+                "#logs input:checked"
+            )
+        ].map(
+            element =>
+                element.value
+        );
+
+
+    if (
+        !selected.length
+    ) {
+
+        setError(
+            "Choose at least one uploaded run."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const result =
+            await api(
+                "/api/stats/load",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            ids: selected
+                        })
+                }
+            );
+
+
+        if (
+            !result.success
+        ) {
+
+            setError(
+                result.error
+                || "Could not load the selected runs."
+            );
+
+            return;
+        }
+
+
+        await refresh();
+
+    } catch (
+        error
+    ) {
+
+        setError(
+            error.message
+        );
+    }
+}
+
+
+/* ============================================================
+   LIVE CONTROLS
+============================================================ */
+
+async function startLive() {
+
+    await api(
+        "/api/stats/live/start",
+        {
+            method: "POST"
+        }
+    );
+
+    await refresh();
+}
+
+
+async function stopLive() {
+
+    await api(
+        "/api/stats/live/stop",
+        {
+            method: "POST"
+        }
+    );
+
+    await refresh();
+}
+
+
+async function clearLive() {
+
+    await api(
+        "/api/stats/live/clear",
+        {
+            method: "POST"
+        }
+    );
+
+    await refresh();
+}
+
+
+/* ============================================================
+   CARDS
+============================================================ */
+
+function card(
+    label,
+    value
+) {
+
+    return `
+
+        <div class="card">
+
+            <div class="label">
+                ${label}
+            </div>
+
+            <div class="value">
+                ${value}
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+/* ============================================================
+   CHART DATA
+============================================================ */
+
+/*
+    Each run becomes a SEPARATE DATASET.
+
+    This is the actual fix for the discontinuity problem.
+
+    Run 1:
+        dataset 1
+
+    Run 2:
+        dataset 2
+
+    Run 3:
+        dataset 3
+
+    Because they are different datasets, Chart.js does not
+    connect them with a fake line.
+
+    However the backend has already added cumulative offsets,
+    so Run 2 begins exactly where Run 1 ended numerically.
+*/
+
+
+const chartColours = [
+    "#22c55e",
+    "#3b82f6",
+    "#f59e0b",
+    "#ec4899",
+    "#a855f7",
+    "#14b8a6"
+];
+
+
+function getDatasets(
+    field,
+    transform = value => value
+) {
+
+    if (
+        !stats
+        || !stats.series
+    ) {
+        return [];
+    }
+
+
+    return stats.series.map(
+        (
+            run,
+            index
+        ) => {
+
+            const colour =
+                chartColours[
+                    index
+                    % chartColours.length
+                ];
+
+
+            const points =
+                run.points
+                .filter(
+                    point => {
+
+                        const value =
+                            point[field];
+
+                        return (
+                            value !== null
+                            &&
+                            value !== undefined
+                            &&
+                            Number.isFinite(
+                                Number(value)
+                            )
+                        );
+                    }
+                )
+                .map(
+                    point => ({
+                        x:
+                            point.epoch_ms,
+
+                        y:
+                            transform(
+                                point[field]
+                            )
+                    })
+                );
+
+
+            return {
+
+                label:
+                    run.name,
+
+                data:
+                    points,
+
+                borderColor:
+                    colour,
+
+                backgroundColor:
+                    colour + "20",
+
+                borderWidth:
+                    2,
+
+                pointRadius:
+                    0,
+
+                pointHoverRadius:
+                    3,
+
+                fill:
+                    false,
+
+                tension:
+                    0.1,
+
+                spanGaps:
+                    false
+            };
+        }
+    );
+}
+
+
+/* ============================================================
+   GLOBAL TIME RANGE
+============================================================ */
+
+function globalStart() {
+
+    return stats?.global_start_ms
+        ?? undefined;
+}
+
+
+function globalEnd() {
+
+    return stats?.global_end_ms
+        ?? undefined;
+}
+
+
+/* ============================================================
+   DRAW CHART
+============================================================ */
+
+function drawChart(
+    id,
+    field,
+    label,
+    unit,
+    transform =
+        value => value
+) {
+
+    const canvas =
+        document.getElementById(
+            id
+        );
+
+
+    if (
+        !canvas
+    ) {
+        return;
+    }
+
+
+    if (
+        charts[id]
+    ) {
+
+        charts[id].destroy();
+    }
+
+
+    const datasets =
+        getDatasets(
+            field,
+            transform
+        );
+
+
+    charts[id] =
+        new Chart(
+            canvas,
+            {
+                type: "line",
+
+                data: {
+                    datasets
+                },
+
+                options: {
+
+                    responsive:
+                        true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    animation:
+                        false,
+
+                    normalized:
+                        true,
+
+                    parsing:
+                        false,
+
+                    interaction: {
+                        mode:
+                            "nearest",
+
+                        intersect:
+                            false
+                    },
+
+
+                    scales: {
+
+                        x: {
+
+                            type:
+                                "linear",
+
+                            min:
+                                globalStart(),
+
+                            max:
+                                globalEnd(),
+
+
+                            title: {
+
+                                display:
+                                    true,
+
+                                text:
+                                    `Global time — ${
+                                        stats.loaded_date
+                                        || "same day"
+                                    }`,
+
+                                color:
+                                    "#fff"
+                            },
+
+
+                            ticks: {
+
+                                color:
+                                    "#fff",
+
+                                maxTicksLimit:
+                                    9,
+
+                                callback:
+                                    value =>
+                                        formatShortTime(
+                                            Number(value)
+                                        )
+                            },
+
+
+                            grid: {
+
+                                color:
+                                    "#374151"
+                            }
+                        },
+
+
+                        y: {
+
+                            title: {
+
+                                display:
+                                    true,
+
+                                text:
+                                    unit,
+
+                                color:
+                                    "#fff"
+                            },
+
+
+                            ticks: {
+
+                                color:
+                                    "#fff"
+                            },
+
+
+                            grid: {
+
+                                color:
+                                    "#374151"
+                            }
+                        }
+                    },
+
+
+                    plugins: {
+
+                        legend: {
+
+                            labels: {
+
+                                color:
+                                    "#fff"
+                            }
+                        },
+
+
+                        title: {
+
+                            display:
+                                true,
+
+                            text:
+                                `${label} vs Time`,
+
+                            color:
+                                "#fff"
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                title:
+                                    items => {
+
+                                        if (
+                                            !items.length
+                                        ) {
+                                            return "";
+                                        }
+
+                                        return formatTime(
+                                            items[0]
+                                            .parsed
+                                            .x
+                                        );
+                                    },
+
+
+                                label:
+                                    item => {
+
+                                        return (
+                                            `${item.dataset.label}: `
+                                            +
+                                            `${fmt(
+                                                item.parsed.y
+                                            )} `
+                                            +
+                                            unit
+                                        );
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+}
+
+
+/* ============================================================
+   BOUNDARIES
+============================================================ */
+
+function renderBoundaries() {
+
+    const html =
+        (
+            stats.boundaries
+            || []
+        ).map(
+            (
+                boundary,
+                index
+            ) => `
+
+            <span class="boundary">
+
+                <b>
+                    Run ${index + 1}
+                    ·
+                    ${escapeHtml(
+                        boundary.run
+                    )}
+                </b>
+
+                :
+
+                ${formatDateTime(
+                    boundary.start_time
+                )}
+
+                →
+
+                ${formatDateTime(
+                    boundary.end_time
+                )}
+
+            </span>
+
+        `
+        ).join("");
+
+
+    for (
+        const id of [
+            "energyIn",
+            "energyOut",
+            "distance",
+            "velocity"
+        ]
+    ) {
+
+        document.getElementById(
+            id + "Bounds"
+        ).innerHTML = html;
+    }
+}
+
+
+/* ============================================================
+   RENDER
+============================================================ */
+
+function render() {
+
+    if (
+        !stats
+    ) {
+        return;
+    }
+
+
+    const overall =
+        stats.overall;
+
+
+    document.getElementById(
+        "state"
+    ).textContent = (
+
+        stats.live_capture
+            ? "● LIVE CAPTURE ACTIVE"
+            : "● STATIC MEMORY"
+
+    )
+
+    + ` · ${
+        stats.historical_run_count
+    } historical runs`
+
+    + ` · ${
+        stats.live_packet_count
+    } live packets`;
+
+
+    const badge =
+        document.getElementById(
+            "loadedDay"
+        );
+
+
+    if (
+        stats.loaded_date
+    ) {
+
+        badge.textContent =
+            `Loaded day: ${
+                stats.loaded_date
+            }`;
+
+        badge.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        badge.classList.add(
+            "hidden"
+        );
+    }
+
+
+    document.getElementById(
+        "cards"
+    ).innerHTML = [
+
+        card(
+            "Cumulative Distance",
+            fmt(
+                overall.cumulative_distance_km
+            )
+            + " km"
+        ),
+
+        card(
+            "Solar Energy Received",
+            fmt(
+                overall
+                .cumulative_energy_received_wh
+                / 1000
+            )
+            + " kWh"
+        ),
+
+        card(
+            "Energy Lost",
+            fmt(
+                overall
+                .cumulative_energy_lost_wh
+                / 1000
+            )
+            + " kWh"
+        ),
+
+        card(
+            "Net Energy",
+            fmt(
+                overall
+                .net_energy_wh
+                / 1000
+            )
+            + " kWh"
+        ),
+
+        card(
+            "Maximum Velocity",
+            fmt(
+                overall
+                .maximum_velocity_kmh
+            )
+            + " km/h"
+        ),
+
+        card(
+            "Active Driving Time",
+            duration(
+                overall
+                .total_active_time_seconds
+            )
+        )
+
+    ].join("");
+
+
+    /*
+        FOUR GRAPHS
+
+        Every graph receives:
+        - Actual epoch timestamps
+        - Separate dataset for every run
+        - Global time axis
+        - Real gaps between logs
+        - Cumulative numerical offsets
+    */
+
+    drawChart(
+        "energyIn",
+
+        "cumulative_energy_received_wh",
+
+        "Cumulative Energy Received",
+
+        "kWh",
+
+        value =>
+            value / 1000
+    );
+
+
+    drawChart(
+        "energyOut",
+
+        "cumulative_energy_lost_wh",
+
+        "Cumulative Energy Lost",
+
+        "kWh",
+
+        value =>
+            value / 1000
+    );
+
+
+    drawChart(
+        "distance",
+
+        "cumulative_distance_km",
+
+        "Cumulative Distance",
+
+        "km"
+    );
+
+
+    drawChart(
+        "velocity",
+
+        "velocity_kmh",
+
+        "Vehicle Velocity",
+
+        "km/h"
+    );
+
+
+    renderBoundaries();
+
+
+    document.getElementById(
+        "runRows"
+    ).innerHTML = (
+
+        stats.runs
+        || []
+
+    ).map(
+        run => `
+
+        <tr>
+
+            <td>
+                ${escapeHtml(
+                    run.filename
+                )}
+            </td>
+
+            <td>
+                ${formatDateTime(
+                    run.start_time
+                )}
+            </td>
+
+            <td>
+                ${formatDateTime(
+                    run.end_time
+                )}
+            </td>
+
+            <td>
+                ${fmt(
+                    run.stats.distance_km
+                )}
+                km
+            </td>
+
+            <td>
+                ${fmt(
+                    run.stats
+                    .energy_received_wh
+                    / 1000
+                )}
+                kWh
+            </td>
+
+            <td>
+                ${fmt(
+                    run.stats
+                    .energy_lost_wh
+                    / 1000
+                )}
+                kWh
+            </td>
+
+            <td>
+                ${fmt(
+                    run.stats
+                    .max_velocity_kmh
+                )}
+                km/h
+            </td>
+
+        </tr>
+
+    `
+    ).join("")
+
+    ||
+
+    `
+        <tr>
+
+            <td colspan="7">
+                Choose and load local JSONL runs.
+            </td>
+
+        </tr>
+    `;
+}
+
+
+/* ============================================================
+   REFRESH
+============================================================ */
+
+async function refresh() {
+
+    try {
+
+        stats =
+            await api(
+                "/api/stats/data"
+            );
+
+        render();
+
+    } catch (
+        error
+    ) {
+
+        setError(
+            error.message
+        );
+    }
+}
+
+
+/* ============================================================
+   AUTO REFRESH LIVE
+============================================================ */
+
+setInterval(
+    () => {
+
+        if (
+            stats?.live_capture
+        ) {
+
+            refresh();
+        }
+
+    },
+
+    3000
+);
+
+
+/* ============================================================
+   EXPOSE FUNCTIONS
+============================================================ */
+
+window.uploadFiles =
+    uploadFiles;
+
+window.cancelFile =
+    cancelFile;
+
+window.loadSelected =
+    loadSelected;
+
+window.startLive =
+    startLive;
+
+window.stopLive =
+    stopLive;
+
+window.clearLive =
+    clearLive;
+
+
+/* ============================================================
+   INITIAL LOAD
+============================================================ */
+
+fetchLogs()
+    .then(refresh)
+    .catch(
+        error =>
+            setError(
+                error.message
+            )
+    );
+
+</script>
+
+</body>
+</html>

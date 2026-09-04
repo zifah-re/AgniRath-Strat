@@ -135,8 +135,31 @@ def _synthetic_loop_leg(km: float, route: Route | None) -> pd.DataFrame:
 
 
 def _splice_loops(route: Route, loop_geoms: dict | None,
-                   loops_committed: list[tuple[str, float]]) -> Route:
+                   loops_committed: list[tuple[str, float]],
+                   stage1_km: float | None = None) -> Route:
     """Build the real simulated route for a day with committed loop reps.
+
+    stage1_km: the day's REAL Stage-1 distance (plan.stage1_km — see
+    trust_region.py's per-variant _DayPlan construction for Day 3, which
+    already computes this correctly: 0.0 for Aryaman, a real value for
+    Prahlad). This disambiguates two genuinely different route shapes that
+    otherwise present IDENTICALLY as "stage1 bucket empty, stage2 bucket
+    populated" from the dataframe alone, and previously got the SAME
+    treatment (loop spliced AFTER the populated bucket) even though only
+    one of them is actually correct that way:
+      - Day 6-style mistagging: real Stage 1 content exists (stage1_km>0)
+        but its source file got tagged "stage2" — the loop belongs AFTER
+        that (mistagged) content, matching what _DayPlan expects.
+      - A genuinely loop-first day (Day 3 Aryaman, stage1_km==0.0): there
+        is NO Stage 1 leg at all — the loop belongs BEFORE whatever content
+        sits in the "stage2" bucket. Splicing it after (the old behaviour)
+        silently fed the optimizer a Stage2-then-loop route instead of the
+        real loop-then-Stage2 route, corrupting that day's simulated
+        solar/time/SOC curve (the driving order the physics integrates
+        determines what time-of-day sun each segment sees).
+    Passing stage1_km=None (old call sites, or genuinely unknown) falls
+    back to the prior bucket-occupancy-only heuristic — Day-6-style
+    behaviour — so nothing regresses for callers that haven't been updated.
 
     KNOWN SIMPLIFICATION: assumes the day's loops haven't started yet (fine
     for a full-day Tier 2 sample or the final extract_final_profiles pass,
@@ -156,26 +179,37 @@ def _splice_loops(route: Route, loop_geoms: dict | None,
     stage1 = base_df[base_df["seg_type"] == "stage1"].copy()
     stage2 = base_df[base_df["seg_type"] == "stage2"].copy()
 
-    # CRASH FIX (Day 6): the old guard only handled "both stage1 and stage2
-    # empty". Some single-file days get tagged "stage2" instead of "stage1"
-    # depending on the source filename — Day 6's control-stop location ==
-    # finish location (race_config.py), so it's a single leg with no
-    # separate Stage 1 file to disambiguate the name against, and its file
-    # apparently reads as "Stage 2". That left stage1 empty / stage2
-    # populated, a case the old guard never caught, so the old code crashed
-    # on stage1.iloc[-1] (IndexError: single positional indexer is
-    # out-of-bounds) the moment a real combo (non-empty loops_committed) hit
-    # this day. Fix: treat whichever block is actually populated as the
-    # "pre-loop" content, instead of assuming stage1 specifically is always
-    # the non-empty one.
+    # CRASH FIX (Day 6) + DISAMBIGUATION FIX (Day 3 Aryaman): the original
+    # guard only handled "both stage1 and stage2 empty". Some single-file
+    # days get tagged "stage2" instead of "stage1" depending on the source
+    # filename (Day 6: control-stop location == finish location, single
+    # leg, no separate Stage 1 file to disambiguate the name against — its
+    # file apparently reads as "Stage 2"). That left stage1 empty / stage2
+    # populated, which the old code always resolved as "populated bucket is
+    # the pre-loop content, loop after" — correct for Day 6, but WRONG for
+    # Aryaman's Day 3, where stage1 is empty because there genuinely is no
+    # Stage 1 (the day starts with the loop). Both cases look identical from
+    # bucket occupancy alone; stage1_km is the real signal that tells them
+    # apart.
     if len(stage1) == 0 and len(stage2) > 0:
-        pre, post = stage2, stage1
+        if stage1_km is not None and stage1_km < 1.0:
+            # Genuinely no Stage 1 (e.g. Day 3 Aryaman) — loop comes FIRST.
+            pre, post = base_df.iloc[0:0].copy(), stage2
+        else:
+            # stage1_km unknown (old call site) or real/nonzero (Day-6-style
+            # mistagging) — keep the original crash-fix behaviour: treat the
+            # populated bucket as the pre-loop content, loop after.
+            pre, post = stage2, stage1
     elif len(stage1) == 0 and len(stage2) == 0:
         pre, post = base_df.copy(), base_df.iloc[0:0].copy()
     else:
         pre, post = stage1, stage2
 
-    blocks = [pre]
+    # blocks starts EMPTY (not [pre]) when pre has no rows, so the
+    # loop-first case below doesn't anchor its first separator row on an
+    # empty frame (blocks[-1].iloc[[-1]] on a 0-row pre would raise the same
+    # IndexError the Day-6 crash fix already had to solve once).
+    blocks = [pre] if len(pre) else []
     pre_end_m = float(pre["distance_m"].max()) if len(pre) else 0.0
     offset = pre_end_m
 
@@ -229,8 +263,14 @@ def _splice_loops(route: Route, loop_geoms: dict | None,
             leg = _synthetic_loop_leg(km, route)
         leg = leg.copy()
         leg["seg_type"] = f"loop_{name}"
-        offset += _LOOP_SEPARATOR_M
-        blocks.append(_separator_row(offset))
+        # Only insert a separator when there's real prior content to reset
+        # away from (blocks non-empty). On a loop-first day (empty pre), the
+        # very first loop leg starts immediately at x=0 with nothing before
+        # it to separate from — a separator there would have nothing valid
+        # to anchor its row on and isn't semantically needed anyway.
+        if blocks:
+            offset += _LOOP_SEPARATOR_M
+            blocks.append(_separator_row(offset))
         leg["distance_m"] = leg["distance_m"] + offset
         offset = float(leg["distance_m"].max())
         blocks.append(leg)
@@ -535,6 +575,7 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
           loops_committed, global_method: str = "ga", seed: int | None = None,
           dist_done_km: float = 0.0, elapsed_s: float = 0.0, cs_taken: bool = False,
           loop_geoms: dict | None = None,
+          stage1_km: float | None = None,
           penalty_stoppage_s: float = 0.0,
           **kwargs):
 
@@ -546,9 +587,14 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     # (e.g. an old call site not yet updated), loops still get a flat
     # synthetic geometry via _splice_loops rather than silently costing
     # nothing — real distance/time/energy either way.
+    # stage1_km (plan.stage1_km) disambiguates loop-first days (e.g. Day 3
+    # Aryaman, stage1_km==0.0) from Day-6-style mistagged-single-file days —
+    # see _splice_loops' docstring. None (old call sites) keeps the prior
+    # Day-6-only behaviour.
     sim_route = route
     if loops_committed and route is not None:
-        sim_route = _splice_loops(route, loop_geoms, loops_committed)
+        sim_route = _splice_loops(route, loop_geoms, loops_committed,
+                                   stage1_km=stage1_km)
 
     rem_m = (sim_route.total_m - dist_done_km * 1000.0) if sim_route else 0.0
     n_segments = max(1, int(np.ceil(rem_m / CONTROL_SEGMENT_M)))

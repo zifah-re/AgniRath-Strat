@@ -236,6 +236,10 @@ function st(e, a) {
         path: "/map.html",
         icon: "🗺️"
     }, {
+        name: "Statistics",
+        path: "/stats.html",
+        icon: "📊"
+    }, {
         name: "System Status",
         path: "/system_status",
         icon: "🚨"

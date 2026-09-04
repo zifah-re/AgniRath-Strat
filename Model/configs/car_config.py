@@ -164,12 +164,12 @@ LEGACY_KR = dict(                        # race_completion/race_config.py
 )
 
 DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
-    mass_kg=310.0,
+    mass_kg=320.0,
     crr=0.007,
     cda_m2=0.16,
     air_density=1.2,
-    array_area_m2=5.95,
-    array_efficiency=0.22,
+    array_area_m2=5.78,
+    array_efficiency=0.21,
     motor_eff=0.95,
     regen_eff=0.70,
     power_loss_w=5.0,

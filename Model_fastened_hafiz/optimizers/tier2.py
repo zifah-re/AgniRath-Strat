@@ -153,6 +153,11 @@ def _sweep_one_offset(task: dict) -> dict:
                               loops_committed,
                               dist_done_km=d_dist, elapsed_s=d_elap, cs_taken=d_cs,
                               loop_geoms=loop_geoms,
+                              # plan.stage1_km is the real per-variant Stage-1
+                              # distance (0.0 for Day 3 Aryaman) — disambiguates
+                              # loop-first days from Day-6-style single-file
+                              # mistagging in singleday._splice_loops().
+                              stage1_km=plan.stage1_km,
                               **kwargs)
         dt = time.perf_counter() - t0
 

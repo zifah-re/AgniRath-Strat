@@ -326,8 +326,14 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             seg_slopes = route.slope_pct_array(x_pre)
             seg_reds = route.red_flag_array(x_pre)
             seg_cs_stops = route.control_stop_array(x_post)
-            seg_loop_stops = np.char.startswith(
-                route.seg_type_array(x_post).astype(str), "loop_")
+            _seg_type_post = route.seg_type_array(x_post).astype(str)
+            # "loop_separator" is the single synthetic point _splice_loops
+            # inserts BETWEEN reps to reset in_loop_zone (so each lap gets
+            # its own mandatory-stop credit, per SR 2.29.5). It must NOT
+            # itself count as "in a loop" here, or in_loop_zone would never
+            # actually drop back to False between reps.
+            seg_loop_stops = (np.char.startswith(_seg_type_post, "loop_")
+                               & (_seg_type_post != "loop_separator"))
             seg_stops = seg_cs_stops | seg_loop_stops
             seg_nodes = (node_index_fn(x_pre)
                          if node_index_fn is not None else None)
