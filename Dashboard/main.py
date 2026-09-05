@@ -22,7 +22,8 @@ import numpy as np
 import copy
 from pathlib import Path
 from downlink import main as run_downlink
-from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED
+from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED,TZ_OFFSET_HOURS
+from strategy_push import list_strategy_variants, push_strategy_for_day, StrategyPushError
 import uuid
 import xml.etree.ElementTree as ET
 from fastapi import UploadFile, File, HTTPException
@@ -867,28 +868,13 @@ def get_live_car_gps():
 async def stats_logs():
     return {"logs": stats_memory.available_logs()}
 
-@app.post("/api/stats/upload")
-async def stats_upload(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith((".jsonl", ".json")):
-        raise HTTPException(status_code=400, detail="Please select a JSONL telemetry log.")
-    try:
-        return stats_memory.upload_file(file.filename, await file.read())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-@app.delete("/api/stats/logs/{log_id}")
-async def stats_remove_log(log_id: str):
-    if not stats_memory.remove_uploaded(log_id):
-        raise HTTPException(status_code=404, detail="Uploaded log not found")
-    return {"success": True}
-
 @app.post("/api/stats/load")
 async def stats_load(request: Request):
     body = await request.json()
-    ids = body.get("ids", [])
-    if not isinstance(ids, list):
-        raise HTTPException(status_code=400, detail="ids must be a list")
-    return stats_memory.load_runs(ids)
+    names = body.get("filenames", [])
+    if not isinstance(names, list):
+        raise HTTPException(status_code=400, detail="filenames must be a list")
+    return stats_memory.load_runs(names)
 
 @app.get("/api/stats/data")
 async def stats_data():
@@ -923,6 +909,92 @@ async def spa_catch_all(full_path: str):
     if os.path.isfile(file_path):
         return FileResponse(file_path)
     return FileResponse(os.path.join(frontend_dir, "index.html"))
+
+@app.post("/api/strategy/upload")
+async def upload_strategy(file: UploadFile = File(...)):
+    """Upload an offline solver JSON into output/ so it can be selected
+    immediately from the Strategy page. The JSON must contain a `days` object.
+    """
+    if not file.filename or not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Please upload a .json offline model output file.")
+
+    try:
+        raw = await file.read()
+        data = json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="The uploaded file is not valid UTF-8 JSON.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e.msg} (line {e.lineno}, column {e.colno}).")
+
+    if not isinstance(data, dict) or not isinstance(data.get("days"), dict) or not data["days"]:
+        raise HTTPException(status_code=400, detail="This does not look like an offline strategy output: missing non-empty `days` object.")
+
+    # Prefer the solver's embedded variant; otherwise derive it from the filename.
+    variant = str(data.get("variant") or "").strip()
+    if not variant:
+        stem = Path(file.filename).stem
+        variant = stem
+        if variant.startswith("strategy_"):
+            variant = variant[len("strategy_"):]
+        for suffix in ("_final", "_fixed"):
+            if variant.endswith(suffix):
+                variant = variant[:-len(suffix)]
+                break
+
+    safe_variant = "".join(c for c in variant if c.isalnum() or c in "-_")
+    if not safe_variant:
+        raise HTTPException(status_code=400, detail="Could not determine a safe strategy name from the upload.")
+
+    data["variant"] = safe_variant
+    STRATEGY_DIR = Path(__file__).resolve().parent / "output"
+    STRATEGY_DIR.mkdir(parents=True, exist_ok=True)
+    destination = STRATEGY_DIR / f"strategy_{safe_variant}_final.json"
+    destination.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    return {
+        "status": "success",
+        "variant": safe_variant,
+        "filename": destination.name,
+        "days": sorted([int(k) for k in data["days"].keys() if str(k).isdigit()]),
+    }
+
+@app.get("/api/strategy/options")
+async def get_strategy_options():
+    """List available strategy variants + the race days solved within each,
+    for the Strategy page's variant/day pickers."""
+    return {"variants": list_strategy_variants()}
+
+
+class StrategyPushRequest(BaseModel):
+    variant: str
+    day: int
+    tz_offset: float | None = None
+
+
+@app.post("/api/strategy/push")
+async def push_strategy(payload: StrategyPushRequest):
+    """Push a solved strategy's velocity profile onto the live dashboard as
+    TargetProfile, interpolated from distance onto the currently-loaded
+    route and from distance onto time (see strategy_push.py). This is the
+    on-dashboard replacement for manually running push_target_profile.py."""
+    live_distance_km = current_data['profile'].get('Distance', [])
+    tz_offset = payload.tz_offset if payload.tz_offset is not None else TZ_OFFSET_HOURS
+
+    try:
+        result = push_strategy_for_day(
+            variant=payload.variant,
+            day=payload.day,
+            live_distance_km=live_distance_km,
+            tz_offset_hours=tz_offset,
+        )
+    except StrategyPushError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    target_profile = result.pop("target_profile")
+    await app.state.queue.put(("C", {"TargetProfile": target_profile}))
+
+    return {"status": "success", **result}
+
 
 @app.post("/api/simulate")
 async def simulate_endpoint(request: Request):
