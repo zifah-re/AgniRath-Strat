@@ -164,7 +164,7 @@ LEGACY_KR = dict(                        # race_completion/race_config.py
 )
 
 DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
-    mass_kg=320.0,
+    mass_kg=336.5,
     crr=0.007,
     cda_m2=0.16,
     air_density=1.2,
@@ -174,5 +174,5 @@ DASHBOARD = dict(                        # AgniRath-Strat/Dashboard/constants.py
     regen_eff=0.70,
     power_loss_w=5.0,
     battery_wh=3528.0,
-    max_speed_kmh=90.0,
+    max_speed_kmh=85.0,
 )

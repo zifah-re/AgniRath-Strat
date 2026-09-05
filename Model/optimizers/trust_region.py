@@ -1126,8 +1126,10 @@ if __name__ == "__main__":
     import pandas as pd
     import numpy as np
     from configs.car_config import CarState
-    from core.solar import HourlyJSONSolarProvider, GaussianProvider, FlooredSolarProvider
-    from core.wind import HourlyJSONWindProvider, ConstantWindProvider
+    from core.solar import (HourlyJSONSolarProvider, GaussianProvider,
+                            FlooredSolarProvider, RealSolcastSolarProvider)
+    from core.wind import (HourlyJSONWindProvider, ConstantWindProvider,
+                           RealSolcastWindProvider)
     from core.route import Route
 
     logging.basicConfig(level=logging.INFO,
@@ -1148,6 +1150,13 @@ if __name__ == "__main__":
     car = CarState()
     current_dir = os.path.dirname(os.path.abspath(__file__))
     json_dir  = os.path.abspath(os.path.join(current_dir, "..", "data", "solar"))
+    # ACTUAL race-week Solcast forecast, scraped for the real 2026 race dates
+    # (5-min resolution, UTC-stamped — see core/solcast_time.py + the
+    # RealSolcast*Provider classes). Preferred over json_dir's typical-year
+    # data whenever a matching file exists for the day; json_dir stays as
+    # the fallback (see _load_weather below) so nothing breaks for any day
+    # that isn't covered by data/Solar_real.
+    real_solar_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "Solar_real"))
     kml_dir   = os.path.abspath(os.path.join(current_dir, "..", "data", "shaded"))
     save_dir  = os.path.abspath(os.path.join(current_dir, "..", "data", "processed"))
 
@@ -1542,34 +1551,58 @@ if __name__ == "__main__":
     _FlooredSolarProvider = FlooredSolarProvider
 
     def _check_daytime_avg_ghi(weather_files):
-        """Quick scan: average GHI during race hours (8-17h) across all nodes."""
+        """Quick scan: average GHI during race hours across all nodes.
+        Schema-aware: handles BOTH the old typical-year file (hourly array
+        under historical_weather.hourly.shortwave_radiation) and the real
+        Solcast forecast file (5-min samples under "data", "ghi" per sample,
+        already daylight-only so no hour-slicing is needed)."""
         all_ghi = []
         for fp in weather_files:
             with open(fp, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for node in data:
-                ghi = node["historical_weather"]["hourly"]["shortwave_radiation"]
-                all_ghi.append(np.mean(ghi[8:17]))  # hours 8-16 (race window)
+                if "historical_weather" in node:
+                    ghi = node["historical_weather"]["hourly"]["shortwave_radiation"]
+                    all_ghi.append(np.mean(ghi[8:17]))  # hours 8-16 (race window)
+                else:
+                    ghi_vals = [float(s.get("ghi", 0.0) or 0.0)
+                                for s in node.get("data", [])]
+                    if ghi_vals:
+                        all_ghi.append(float(np.mean(ghi_vals)))
         return float(np.mean(all_ghi)) if all_ghi else 0.0
 
-    def _load_weather(weather_files, route, day_num=None):
+    def _load_weather(weather_files, route, day_num=None, real_weather_files=None):
         """Load ALL weather JSONs for a day into solar + wind providers.
 
+        Prefers the ACTUAL race-week Solcast forecast (real_weather_files,
+        from data/Solar_real/mean_*.jsonl) when available for this day —
+        falls back to the typical-year historical data (weather_files, from
+        data/solar/*.json) otherwise, so any day/variant not yet covered by
+        real data keeps working exactly as before.
+
         If daytime-avg GHI is anomalously low (< MIN_DAYTIME_GHI_WM2),
-        the solar provider is wrapped with a GaussianProvider floor.
+        the solar provider is wrapped with a GaussianProvider floor either way.
         """
-        if not weather_files:
+        real_weather_files = real_weather_files or []
+
+        if real_weather_files:
+            json_prov = RealSolcastSolarProvider(real_weather_files, route)
+            wind_prov = RealSolcastWindProvider(real_weather_files, route)
+            avg_ghi = _check_daytime_avg_ghi(real_weather_files)
+            source = "REAL forecast"
+        elif weather_files:
+            json_prov = HourlyJSONSolarProvider(weather_files, route)
+            wind_prov = HourlyJSONWindProvider(weather_files, route)
+            avg_ghi = _check_daytime_avg_ghi(weather_files)
+            source = "historical (typical-year)"
+        else:
             return GaussianProvider(), ConstantWindProvider(0.0, 0.0)
 
-        json_prov = HourlyJSONSolarProvider(weather_files, route)
-        wind_prov = HourlyJSONWindProvider(weather_files, route)
-
-        avg_ghi = _check_daytime_avg_ghi(weather_files)
         if avg_ghi < MIN_DAYTIME_GHI_WM2:
             logger.warning(
-                "Day %s: daytime avg GHI = %.0f W/m² (below %.0f floor) — "
-                "blending with Gaussian clear-sky fallback",
-                day_num or "?", avg_ghi, MIN_DAYTIME_GHI_WM2)
+                "Day %s: daytime avg GHI = %.0f W/m² (below %.0f floor, "
+                "source=%s) — blending with Gaussian clear-sky fallback",
+                day_num or "?", avg_ghi, MIN_DAYTIME_GHI_WM2, source)
             json_prov = _FlooredSolarProvider(json_prov, GAUSSIAN_BLEND_FRAC)
 
         return json_prov, wind_prov
@@ -1611,11 +1644,15 @@ if __name__ == "__main__":
             loop_geoms_by_day[d] = _load_loop_geometries(
                 route_files, _get_day_plan(d), day_num)
 
-        # --- Weather (ALL files for this day) ---
+        # --- Weather (ALL files for this day; real forecast preferred) ---
         weather_files = glob.glob(os.path.join(json_dir, f"*Day {day_num}*.json"))
-        solar_providers[d], wind_providers[d] = _load_weather(weather_files, routes.get(d), day_num)
-        if weather_files:
-            logger.info("Day %d: loaded %d weather JSONs", day_num, len(weather_files))
+        real_weather_files = glob.glob(os.path.join(real_solar_dir, f"*Day {day_num}*.jsonl"))
+        solar_providers[d], wind_providers[d] = _load_weather(
+            weather_files, routes.get(d), day_num, real_weather_files)
+        if real_weather_files:
+            logger.info("Day %d: loaded %d REAL forecast weather files", day_num, len(real_weather_files))
+        elif weather_files:
+            logger.info("Day %d: loaded %d weather JSONs (historical fallback)", day_num, len(weather_files))
 
         # --- KML trailering ---
         kml_files = glob.glob(os.path.join(kml_dir, f"*Day {day_num}*.kml"))
@@ -1704,6 +1741,7 @@ if __name__ == "__main__":
     day3_route_files = glob.glob(os.path.join(save_dir, "*Day 3*probables*.save")) or \
                        glob.glob(os.path.join(save_dir, "*Day 3*.save"))
     day3_weather_files = glob.glob(os.path.join(json_dir, "*Day 3*.json"))
+    day3_real_weather_files = glob.glob(os.path.join(real_solar_dir, "*Day 3*.jsonl"))
 
     # Group by variant name (e.g. "Prahlad", "Aryaman")
     day3_variants = {}
@@ -1722,13 +1760,20 @@ if __name__ == "__main__":
 
     logger.info("Day 3 variants discovered: %s", list(day3_variants.keys()))
 
-    # Match weather files to each variant
+    # Match weather files to each variant (real forecast + historical fallback)
     day3_variant_weather = {}
+    day3_variant_real_weather = {}
     for vname in day3_variants:
         matched = [f for f in day3_weather_files if vname.lower() in os.path.basename(f).lower()]
         if not matched:
             matched = day3_weather_files  # fallback: use all available
         day3_variant_weather[vname] = matched
+
+        real_matched = [f for f in day3_real_weather_files
+                        if vname.lower() in os.path.basename(f).lower()]
+        if not real_matched:
+            real_matched = day3_real_weather_files  # fallback: use all available
+        day3_variant_real_weather[vname] = real_matched
 
     # ------------------------------------------------------------------ #
     # 5.  Run optimizer once per Day-3 variant, each with its OWN Tier 1
@@ -1804,7 +1849,8 @@ if __name__ == "__main__":
             _d3p = _build_day3_variant_plan(vfiles, ivariant, day_num=3)
             loop_geoms_by_day[2] = _load_loop_geometries(vfiles, _d3p, 3)
             solar_providers[2], wind_providers[2] = _load_weather(
-                day3_variant_weather.get(ivariant, []), routes.get(2), 3)
+                day3_variant_weather.get(ivariant, []), routes.get(2), 3,
+                day3_variant_real_weather.get(ivariant, []))
 
         rr = resolve_intraday(
             routes.get(didx), car, solar_providers.get(didx), wind_providers.get(didx),
@@ -1873,7 +1919,8 @@ if __name__ == "__main__":
         day3_plan = _build_day3_variant_plan(variant_route_files, variant_name, day_num=3)
         loop_geoms_by_day[2] = _load_loop_geometries(variant_route_files, day3_plan, 3)
         solar_providers[2], wind_providers[2] = _load_weather(
-            day3_variant_weather.get(variant_name, []), routes.get(2), 3)
+            day3_variant_weather.get(variant_name, []), routes.get(2), 3,
+            day3_variant_real_weather.get(variant_name, []))
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
         _apply_trailered_mask(routes.get(2), kml_paths, 2)
 
@@ -2039,7 +2086,9 @@ if __name__ == "__main__":
 
         # Build Day 3 weather for this variant
         weather_files = day3_variant_weather.get(variant_name, [])
-        solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
+        real_weather_files = day3_variant_real_weather.get(variant_name, [])
+        solar_providers[2], wind_providers[2] = _load_weather(
+            weather_files, routes.get(2), 3, real_weather_files)
 
                 # KML for Day 3
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None

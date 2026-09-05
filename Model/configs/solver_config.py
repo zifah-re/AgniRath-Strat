@@ -95,7 +95,7 @@ SPEED_SOFTCAP_PENALTY_WEIGHT = 30.0   # steep zone (> CRUISE_SOFT_CAP_KMH)
 # The car draws/stores NO energy while trailered (inert cargo), but this time
 # IS counted into the day's ETA, so the value matters. Strategist-set (22/08):
 # keep 80 km/h (a conservative highway tow) rather than 90.
-TRAILER_TOW_SPEED_KMH = 80.0
+TRAILER_TOW_SPEED_KMH = 65.0
 
 # Future-SOC value discount in the Tier 3 allocator (0 < d <= 1). The DP's
 # value-to-go term rewards ending a day with high SOC (more options tomorrow),

@@ -25,6 +25,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 from scipy.interpolate import CubicSpline
 
+from core import solcast_time as _solcast_time
+
 # ---------------------------------------------------------------------------
 # PMF correction
 # ---------------------------------------------------------------------------
@@ -180,6 +182,110 @@ class HourlyJSONSolarProvider(SolarProvider):
             mask = node_idx == n
             out[mask] = self.spline_models[int(n)](t_s[mask])
         return np.clip(out, 0.0, None)
+
+class RealSolcastSolarProvider(SolarProvider):
+    """
+    Consumes the ACTUAL race-week Solcast forecast (data/Solar_real/mean_*.jsonl):
+
+        [{"lat": ..., "lon": ...,
+          "data": [{"period_end": "2026-09-10T07:00:00+00:00",
+                     "ghi": 461, "dni": 437, "air_temp": 20,
+                     "wind_speed_10m": 2.3, "wind_direction_10m": 307}, ...]}]
+
+    This is a DIFFERENT schema from HourlyJSONSolarProvider's typical-year
+    file (node keys "latitude"/"longitude", hourly GHI nested under
+    historical_weather.hourly.shortwave_radiation, 24 local-naive hourly
+    buckets). The real data is instead: node keys "lat"/"lon", 5-minute
+    resolution, UTC timestamps, and only covers the actual forecast daylight
+    window (no synthetic night-time zero padding to 24h).
+
+    FROZEN INTERFACE preserved exactly: ghi_wm2(t_s, x_m) still takes t_s as
+    LOCAL seconds since midnight of the race day and x_m as route distance.
+    node_index_array / ghi_wm2_at_node / ghi_wm2_array are also implemented
+    so forward_sim's fast path (see simulator/forward_sim.py) is exercised
+    exactly as it is for HourlyJSONSolarProvider — no perf regression.
+    """
+    def __init__(self, json_paths: list[str] | str, route):
+        if isinstance(json_paths, str):
+            json_paths = [json_paths]
+
+        self.route = route
+        coords = []
+        self.spline_models = []
+        # Per-node (t_min_s, t_max_s): outside this window the real forecast
+        # simply has no sample (pre-dawn / post-dusk are not requested from
+        # Solcast at all, unlike the old data's explicit 0.0 night buckets),
+        # so a query outside the window returns night (0.0) rather than
+        # extrapolating the spline off the end of its data.
+        self.t_bounds = []
+
+        for jp in json_paths:
+            with open(jp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            for node in data:
+                coords.append([node["lat"], node["lon"]])
+                samples = node["data"]
+                t_local_s = np.array(
+                    [_solcast_time.period_end_to_local_s(s["period_end"])
+                     for s in samples], dtype=float)
+                ghi = np.array(
+                    [float(s.get("ghi", 0.0) or 0.0) for s in samples],
+                    dtype=float)
+                order = np.argsort(t_local_s)
+                t_local_s, ghi = t_local_s[order], ghi[order]
+                spline_fit = CubicSpline(t_local_s, ghi, bc_type="natural")
+                self.spline_models.append(spline_fit)
+                self.t_bounds.append((float(t_local_s[0]), float(t_local_s[-1])))
+
+        self.tree = cKDTree(np.array(coords))
+
+    def _in_window(self, t_s: float, idx: int) -> bool:
+        t_min, t_max = self.t_bounds[idx]
+        return t_min <= t_s <= t_max
+
+    def ghi_wm2(self, t_s: float, x_m: float = 0.0) -> float:
+        if self.route is None:
+            idx = len(self.spline_models) // 2
+        else:
+            lat, lon = self.route.latlon_at(x_m)
+            _, idx = self.tree.query([lat, lon])
+
+        if not self._in_window(t_s, idx):
+            return 0.0
+        return max(0.0, float(self.spline_models[idx](t_s)))
+
+    def node_index_array(self, x_m: np.ndarray) -> np.ndarray:
+        x_m = np.asarray(x_m, dtype=float)
+        if self.route is None:
+            return np.full(np.shape(x_m), len(self.spline_models) // 2,
+                           dtype=np.intp)
+        lats, lons = self.route.latlon_array(x_m)
+        _, idx = self.tree.query(
+            np.column_stack([lats.ravel(), lons.ravel()]))
+        return idx.reshape(np.shape(x_m)).astype(np.intp)
+
+    def ghi_wm2_at_node(self, t_s: float, node_index: int) -> float:
+        idx = int(node_index)
+        if not self._in_window(t_s, idx):
+            return 0.0
+        return max(0.0, float(self.spline_models[idx](t_s)))
+
+    def ghi_wm2_array(self, t_s, x_m) -> np.ndarray:
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        node_idx = self.node_index_array(x_m)
+        out = np.zeros(np.shape(x_m), dtype=float)
+        for n in np.unique(node_idx):
+            mask = node_idx == n
+            t_min, t_max = self.t_bounds[int(n)]
+            vals = self.spline_models[int(n)](t_s[mask])
+            in_win = (t_s[mask] >= t_min) & (t_s[mask] <= t_max)
+            out[mask] = np.where(in_win, np.clip(vals, 0.0, None), 0.0)
+        return out
+
 
 def best_available_provider(**pvlib_kwargs) -> SolarProvider:
     try:
