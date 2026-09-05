@@ -5,13 +5,13 @@ import {g as ke, s as V, c as Ae} from "../chunks/DNFaeDbv.js";
 import {b as f} from "../chunks/CqHrAp-I.js";
 import {s as Te, a as $e} from "../chunks/DkIwFic-.js";
 import {C as n, a as Le, L as Pe, P as Be, b as We, c as Me, p as Ee, d as Ie, e as Re} from "../chunks/DHTsbXwT.js";
-var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div></div>');
+var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div> <div class="metric-card svelte-14ry3bj p-4 mt-4"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold">Offline Model Strategy</h3> <span class="text-sm text-gray-400">Upload &rarr; select day &rarr; apply</span></div> <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label> <input id="strategy-file-input" type="file" accept=".json,application/json" class="w-full text-sm text-gray-300 bg-gray-800 rounded border border-gray-600 p-1.5" /></div> <div><label class="text-sm text-gray-400 block mb-1">Strategy</label> <select id="strategy-variant-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"><option value="">No strategies</option></select></div> <div><label class="text-sm text-gray-400 block mb-1">Day</label> <select id="strategy-day-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <button id="strategy-apply-btn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">Apply to Dashboard</button></div> <p id="strategy-status" class="mt-2 text-sm hidden"></p></div></div>');
 function De(ee, te) {
     ye(te, !0);
     const [ae,se] = $e()
       , e = () => Te(ke, "$globalStore", ae);
     n.register(Le, Pe, Be, We, Me, Ee, Ie, Re);
-    let _, y, x, S, C, j, r, l, o, d, c, v;
+    let _, y, x, S, C, j, r, l, o, d, c, v, cleanupOfflineStrategyWidget;
     function m(s, p="", m=1) {
         return typeof s != "number" ? (Array.isArray(s) ? s.map(x => Math.round(x * 10**m) / 10**m) : "N/A") : `${s.toFixed(m)} ${p}`
     }
@@ -249,6 +249,144 @@ function De(ee, te) {
             }
         }
     }
+    // 🔌 Offline Model Strategy widget — wired imperatively (like grad-dist/alt-dist
+    // charts below) since this markup lives outside Svelte's tracked template output.
+    // Mirrors StrategyPush.svelte's loadOptions/uploadFile/applyStrategy logic 1:1.
+    function initOfflineStrategyWidget() {
+        const fileInput = document.getElementById("strategy-file-input");
+        const variantSelect = document.getElementById("strategy-variant-select");
+        const daySelect = document.getElementById("strategy-day-select");
+        const applyBtn = document.getElementById("strategy-apply-btn");
+        const statusEl = document.getElementById("strategy-status");
+        if (!fileInput || !variantSelect || !daySelect || !applyBtn || !statusEl) return () => {};
+
+        let variants = [];
+        let busy = false;
+
+        function setStatus(msg, isError) {
+            statusEl.textContent = msg || "";
+            statusEl.classList.toggle("hidden", !msg);
+            statusEl.classList.toggle("text-red-400", !!isError);
+            statusEl.classList.toggle("text-green-400", !isError && !!msg);
+        }
+
+        function refreshApplyDisabled() {
+            applyBtn.disabled = busy || !variantSelect.value || daySelect.value === "";
+        }
+
+        function setBusy(b) {
+            busy = b;
+            applyBtn.textContent = b ? "Working..." : "Apply to Dashboard";
+            refreshApplyDisabled();
+        }
+
+        function renderDays(variant) {
+            const v = variants.find(x => x.variant === variant);
+            const days = v?.days ?? [];
+            daySelect.innerHTML = "";
+            days.forEach(d => {
+                const opt = document.createElement("option");
+                opt.value = String(d.day);
+                opt.textContent = `Day ${d.day} — ${d.route ?? "?"}`;
+                daySelect.appendChild(opt);
+            });
+            refreshApplyDisabled();
+        }
+
+        function renderVariants(preferredVariant) {
+            variantSelect.innerHTML = "";
+            if (variants.length === 0) {
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No strategies";
+                variantSelect.appendChild(opt);
+            } else {
+                variants.forEach(v => {
+                    const opt = document.createElement("option");
+                    opt.value = v.variant;
+                    opt.textContent = v.variant;
+                    variantSelect.appendChild(opt);
+                });
+            }
+            const wanted = preferredVariant && variants.some(v => v.variant === preferredVariant)
+                ? preferredVariant
+                : variantSelect.value && variants.some(v => v.variant === variantSelect.value)
+                    ? variantSelect.value
+                    : (variants[0]?.variant ?? "");
+            variantSelect.value = wanted;
+            renderDays(wanted);
+        }
+
+        async function loadOptions(preferredVariant) {
+            try {
+                const res = await fetch("/api/strategy/options", { cache: "no-store" });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Could not load strategy options");
+                variants = data.variants ?? [];
+                renderVariants(preferredVariant || null);
+            } catch (e) {
+                setStatus(e.message || "Could not load strategy options", true);
+            }
+        }
+
+        async function uploadFile() {
+            const file = fileInput.files?.[0];
+            if (!file) return;
+            setBusy(true); setStatus(`Uploading ${file.name}...`, false);
+            try {
+                const body = new FormData();
+                body.append("file", file);
+                const res = await fetch("/api/strategy/upload", { method: "POST", body });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Upload failed");
+                await loadOptions(data.variant);
+                setStatus(`Uploaded ${data.filename}. Select a day and click Apply.`, false);
+            } catch (e) {
+                setStatus(e.message || "Upload failed", true);
+            } finally {
+                setBusy(false);
+                fileInput.value = "";
+            }
+        }
+
+        async function applyStrategy() {
+            const variant = variantSelect.value;
+            const day = daySelect.value;
+            if (!variant || day === "") return;
+            setBusy(true); setStatus("Applying offline model...", false);
+            try {
+                const res = await fetch("/api/strategy/push", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ variant, day: Number(day) })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Push failed");
+                setStatus(`Applied ${variant}, Day ${day} — ${data.points} points.`, false);
+            } catch (e) {
+                setStatus(e.message || "Push failed", true);
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        const onVariantChange = () => renderDays(variantSelect.value);
+        const onDayChange = () => refreshApplyDisabled();
+
+        fileInput.addEventListener("change", uploadFile);
+        variantSelect.addEventListener("change", onVariantChange);
+        daySelect.addEventListener("change", onDayChange);
+        applyBtn.addEventListener("click", applyStrategy);
+
+        loadOptions();
+
+        return () => {
+            fileInput.removeEventListener("change", uploadFile);
+            variantSelect.removeEventListener("change", onVariantChange);
+            daySelect.removeEventListener("change", onDayChange);
+            applyBtn.removeEventListener("click", applyStrategy);
+        };
+    }
     xe( () => {
         const hasHistory = e().historic?.Timestamps?.length > 0;
         const hasProfile = e().profile?.Distance?.length > 0;
@@ -292,6 +430,8 @@ function De(ee, te) {
             window.chartGD.update();
         }
 
+        cleanupOfflineStrategyWidget = initOfflineStrategyWidget();
+
         let cAD = document.getElementById("alt-dist");
         if (cAD) {
             window.chartAD = new n(cAD,{
@@ -326,7 +466,8 @@ function De(ee, te) {
         l == null || l.destroy(),
         o == null || o.destroy(),
         window.chartGD && window.chartGD.destroy(),
-        window.chartAD && window.chartAD.destroy()
+        window.chartAD && window.chartAD.destroy(),
+        cleanupOfflineStrategyWidget && cleanupOfflineStrategyWidget()
     }
     ));
     const Y = X( () => Math.abs(e().metric.Speed - e().metric.predicted))

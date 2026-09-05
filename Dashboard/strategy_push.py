@@ -207,3 +207,6 @@ def push_strategy_for_day(
         "route": day_data.get("route"),
         "points": len(target_profile),
     }
+
+
+# updated the code a bit for the changes i needed and now there is an issue with the stats oage wehn i load a jsonl file it says method not allowed and hence, i cant even select it so idk what to do with this

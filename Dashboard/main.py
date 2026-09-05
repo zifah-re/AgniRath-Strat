@@ -864,6 +864,18 @@ def get_live_car_gps():
             }
         ]
     }
+@app.post("/api/stats/upload")
+async def stats_upload(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        result = stats_memory.upload_file(file.filename, content)
+        return {"success": True, "log": result}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(error))
+
 @app.get("/api/stats/logs")
 async def stats_logs():
     return {"logs": stats_memory.available_logs()}
@@ -871,10 +883,10 @@ async def stats_logs():
 @app.post("/api/stats/load")
 async def stats_load(request: Request):
     body = await request.json()
-    names = body.get("filenames", [])
-    if not isinstance(names, list):
-        raise HTTPException(status_code=400, detail="filenames must be a list")
-    return stats_memory.load_runs(names)
+    ids = body.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids must be a list")
+    return stats_memory.load_runs(ids)
 
 @app.get("/api/stats/data")
 async def stats_data():
@@ -902,13 +914,6 @@ async def root():
         content = f.read()
     headers = {"Clear-Site-Data": '"cache"'}
     return HTMLResponse(content=content, headers=headers)
-
-@app.get("/{full_path:path}")
-async def spa_catch_all(full_path: str):
-    file_path = os.path.join(frontend_dir, full_path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
 
 @app.post("/api/strategy/upload")
 async def upload_strategy(file: UploadFile = File(...)):
@@ -1168,6 +1173,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        
+
+# IMPORTANT: this catch-all must stay the LAST route registered in this file.
+# FastAPI/Starlette matches routes in registration order, and "/{full_path:path}"
+# matches literally any path — if it were registered earlier, it would swallow
+# every GET request meant for a real API route (as it did with
+# /api/strategy/options) before that route ever got a chance to run.
+@app.get("/{full_path:path}")
+async def spa_catch_all(full_path: str):
+    file_path = os.path.join(frontend_dir, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
