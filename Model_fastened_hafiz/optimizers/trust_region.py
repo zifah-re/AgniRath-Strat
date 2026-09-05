@@ -832,7 +832,9 @@ def resolve_intraday(
         solar_efficiency: float | None = None,
         car_overrides: dict | None = None,
         global_method: str = "ga",
-        seed: int | None = None) -> dict:
+        seed: int | None = None,
+        breakdown_enabled: bool = False,
+        breakdown_seed: int | None = None) -> dict:
     """Re-plan the rest of TODAY from the car's current state.
 
     Parameters
@@ -903,10 +905,24 @@ def resolve_intraday(
     loop_stop_s = n_loops * (float(rc.LOOP_STOP_DURATION_S)
                              + float(getattr(rc, "LOOP_TURNAROUND_S", 0.0)))
     remaining_drive_s = float(res.get("total_time_s", 0.0))
+        # Same post-hoc breakdown model as extract_final_profiles' FEATURE 2 —
+    # opt-in via --breakdown, mirrored here so resolve-intraday can be
+    # tested with the identical scenario as the between-days resolve.
+    breakdown_s = 0.0
+    if breakdown_enabled:
+        _drive_h = max(1e-6, remaining_drive_s / 3600.0)
+        _avg_power_w = float(res.get("motor_energy_wh", 0.0)) / _drive_h
+        _p_ref_w = float(getattr(car, "p_max_continuous_w", 3000.0))
+        _bd = _DailyBreakdown(
+            max_seconds=float(getattr(_sc, "BREAKDOWN_MAX_SECONDS", 3600.0)))
+        _seed = (breakdown_seed if breakdown_seed is not None
+                 else int(getattr(_sc, "BREAKDOWN_SEED", 20260823)))
+        breakdown_s = _bd.sample_seconds(
+            _avg_power_w, _p_ref_w, _random.Random(_seed + day_index))
     # True finish = day start + time already elapsed + remaining drive + the
     # stops still to serve.
     finish_abs_s = (rc.day_start_time_s(day_index) + float(elapsed_s)
-                    + remaining_drive_s + control_left_s + loop_stop_s)
+                    + remaining_drive_s + control_left_s + loop_stop_s +breakdown_s)
 
     stages = _stage_breakdown(
         res, getattr(_sc, "TRAILER_TOW_SPEED_KMH", 80.0),
@@ -920,6 +936,7 @@ def resolve_intraday(
         "remaining_drive_s": round(remaining_drive_s, 0),
         "remaining_km": round(float(res.get("driven_km", 0.0)), 1),
         "stop_time_s": round(control_left_s + loop_stop_s, 0),
+        "breakdown_min": int(round(breakdown_s / 60.0)),
         "finish_abs_s": round(finish_abs_s, 0),
         "eta": _clock_hhmm(finish_abs_s),
         "on_time": finish_abs_s <= rc.day_finish_soft_limit_s(day_index),
@@ -1105,11 +1122,14 @@ if __name__ == "__main__":
     import glob
     import logging
     import json
+    import datetime as _dt
     import pandas as pd
     import numpy as np
     from configs.car_config import CarState
-    from core.solar import HourlyJSONSolarProvider, GaussianProvider, FlooredSolarProvider
-    from core.wind import HourlyJSONWindProvider, ConstantWindProvider
+    from core.solar import (HourlyJSONSolarProvider, GaussianProvider,
+                            FlooredSolarProvider, RealSolcastSolarProvider)
+    from core.wind import (HourlyJSONWindProvider, ConstantWindProvider,
+                           RealSolcastWindProvider)
     from core.route import Route
 
     logging.basicConfig(level=logging.INFO,
@@ -1130,8 +1150,199 @@ if __name__ == "__main__":
     car = CarState()
     current_dir = os.path.dirname(os.path.abspath(__file__))
     json_dir  = os.path.abspath(os.path.join(current_dir, "..", "data", "solar"))
+    # ACTUAL race-week Solcast forecast, scraped for the real 2026 race dates
+    # (5-min resolution, UTC-stamped — see core/solcast_time.py + the
+    # RealSolcast*Provider classes). Preferred over json_dir's typical-year
+    # data whenever a matching file exists for the day; json_dir stays as
+    # the fallback (see _load_weather below) so nothing breaks for any day
+    # that isn't covered by data/Solar_real.
+    real_solar_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "Solar_real"))
     kml_dir   = os.path.abspath(os.path.join(current_dir, "..", "data", "shaded"))
     save_dir  = os.path.abspath(os.path.join(current_dir, "..", "data", "processed"))
+
+    # ------------------------------------------------------------------ #
+    # 1b. Output-report helpers (moved up from the bottom of this block so
+    #     both resolve/resolve-intraday AND the cold-start save loop can
+    #     share the exact same JSON schema via _save_strategy_json below).
+    # ------------------------------------------------------------------ #
+    def _day_label(d_idx: int) -> str:
+        try:
+            note = rc.DAY_ROUTE_NOTES[d_idx]
+            return f"{note['start']} → {note['finish']}"
+        except Exception:
+            return f"Day {d_idx + 1}"
+    DAY_NAMES = {d: _day_label(d) for d in range(rc.N_RACE_DAYS)}
+
+    def _hms(seconds: float) -> str:
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        return f"{h:02d}:{m:02d}"
+
+    def _clock(abs_s: float) -> str:
+        """Absolute seconds from midnight → HH:MM clock string."""
+        return _hms(abs_s)
+
+    _SOLAR_AREA  = car.array_area_m2
+    _SOLAR_EFF   = car.array_efficiency
+    _BATT_CAP_WH = car.battery_nominal_wh
+
+    def _loop_km_for(plan, lp) -> float:
+        """Committed loop km = Σ reps × official single-pass loop length."""
+        return sum(cnt * km for (name, km) in plan.loops
+                   for cnt in [lp.get(name, 0)]) if lp else 0.0
+
+    def _trailered_km_for(d_idx, profiles) -> float:
+        if profiles and d_idx in profiles:
+            return float(profiles[d_idx].get("trailered_km", 0.0) or 0.0)
+        return 0.0
+
+    def _real_day_km(d_idx, plan, lp, profiles) -> float:
+        loop_km = _loop_km_for(plan, lp)
+        trailered_km = _trailered_km_for(d_idx, profiles)
+        return max(0.0, plan.stage1_km + plan.stage2_km + loop_km - trailered_km)
+
+    def _simulated_day_km(d_idx, profiles) -> float:
+        """Raw driven distance from forward_sim (excludes trailered km)."""
+        if profiles and d_idx in profiles:
+            dk = profiles[d_idx].get("driven_km")
+            if dk is not None and dk > 0:
+                return float(dk)
+        return 0.0
+
+    def _save_strategy_json(variant_name, result, profiles, plans, output_dir, tag=None):
+        """Write output/strategy_<variant>[_<tag>].json — same schema the
+        cold-start loop used to build inline, now shared by resolve and
+        resolve-intraday so ANY run can be dropped into
+        `analysis.offline_dashboard --all output/` unmodified."""
+        json_out = {
+            "variant": variant_name,
+            "timestamp": _dt.datetime.now().isoformat(),
+            "converged": result.get("converged"),
+            "feasible": result.get("feasible"),
+            "iterations": result.get("iterations"),
+            "total_distance_km": result.get("total_distance_km", 0),
+            "history": result.get("history", []),
+            "days": {},
+        }
+
+        if result.get("feasible"):
+            loop_plan = result.get("loop_plan", {})
+            s_start = result.get("s_start_pct")
+            _json_real_total_km = 0.0
+            _json_total_trailered_km = 0.0
+
+            from collections import Counter as _Counter2
+            def _json_lp(d_idx):
+                if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
+                    return dict(_Counter2(nm for nm, _km in profiles[d_idx]["loops_committed"]))
+                return loop_plan.get(d_idx, {})
+
+            for d_idx in range(8):
+                plan = plans[d_idx]
+                lp = _json_lp(d_idx)
+                n_loops = sum(lp.values()) if lp else 0
+                loop_km = sum(cnt * km for (name, km) in plan.loops
+                              for cnt in [lp.get(name, 0)])
+                day_km = _real_day_km(d_idx, plan, lp, profiles)
+                soc_start = (float(profiles[d_idx]["start_soc_pct"])
+                         if profiles and d_idx in profiles and profiles[d_idx].get("start_soc_pct") is not None
+                         else (float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0))
+
+                trailered_km_day = _trailered_km_for(d_idx, profiles)
+                day_data = {
+                    "route": DAY_NAMES.get(d_idx, f"Day {d_idx + 1}"),
+                    "distance_km": round(day_km, 1),
+                    "stage1_km": round(plan.stage1_km, 1),
+                    "stage2_km": round(plan.stage2_km, 1),
+                    "loop_km": round(loop_km, 1),
+                    "trailered_km": round(trailered_km_day, 1),
+                    "distance_km_simulated": round(_simulated_day_km(d_idx, profiles), 1),
+                    "loops": {name: cnt for name, cnt in lp.items()} if lp else {},
+                    "n_loops": n_loops,
+                    "soc_start_pct": round(soc_start, 1),
+                    "morning_charge_pct": (profiles.get(d_idx, {}) or {}).get("morning_charge_pct", 0.0),
+                    "late_penalty_min": (profiles.get(d_idx, {}) or {}).get("late_penalty_min", 0),
+                    "next_start_soc_pct": (profiles.get(d_idx, {}) or {}).get("next_start_soc_pct"),
+                    # FEATURE 2: breakdown downtime for this day, 0 unless
+                    # --breakdown was enabled for this run.
+                    "breakdown_min": (profiles.get(d_idx, {}) or {}).get("breakdown_min", 0),
+                }
+
+                solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
+                underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
+                day_data["solar_input_wh"] = round(solar_wh, 0)
+                day_data["solar_underutil_wh"] = round(underutil_wh, 0)
+                day_data["solar_stored_wh"] = round(max(0.0, solar_wh - underutil_wh), 0)
+
+                if profiles and d_idx in profiles:
+                    p = profiles[d_idx]
+                    soc_end = p.get("end_soc_pct", 0.0) or 0.0
+                    drive_t = p.get("total_time_s")
+                    if drive_t is None:
+                        t_arr = p.get("time_array_s")
+                        if t_arr is not None and hasattr(t_arr, '__iter__'):
+                            drive_t = float(max(t_arr)) - rc.day_start_time_s(d_idx)
+                        else:
+                            drive_t = 0.0
+                    v_arr = p.get("velocity_profile_kmh")
+                    day_data["soc_end_pct"] = round(soc_end, 1)
+                    day_data["drive_time_s"] = round(drive_t, 0)
+                    _stop_s = float(p.get("stop_time_s",
+                        _day_mandatory_stop_s(len(p.get("loops_committed") or []))))
+                    _inh_s = float(p.get("inherited_penalty_min", 0) or 0) * 60.0
+                    _finish_abs = p.get("finish_abs_s")
+                    if _finish_abs is None:
+                        _finish_abs = rc.day_start_time_s(d_idx) + drive_t + _stop_s + _inh_s
+                    day_data["stop_time_s"] = round(_stop_s, 0)
+                    day_data["control_stop_s"] = round(float(p.get("control_stop_s", 0.0)), 0)
+                    day_data["loop_stop_s"] = round(float(p.get("loop_stop_s", 0.0)), 0)
+                    day_data["eta"] = _clock(float(_finish_abs))
+                    day_data["eta_drive_only"] = _clock(rc.day_start_time_s(d_idx) + drive_t)
+                    if v_arr is not None:
+                        v_np = np.asarray(v_arr)
+                        day_data["speed_avg_kmh"] = round(float(v_np.mean()), 1)
+                        day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
+                        day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
+                        day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
+                    dash = p.get("dashboard_trace")
+                    if dash:
+                        day_data["dashboard_trace"] = dash
+                    _stage_list = p.get("stages", []) or []
+                    day_data["stages"] = _stage_list
+                    day_data["stage_names"] = [s["stage"] for s in _stage_list]
+                    _by_name = {s["stage"]: s for s in _stage_list}
+                    for _sk in ("stage1", "loop", "stage2"):
+                        day_data[_sk] = _by_name.get(_sk)
+
+                if profiles and d_idx in profiles:
+                    day_data["trailered_km"] = round(profiles[d_idx].get("trailered_km", 0.0) or 0.0, 1)
+                    day_data["trailered_substeps"] = profiles[d_idx].get("trailered_substeps", 0) or 0
+
+                soc_drain = soc_start - day_data.get("soc_end_pct", soc_start)
+                drain_wh = soc_drain / 100.0 * _BATT_CAP_WH
+                day_data["battery_drain_wh"] = round(drain_wh, 0)
+                day_data["battery_drain_pct"] = round(soc_drain, 1)
+                _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
+                                        if profiles else None)
+                day_data["motor_energy_wh"] = round(
+                    float(_real_motor_wh_json) if _real_motor_wh_json is not None else 0.0, 0)
+
+                _json_real_total_km += day_km
+                _json_total_trailered_km += day_data.get("trailered_km", 0.0)
+
+                json_out["days"][str(d_idx + 1)] = day_data
+
+            json_out["total_distance_km"] = round(_json_real_total_km, 1)
+            json_out["total_trailered_km"] = round(_json_total_trailered_km, 1)
+            json_out["total_distance_km_dp_estimate"] = result.get("total_distance_km", 0)
+
+        suffix = f"_{tag}" if tag else ""
+        os.makedirs(output_dir, exist_ok=True)
+        out_path = os.path.join(output_dir, f"strategy_{variant_name}{suffix}.json")
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(json_out, f, indent=2, default=str)
+        logger.info("Saved strategy → %s", out_path)
+        return out_path
 
     # ------------------------------------------------------------------ #
     # 2.  Helpers
@@ -1340,34 +1551,58 @@ if __name__ == "__main__":
     _FlooredSolarProvider = FlooredSolarProvider
 
     def _check_daytime_avg_ghi(weather_files):
-        """Quick scan: average GHI during race hours (8-17h) across all nodes."""
+        """Quick scan: average GHI during race hours across all nodes.
+        Schema-aware: handles BOTH the old typical-year file (hourly array
+        under historical_weather.hourly.shortwave_radiation) and the real
+        Solcast forecast file (5-min samples under "data", "ghi" per sample,
+        already daylight-only so no hour-slicing is needed)."""
         all_ghi = []
         for fp in weather_files:
             with open(fp, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for node in data:
-                ghi = node["historical_weather"]["hourly"]["shortwave_radiation"]
-                all_ghi.append(np.mean(ghi[8:17]))  # hours 8-16 (race window)
+                if "historical_weather" in node:
+                    ghi = node["historical_weather"]["hourly"]["shortwave_radiation"]
+                    all_ghi.append(np.mean(ghi[8:17]))  # hours 8-16 (race window)
+                else:
+                    ghi_vals = [float(s.get("ghi", 0.0) or 0.0)
+                                for s in node.get("data", [])]
+                    if ghi_vals:
+                        all_ghi.append(float(np.mean(ghi_vals)))
         return float(np.mean(all_ghi)) if all_ghi else 0.0
 
-    def _load_weather(weather_files, route, day_num=None):
+    def _load_weather(weather_files, route, day_num=None, real_weather_files=None):
         """Load ALL weather JSONs for a day into solar + wind providers.
 
+        Prefers the ACTUAL race-week Solcast forecast (real_weather_files,
+        from data/Solar_real/mean_*.jsonl) when available for this day —
+        falls back to the typical-year historical data (weather_files, from
+        data/solar/*.json) otherwise, so any day/variant not yet covered by
+        real data keeps working exactly as before.
+
         If daytime-avg GHI is anomalously low (< MIN_DAYTIME_GHI_WM2),
-        the solar provider is wrapped with a GaussianProvider floor.
+        the solar provider is wrapped with a GaussianProvider floor either way.
         """
-        if not weather_files:
+        real_weather_files = real_weather_files or []
+
+        if real_weather_files:
+            json_prov = RealSolcastSolarProvider(real_weather_files, route)
+            wind_prov = RealSolcastWindProvider(real_weather_files, route)
+            avg_ghi = _check_daytime_avg_ghi(real_weather_files)
+            source = "REAL forecast"
+        elif weather_files:
+            json_prov = HourlyJSONSolarProvider(weather_files, route)
+            wind_prov = HourlyJSONWindProvider(weather_files, route)
+            avg_ghi = _check_daytime_avg_ghi(weather_files)
+            source = "historical (typical-year)"
+        else:
             return GaussianProvider(), ConstantWindProvider(0.0, 0.0)
 
-        json_prov = HourlyJSONSolarProvider(weather_files, route)
-        wind_prov = HourlyJSONWindProvider(weather_files, route)
-
-        avg_ghi = _check_daytime_avg_ghi(weather_files)
         if avg_ghi < MIN_DAYTIME_GHI_WM2:
             logger.warning(
-                "Day %s: daytime avg GHI = %.0f W/m² (below %.0f floor) — "
-                "blending with Gaussian clear-sky fallback",
-                day_num or "?", avg_ghi, MIN_DAYTIME_GHI_WM2)
+                "Day %s: daytime avg GHI = %.0f W/m² (below %.0f floor, "
+                "source=%s) — blending with Gaussian clear-sky fallback",
+                day_num or "?", avg_ghi, MIN_DAYTIME_GHI_WM2, source)
             json_prov = _FlooredSolarProvider(json_prov, GAUSSIAN_BLEND_FRAC)
 
         return json_prov, wind_prov
@@ -1409,11 +1644,15 @@ if __name__ == "__main__":
             loop_geoms_by_day[d] = _load_loop_geometries(
                 route_files, _get_day_plan(d), day_num)
 
-        # --- Weather (ALL files for this day) ---
+        # --- Weather (ALL files for this day; real forecast preferred) ---
         weather_files = glob.glob(os.path.join(json_dir, f"*Day {day_num}*.json"))
-        solar_providers[d], wind_providers[d] = _load_weather(weather_files, routes.get(d), day_num)
-        if weather_files:
-            logger.info("Day %d: loaded %d weather JSONs", day_num, len(weather_files))
+        real_weather_files = glob.glob(os.path.join(real_solar_dir, f"*Day {day_num}*.jsonl"))
+        solar_providers[d], wind_providers[d] = _load_weather(
+            weather_files, routes.get(d), day_num, real_weather_files)
+        if real_weather_files:
+            logger.info("Day %d: loaded %d REAL forecast weather files", day_num, len(real_weather_files))
+        elif weather_files:
+            logger.info("Day %d: loaded %d weather JSONs (historical fallback)", day_num, len(weather_files))
 
         # --- KML trailering ---
         kml_files = glob.glob(os.path.join(kml_dir, f"*Day {day_num}*.kml"))
@@ -1502,6 +1741,7 @@ if __name__ == "__main__":
     day3_route_files = glob.glob(os.path.join(save_dir, "*Day 3*probables*.save")) or \
                        glob.glob(os.path.join(save_dir, "*Day 3*.save"))
     day3_weather_files = glob.glob(os.path.join(json_dir, "*Day 3*.json"))
+    day3_real_weather_files = glob.glob(os.path.join(real_solar_dir, "*Day 3*.jsonl"))
 
     # Group by variant name (e.g. "Prahlad", "Aryaman")
     day3_variants = {}
@@ -1520,13 +1760,20 @@ if __name__ == "__main__":
 
     logger.info("Day 3 variants discovered: %s", list(day3_variants.keys()))
 
-    # Match weather files to each variant
+    # Match weather files to each variant (real forecast + historical fallback)
     day3_variant_weather = {}
+    day3_variant_real_weather = {}
     for vname in day3_variants:
         matched = [f for f in day3_weather_files if vname.lower() in os.path.basename(f).lower()]
         if not matched:
             matched = day3_weather_files  # fallback: use all available
         day3_variant_weather[vname] = matched
+
+        real_matched = [f for f in day3_real_weather_files
+                        if vname.lower() in os.path.basename(f).lower()]
+        if not real_matched:
+            real_matched = day3_real_weather_files  # fallback: use all available
+        day3_variant_real_weather[vname] = real_matched
 
     # ------------------------------------------------------------------ #
     # 5.  Run optimizer once per Day-3 variant, each with its OWN Tier 1
@@ -1602,13 +1849,15 @@ if __name__ == "__main__":
             _d3p = _build_day3_variant_plan(vfiles, ivariant, day_num=3)
             loop_geoms_by_day[2] = _load_loop_geometries(vfiles, _d3p, 3)
             solar_providers[2], wind_providers[2] = _load_weather(
-                day3_variant_weather.get(ivariant, []), routes.get(2), 3)
+                day3_variant_weather.get(ivariant, []), routes.get(2), 3,
+                day3_variant_real_weather.get(ivariant, []))
 
         rr = resolve_intraday(
             routes.get(didx), car, solar_providers.get(didx), wind_providers.get(didx),
             day_index=didx, cur_soc_pct=isoc, elapsed_s=elapsed,
             dist_done_km=idist, loops_remaining=iloops, cs_taken=ics,
-            solar_efficiency=ieff, loop_geoms=loop_geoms_by_day.get(didx))
+            solar_efficiency=ieff, loop_geoms=loop_geoms_by_day.get(didx),
+            breakdown_enabled=("--breakdown" in sys.argv[1:]))
 
         print("\n" + "=" * 64)
         print(f" INTRA-DAY RE-PLAN — Day {iday} from {itime} "
@@ -1629,6 +1878,23 @@ if __name__ == "__main__":
                   f"avg {st.get('speed_avg_kmh','?')}  ETA {st.get('eta','?')}  "
                   f"loops {st.get('n_loops',0)}")
         print("=" * 64 + "\n")
+               # Persist so the dashboard can view an intra-day resolve run, distinct
+       # filename per day/time/breakdown-state so runs don't overwrite each other.
+        _ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+        _tag = f"intraday_day{iday}_{str(itime).replace(':','')}"
+        if "--breakdown" in sys.argv[1:]:
+            _tag += "_breakdown"
+        _tag += f"_{_ts}"
+        _out_dir = os.path.abspath(os.path.join(current_dir, "..", "output"))
+        os.makedirs(_out_dir, exist_ok=True)
+        _out_path = os.path.join(_out_dir, f"strategy_{ivariant}_{_tag}.json")
+        with open(_out_path, "w", encoding="utf-8") as _f:
+            json.dump({"mode": "resolve-intraday", "variant": ivariant,
+                       "timestamp": _dt.datetime.now().isoformat(),
+                       "day": iday, "time": itime, "start_soc_pct": isoc,
+                      "breakdown_enabled": ("--breakdown" in sys.argv[1:]),
+                      "result": rr}, _f, indent=2, default=str)
+        logger.info("Saved intraday resolve → %s", _out_path)
         sys.exit(0)
 
     if "resolve" in sys.argv[1:]:
@@ -1653,7 +1919,8 @@ if __name__ == "__main__":
         day3_plan = _build_day3_variant_plan(variant_route_files, variant_name, day_num=3)
         loop_geoms_by_day[2] = _load_loop_geometries(variant_route_files, day3_plan, 3)
         solar_providers[2], wind_providers[2] = _load_weather(
-            day3_variant_weather.get(variant_name, []), routes.get(2), 3)
+            day3_variant_weather.get(variant_name, []), routes.get(2), 3,
+            day3_variant_real_weather.get(variant_name, []))
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
         _apply_trailered_mask(routes.get(2), kml_paths, 2)
 
@@ -1716,6 +1983,23 @@ if __name__ == "__main__":
             print("  (infeasible from this state — raise start SOC or check "
                   "the efficiency input)")
         print("=" * 64 + "\n")
+
+        # Persist so the dashboard can view a next-day (between-days) resolve
+        # run. Tagged with resume day + breakdown state + timestamp so it
+        # never overwrites the cold-start strategy_<variant>.json or a
+        # previous resolve run. Uses the SAME schema as the cold-start save
+        # (via _save_strategy_json), so `analysis.offline_dashboard --all
+        # output/` picks it up automatically — no dashboard code changes.
+        if rr["feasible"]:
+            _ts = _dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+            _tag = f"resolve_day{human_day}"
+            if "--breakdown" in sys.argv[1:]:
+                _tag += "_breakdown"
+            _tag += f"_{_ts}"
+            _out_dir = os.path.abspath(os.path.join(current_dir, "..", "output"))
+            _save_strategy_json(variant_name, rr["result"], rr["profiles"],
+                                 variant_plans, _out_dir, tag=_tag)
+
         if os.environ.get("AGNIRATH_DUMP_STAGES") and rr.get("feasible"):
             _dump = {}
             for _d, _p in (rr.get("profiles") or {}).items():
@@ -1802,7 +2086,9 @@ if __name__ == "__main__":
 
         # Build Day 3 weather for this variant
         weather_files = day3_variant_weather.get(variant_name, [])
-        solar_providers[2], wind_providers[2] = _load_weather(weather_files, routes.get(2), 3)
+        real_weather_files = day3_variant_real_weather.get(variant_name, [])
+        solar_providers[2], wind_providers[2] = _load_weather(
+            weather_files, routes.get(2), 3, real_weather_files)
 
                 # KML for Day 3
         kml_paths[2] = kml_files_d3[0] if kml_files_d3 else None
@@ -1845,77 +2131,9 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 6.  Helpers for per-day strategy plan
     # ------------------------------------------------------------------ #
-    # Route labels are the single source of truth in race_config.DAY_ROUTE_NOTES
-    # (start → finish per the released 2026 route sheets). The old hardcoded
-    # dict here was stale — e.g. Day 1 read "Johannesburg → Rustenburg" when the
-    # real Day 1 is Sasolburg → Swartruggens (Rustenburg is only the control
-    # stop). Build labels from the config so the report can never drift again.
-    def _day_label(d_idx: int) -> str:
-        try:
-            note = rc.DAY_ROUTE_NOTES[d_idx]
-            return f"{note['start']} → {note['finish']}"
-        except Exception:
-            return f"Day {d_idx + 1}"
-    DAY_NAMES = {d: _day_label(d) for d in range(rc.N_RACE_DAYS)}
-
-    def _hms(seconds: float) -> str:
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        return f"{h:02d}:{m:02d}"
-
-    def _clock(abs_s: float) -> str:
-        """Absolute seconds from midnight → HH:MM clock string."""
-        return _hms(abs_s)
-
-    # Car constants for output calculations.
-    # FIX: these getattr() calls previously used attribute names that don't
-    # exist on CarState ('solar_area', 'solar_eff', 'battery_capacity_wh'),
-    # so every call silently fell through to the hardcoded default. That
-    # made array_area_m2/battery figures coincidentally correct (they matched
-    # their fallback defaults) but array_efficiency is really 0.22, not the
-    # fallback 0.18 -- every "Solar input" figure was ~18% understated.
-    _SOLAR_AREA  = car.array_area_m2
-    _SOLAR_EFF   = car.array_efficiency
-    _BATT_CAP_WH = car.battery_nominal_wh
-
-    def _loop_km_for(plan, lp) -> float:
-        """Committed loop km = Σ reps × official single-pass loop length."""
-        return sum(cnt * km for (name, km) in plan.loops
-                   for cnt in [lp.get(name, 0)]) if lp else 0.0
-
-    def _trailered_km_for(d_idx, profiles) -> float:
-        if profiles and d_idx in profiles:
-            return float(profiles[d_idx].get("trailered_km", 0.0) or 0.0)
-        return 0.0
-
-    def _real_day_km(d_idx, plan, lp, profiles) -> float:
-        """Distance credited to the race total, from the AUTHORITATIVE route
-        table so the reported components always reconcile and match the
-        released sheets:
-
-            distance_km = stage1_km + stage2_km + committed_loop_km
-                          − trailered_km        (SR asterisk rule)
-
-        This is deliberately NOT the raw simulated driven_km: the forward
-        integrator's driven_km differs from the published figure by the
-        KML-linestring-vs-published rounding AND by the small synthetic
-        loop-separator buffers spliced between repeated loop attempts
-        (singleday._splice_loops), so it never reconciles cleanly with the
-        headline stage/loop numbers. The simulated distance is still reported
-        separately (distance_km_simulated) for transparency. Day 3 uses the
-        variant plan's real geometry lengths, so it stays variant-specific.
-        """
-        loop_km = _loop_km_for(plan, lp)
-        trailered_km = _trailered_km_for(d_idx, profiles)
-        return max(0.0, plan.stage1_km + plan.stage2_km + loop_km - trailered_km)
-
-    def _simulated_day_km(d_idx, profiles) -> float:
-        """Raw driven distance from forward_sim (excludes trailered km)."""
-        if profiles and d_idx in profiles:
-            dk = profiles[d_idx].get("driven_km")
-            if dk is not None and dk > 0:
-                return float(dk)
-        return 0.0
+    # NOTE: _day_label/DAY_NAMES/_clock/_real_day_km/_trailered_km_for/
+    # _simulated_day_km/_save_strategy_json now live up in section 1b (right
+    # after `car = CarState()`) so resolve/resolve-intraday can use them too.
 
     def _estimate_solar_input_wh(solar_prov, day_index: int) -> float:
         """Rough total solar energy over the race window (Wh)."""
@@ -2212,163 +2430,11 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------ #
     # 8.  Save durable JSON output for dashboard
     # ------------------------------------------------------------------ #
-    import datetime as _dt
-
     output_dir = os.path.abspath(os.path.join(current_dir, "..", "output"))
     os.makedirs(output_dir, exist_ok=True)
 
     for variant_name, data in all_results.items():
-        result   = data["result"]
-        profiles = data["profiles"]
-        plans    = data["plans"]
-
-        json_out = {
-            "variant": variant_name,
-            "timestamp": _dt.datetime.now().isoformat(),
-            "converged": result.get("converged"),
-            "feasible": result.get("feasible"),
-            "iterations": result.get("iterations"),
-            "total_distance_km": result.get("total_distance_km", 0),
-            "history": result.get("history", []),
-            "days": {},
-        }
-
-        if result.get("feasible"):
-            loop_plan = result.get("loop_plan", {})
-            s_start = result.get("s_start_pct")
-            _json_real_total_km = 0.0
-            _json_total_trailered_km = 0.0
-
-            from collections import Counter as _Counter2
-            def _json_lp(d_idx):
-                if profiles and d_idx in profiles and profiles[d_idx].get("loops_committed") is not None:
-                    return dict(_Counter2(nm for nm, _km in profiles[d_idx]["loops_committed"]))
-                return loop_plan.get(d_idx, {})
-
-            for d_idx in range(8):
-                plan = plans[d_idx]
-                lp = _json_lp(d_idx)
-                n_loops = sum(lp.values()) if lp else 0
-                loop_km = sum(cnt * km for (name, km) in plan.loops
-                              for cnt in [lp.get(name, 0)])
-                day_km = _real_day_km(d_idx, plan, lp, profiles)
-                soc_start = (float(profiles[d_idx]["start_soc_pct"])
-                         if profiles and d_idx in profiles and profiles[d_idx].get("start_soc_pct") is not None
-                         else (float(s_start[d_idx]) if s_start is not None and np.isfinite(s_start[d_idx]) else 0.0))
-
-                trailered_km_day = _trailered_km_for(d_idx, profiles)
-                day_data = {
-                    "route": DAY_NAMES.get(d_idx, f"Day {d_idx + 1}"),
-                    # Authoritative, reconciling distance:
-                    #   distance_km == stage1_km + stage2_km + loop_km - trailered_km
-                    "distance_km": round(day_km, 1),
-                    "stage1_km": round(plan.stage1_km, 1),
-                    "stage2_km": round(plan.stage2_km, 1),
-                    "loop_km": round(loop_km, 1),
-                    "trailered_km": round(trailered_km_day, 1),
-                    # Raw forward_sim driven distance (KML linestring + loop
-                    # separators) — for transparency; may differ from the
-                    # published headline by ~1 km. Do NOT sum this for scoring.
-                    "distance_km_simulated": round(_simulated_day_km(d_idx, profiles), 1),
-                    "loops": {name: cnt for name, cnt in lp.items()} if lp else {},
-                    "n_loops": n_loops,
-                    "soc_start_pct": round(soc_start, 1),
-                    "morning_charge_pct": (profiles.get(d_idx, {}) or {}).get("morning_charge_pct", 0.0),
-                    "late_penalty_min": (profiles.get(d_idx, {}) or {}).get("late_penalty_min", 0),
-                    "next_start_soc_pct": (profiles.get(d_idx, {}) or {}).get("next_start_soc_pct"),
-                }
-
-                solar_wh = float((profiles.get(d_idx, {}) or {}).get("solar_energy_wh", 0.0) or 0.0)
-                underutil_wh = float((profiles.get(d_idx, {}) or {}).get("solar_underutil_wh", 0.0) or 0.0)
-                day_data["solar_input_wh"] = round(solar_wh, 0)          # gross panel output
-                day_data["solar_underutil_wh"] = round(underutil_wh, 0)  # clipped at SOC ceiling
-                day_data["solar_stored_wh"] = round(max(0.0, solar_wh - underutil_wh), 0)  # actually banked
-
-                if profiles and d_idx in profiles:
-                    p = profiles[d_idx]
-                    soc_end = p.get("end_soc_pct", 0.0) or 0.0
-                    drive_t = p.get("total_time_s")
-                    if drive_t is None:
-                        t_arr = p.get("time_array_s")
-                        if t_arr is not None and hasattr(t_arr, '__iter__'):
-                            drive_t = float(max(t_arr)) - rc.day_start_time_s(d_idx)
-                        else:
-                            drive_t = 0.0
-                    v_arr = p.get("velocity_profile_kmh")
-                    day_data["soc_end_pct"] = round(soc_end, 1)
-                    day_data["drive_time_s"] = round(drive_t, 0)
-                    # ETA = start + prior-day penalty hold + drive + mandatory
-                    # stops (control + per-loop). Prefer the extractor's true
-                    # finish; fall back to computing it here for older profiles.
-                    _stop_s = float(p.get("stop_time_s",
-                        _day_mandatory_stop_s(len(p.get("loops_committed") or []))))
-                    _inh_s = float(p.get("inherited_penalty_min", 0) or 0) * 60.0
-                    _finish_abs = p.get("finish_abs_s")
-                    if _finish_abs is None:
-                        _finish_abs = rc.day_start_time_s(d_idx) + drive_t + _stop_s + _inh_s
-                    day_data["stop_time_s"] = round(_stop_s, 0)
-                    day_data["control_stop_s"] = round(float(p.get("control_stop_s", 0.0)), 0)
-                    day_data["loop_stop_s"] = round(float(p.get("loop_stop_s", 0.0)), 0)
-                    day_data["eta"] = _clock(float(_finish_abs))       # TRUE arrival (incl. stops)
-                    day_data["eta_drive_only"] = _clock(rc.day_start_time_s(d_idx) + drive_t)
-                    if v_arr is not None:
-                        v_np = np.asarray(v_arr)
-                        day_data["speed_avg_kmh"] = round(float(v_np.mean()), 1)
-                        day_data["speed_min_kmh"] = round(float(v_np.min()), 1)
-                        day_data["speed_max_kmh"] = round(float(v_np.max()), 1)
-                        day_data["velocity_profile_kmh"] = [int(v) for v in v_arr]
-                    # Continuous distance-indexed curves for the dashboard
-                    # (SOC / velocity / solar / gradient vs distance). Coarse
-                    # velocity_profile_kmh above stays the driver card.
-                    dash = p.get("dashboard_trace")
-                    if dash:
-                        day_data["dashboard_trace"] = dash
-
-                    # Per-stage breakdown (stage1 / loop / stage2). Same summary
-                    # metrics as the day PLUS a per-stage plotting trace
-                    # (distance/velocity/solar/soc/slope), split by route stage.
-                    # Exposed two ways for the dashboard:
-                    #   * "stages": the ordered list (as the route runs);
-                    #   * "stage1"/"loop"/"stage2": direct keys, each the stage
-                    #     dict or NULL when that stage doesn't exist that day
-                    #     (e.g. no loop, or Day-3-aryaman with no stage1). So the
-                    #     dashboard can always read day["stage1"] etc. safely.
-                    _stage_list = p.get("stages", []) or []
-                    day_data["stages"] = _stage_list
-                    day_data["stage_names"] = [s["stage"] for s in _stage_list]
-                    _by_name = {s["stage"]: s for s in _stage_list}
-                    for _sk in ("stage1", "loop", "stage2"):
-                        day_data[_sk] = _by_name.get(_sk)   # dict or None
-
-                if profiles and d_idx in profiles:
-                    day_data["trailered_km"] = round(profiles[d_idx].get("trailered_km", 0.0) or 0.0, 1)
-                    day_data["trailered_substeps"] = profiles[d_idx].get("trailered_substeps", 0) or 0
-
-                soc_drain = soc_start - day_data.get("soc_end_pct", soc_start)
-                drain_wh = soc_drain / 100.0 * _BATT_CAP_WH
-                day_data["battery_drain_wh"] = round(drain_wh, 0)
-                day_data["battery_drain_pct"] = round(soc_drain, 1)
-                # Prefer real simulated motor energy over the circular
-                # back-out (see the print-loop fix above for why).
-                _real_motor_wh_json = (profiles.get(d_idx, {}).get("motor_energy_wh")
-                                        if profiles else None)
-                day_data["motor_energy_wh"] = round(
-                    float(_real_motor_wh_json) if _real_motor_wh_json is not None else 0.0, 0)
-
-                _json_real_total_km += day_km
-                _json_total_trailered_km += day_data.get("trailered_km", 0.0)
-
-                json_out["days"][str(d_idx + 1)] = day_data
-
-            # Real total: driven km only, trailered km excluded (SR asterisk
-            # rule). Overwrite the DP planning estimate that was set above.
-            json_out["total_distance_km"] = round(_json_real_total_km, 1)
-            json_out["total_trailered_km"] = round(_json_total_trailered_km, 1)
-            json_out["total_distance_km_dp_estimate"] = result.get("total_distance_km", 0)
-
-        out_path = os.path.join(output_dir, f"strategy_{variant_name}.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(json_out, f, indent=2, default=str)
-        logger.info("Saved strategy → %s", out_path)
+        _save_strategy_json(variant_name, data["result"], data["profiles"],
+                             data["plans"], output_dir)
 
     logger.info("All variant results saved to %s/", output_dir)
