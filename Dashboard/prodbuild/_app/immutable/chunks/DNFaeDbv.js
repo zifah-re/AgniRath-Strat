@@ -288,8 +288,12 @@ function w() {
                     ),
                     t.profile && Object.keys(t.profile).forEach(o => {
                         if (t.profile && t.profile[o] != null) {
-                            r.profile[o] || (r.profile[o] = []);
-                            r.profile[o] = [...t.profile[o]];
+                            if (Array.isArray(t.profile[o])) {
+                                r.profile[o] || (r.profile[o] = []);
+                                r.profile[o] = [...t.profile[o]];
+                            } else {
+                                r.profile[o] = t.profile[o];
+                            }
                         }
                     }
                     ),
@@ -316,7 +320,13 @@ function w() {
                     }
                     ),
                     t.profile && Object.keys(t.profile).forEach(n => {
-                        t.profile[n] && (r.profile[n] = [...t.profile[n]])
+                        if (t.profile[n] != null) {
+                            if (Array.isArray(t.profile[n])) {
+                                r.profile[n] = [...t.profile[n]];
+                            } else {
+                                r.profile[n] = t.profile[n];
+                            }
+                        }
                     }
                     ),
                     r
