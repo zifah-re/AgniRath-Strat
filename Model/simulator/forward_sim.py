@@ -111,6 +111,18 @@ class DayEvalResult:
         default_factory=lambda: np.array([]))
     slope_pct_trace: np.ndarray = dataclasses.field(
         default_factory=lambda: np.array([]))
+    # Motor electrical draw (W, positive = consumption), one entry per
+    # substep aligned with t_s/x_m — computed EVERY substep (previously only
+    # inside the breakdown-model's is_trailered-excluded branch, and never
+    # stored at all). Feeds analysis/offline_dashboard.py's motor-power-vs-
+    # distance plot and optimizers/tier2.py / tier3.py's sustained-power
+    # awareness.
+    motor_w_trace: np.ndarray = dataclasses.field(
+        default_factory=lambda: np.array([]))
+    # Time (s) the SustainedPowerTracker's rolling-window average draw spent
+    # above car.p_max_sustained_w — reported exposure, analogous to
+    # soc_over_safe_pct_s below, for optimizers to penalize.
+    sustained_power_over_budget_s: float = 0.0
     # Per-substep route seg_type ('stage1' | 'loop_<name>' | 'stage2' | ...),
     # aligned 1:1 with x_m. Resolved in ONE vectorized route lookup at return
     # (not per substep), on the SAME (loop-spliced) route the day was simulated
@@ -174,6 +186,119 @@ def _ghi_segment(solar_provider, t_nom: np.ndarray, x_pre: np.ndarray,
     out = np.array([solar_provider.ghi_wm2(float(t_nom[k]), float(x_pre[k]))
                     for k in range(n)], dtype=float)
     return np.clip(out, 0.0, None)
+
+
+def _poa_segment(solar_provider, t_nom: np.ndarray, x_pre: np.ndarray,
+                 seg_nodes, poa_at_node_fn) -> np.ndarray | None:
+    """POA irradiance for a whole segment's substeps, mirroring _ghi_segment's
+    node-batched fast path. Returns None (not an all-zero array) when the
+    provider has no POA support at all, so callers can fall back to the
+    legacy GHI * solar_geom_factor path in core.physics.net_power exactly as
+    before — this must never silently zero out solar for providers that
+    don't implement poa_wm2/poa_wm2_array/poa_wm2_at_node (e.g. GaussianProvider,
+    HourlyJSONSolarProvider typical-year data, which has no DNI column).
+    """
+    n = len(t_nom)
+    arr_fn = getattr(solar_provider, "poa_wm2_array", None)
+    if arr_fn is not None:
+        try:
+            out = np.asarray(arr_fn(t_nom, x_pre), dtype=float)
+            if out.shape == t_nom.shape:
+                return np.clip(out, 0.0, None)
+        except Exception:
+            pass
+    if poa_at_node_fn is not None and seg_nodes is not None:
+        out = np.array([poa_at_node_fn(float(t_nom[k]), int(seg_nodes[k]))
+                        for k in range(n)], dtype=float)
+        return np.clip(out, 0.0, None)
+    scalar_fn = getattr(solar_provider, "poa_wm2", None)
+    if scalar_fn is not None:
+        out = np.array([scalar_fn(float(t_nom[k]), float(x_pre[k]))
+                        for k in range(n)], dtype=float)
+        return np.clip(out, 0.0, None)
+    return None
+
+
+def _avg_parked_solar_w(solar_provider, t_start_s: float, x_m: float,
+                        duration_s: float, node_idx: int | None,
+                        ghi_at_node_fn, poa_at_node_fn, has_poa: bool,
+                        car, default_derate: float, n_samples: int = 6) -> float:
+    """Average available solar power (W) over a PARKED window
+    [t_start_s, t_start_s + duration_s), instead of a single instantaneous
+    snapshot (see the call sites' bugfix comment). x_m is constant (the car
+    isn't moving); only t advances. Falls back gracefully: uses node-indexed
+    lookups when available (fast path, matches the rest of the substep
+    loop), otherwise the provider's scalar (t_s, x_m) methods.
+    """
+    if duration_s <= 0.0:
+        n_samples = 1
+    ts = (np.array([t_start_s]) if n_samples <= 1 else
+          t_start_s + np.linspace(0.0, duration_s, n_samples, endpoint=False))
+    vals = []
+    for t in ts:
+        t = float(t)
+        if has_poa:
+            if node_idx is not None and poa_at_node_fn is not None:
+                poa = poa_at_node_fn(t, node_idx)
+            else:
+                poa = getattr(solar_provider, "poa_wm2", lambda *_: 0.0)(t, x_m)
+            derate = getattr(car, "system_derate", default_derate)
+            vals.append(car.array_area_m2 * car.array_efficiency * poa * derate)
+        else:
+            if node_idx is not None and ghi_at_node_fn is not None:
+                ghi = ghi_at_node_fn(t, node_idx)
+            else:
+                ghi = solar_provider.ghi_wm2(t, x_m)
+            vals.append(car.array_area_m2 * car.array_efficiency * max(0.0, ghi))
+    return float(np.mean(vals))
+
+
+class SustainedPowerTracker:
+    """Rolling-window average of electrical draw, for the p_max_sustained_w
+    thermal cap (workplan fix — there was no ceiling on forward motor draw at
+    all; p_max_peak_w in core.physics.net_power is the pointwise ceiling,
+    this is the coupled-to-recent-history counterpart for sustained climbs).
+
+    Window length defaults to ~motor thermal time constant (car.thermal_tau_s
+    if set, else a 6-minute default — TODO-VERIFY against the real motor
+    controller spec). This is deliberately similar in spirit to
+    DriverSwapScheduler above: a small stateful tracker threaded through the
+    same substep loop, not a pointwise clip.
+
+    NOTE — reactive, not predictive: forward_sim integrates a velocity
+    profile the optimizer already chose, so this tracker can only REPORT
+    exposure over the sustained cap (rolling_avg_w, over_budget_s) for
+    optimizers/tier2.py / tier3.py to penalize when proposing candidate
+    speeds on long climbs; see the comment there. It does not itself alter
+    v_kmh mid-day.
+    """
+
+    def __init__(self, sustained_cap_w: float, window_s: float = 360.0):
+        self.sustained_cap_w = float(sustained_cap_w)
+        self.window_s = float(window_s)
+        self._t_hist: list[float] = []
+        self._p_hist: list[float] = []
+        self.over_budget_s = 0.0
+        self.rolling_avg_w = 0.0
+
+    def advance(self, dt_s: float, p_electric_w: float) -> float:
+        """Record one substep's electrical draw (W, positive = consumption)
+        and return the CURRENT rolling-window average draw (W)."""
+        self._t_hist.append(dt_s)
+        self._p_hist.append(max(0.0, p_electric_w))
+        # Drop substeps that have aged out of the window (front of the list).
+        total_t = sum(self._t_hist)
+        while total_t > self.window_s and len(self._t_hist) > 1:
+            total_t -= self._t_hist.pop(0)
+            self._p_hist.pop(0)
+        if total_t <= 0.0:
+            self.rolling_avg_w = 0.0
+            return 0.0
+        weighted = sum(t * p for t, p in zip(self._t_hist, self._p_hist))
+        self.rolling_avg_w = weighted / total_t
+        if self.rolling_avg_w > self.sustained_cap_w:
+            self.over_budget_s += dt_s
+        return self.rolling_avg_w
 
 
 def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
@@ -296,6 +421,13 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     use_route = route is not None
     node_index_fn = getattr(solar_provider, "node_index_array", None)
     ghi_at_node_fn = getattr(solar_provider, "ghi_wm2_at_node", None)
+    poa_at_node_fn = getattr(solar_provider, "poa_wm2_at_node", None)
+    _has_poa = any(hasattr(solar_provider, a) for a in
+                  ("poa_wm2_array", "poa_wm2_at_node", "poa_wm2"))
+
+    sustained_tracker = SustainedPowerTracker(
+        getattr(car, "p_max_sustained_w", float("inf")))
+    motor_w_array: list[float] = []
 
     for seg_i, v in enumerate(v_kmh):
         v_ms = float(v) / 3.6
@@ -378,14 +510,25 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         t_nom = t_s + np.concatenate(([0.0], np.cumsum(dt_arr)[:-1]))
         ghi_arr = _ghi_segment(solar_provider, t_nom, x_pre_arr,
                                seg_nodes, ghi_at_node_fn)
+        poa_arr = (_poa_segment(solar_provider, t_nom, x_pre_arr,
+                                seg_nodes, poa_at_node_fn)
+                  if _has_poa else None)
         # Physics for the whole segment at once (as if driving); trailered
         # substeps are zeroed right after (inert cargo — no energy flow).
         v_ms_arr = np.full(n_substeps, v_ms, dtype=float)
         p_net_arr, _dt_unused = physics.net_power(
             car, v_ms_arr, v_ms_arr, slopes_arr, ghi_arr, substep_len_km,
-            regen_cap_w=regen_cap_w)
+            regen_cap_w=regen_cap_w, poa_wm2=poa_arr)
         p_net_arr = np.where(seg_reds_b, 0.0, p_net_arr)
-        p_solar_arr = car.array_area_m2 * car.array_efficiency * ghi_arr
+        # p_solar_arr mirrors net_power's own p_solar term exactly (POA*derate
+        # when available, else flat GHI) so downstream traces/credits (parked
+        # solar, motor_draw_w back-out, dashboard) stay consistent with what
+        # the battery actually saw.
+        if poa_arr is not None:
+            _derate = getattr(car, "system_derate", physics.SYSTEM_DERATE)
+            p_solar_arr = car.array_area_m2 * car.array_efficiency * poa_arr * _derate
+        else:
+            p_solar_arr = car.array_area_m2 * car.array_efficiency * ghi_arr
 
         for k in range(n_substeps):
             slope = float(slopes_arr[k])
@@ -411,6 +554,19 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                 p_net = float(p_net_arr[k])
                 driven_km_accum += substep_len_km
 
+            # Motor electrical draw (W, positive = consumption), computed
+            # EVERY substep now (workplan fix — this used to be computed only
+            # inside the breakdown-model branch below and never stored, so
+            # analysis/offline_dashboard.py had no motor-power-vs-distance
+            # series to plot). Back out from the solar term, same convention
+            # as before: p_net = p_solar - p_electric - p_idle =>
+            # p_electric = p_solar - p_net - p_idle. Zero on trailered
+            # substeps (motor off, inert cargo).
+            motor_draw_w = (0.0 if is_trailered else
+                            max(0.0, p_solar_w - p_net - car.p_idle_w))
+            motor_w_array.append(motor_draw_w)
+            sustained_tracker.advance(dt_s_step, motor_draw_w)
+
             # --- Stop-time solar charging (Tier 1 parity) ---
             # Tier 1's coarse evaluate_day credits parked solar at the control
             # stop (CONTROL_STOP_DURATION_S + UNPLANNED_STOP_BUDGET_S, the
@@ -423,19 +579,42 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             # contiguous loop zone (each loop attempt). Skipped on trailered
             # segments (car is inert cargo — no energy flow, same as Tier 1's
             # trailered-mask zeroing).
+            #
+            # AVERAGED over the stop window, not a single instant (bugfix):
+            # a single p_solar_w snapshot at the moment of arrival made the
+            # credit hostage to whatever irradiance happened to land at that
+            # exact second — sensitive to hourly-sample spline wiggle right
+            # near a data breakpoint, and gave no reason to expect a LONGER
+            # (30-min control) stop to credit more than a SHORTER (5-min
+            # loop) one if the control stop's arrival instant happened to be
+            # a lower-irradiance moment (e.g. later in the day / near a
+            # cloudier sample) than the loop stop's. Sampling several points
+            # across the ACTUAL duration and averaging is strictly more
+            # representative of the real energy captured, and removes that
+            # single-instant sensitivity entirely.
             if not is_trailered:
                 if cs_stop_here and not cs_credit_done:
                     cs_credit_done = True
                     _parked_s = ((0.0 if cs_taken else control_stop_dur_s)
                                  + unplanned_budget_s)
-                    _parked_w = (car.array_area_m2 * car.array_efficiency * ghi
-                                 - car.p_idle_w)
+                    _avg_solar_w = _avg_parked_solar_w(
+                        solar_provider, float(t_nom[k]), float(x_pre_arr[k]),
+                        _parked_s,
+                        int(seg_nodes[k]) if seg_nodes is not None else None,
+                        ghi_at_node_fn, poa_at_node_fn, _has_poa,
+                        car, physics.SYSTEM_DERATE)
+                    _parked_w = _avg_solar_w - car.p_idle_w
                     battery.apply_energy_wh(_parked_w * _parked_s / 3600.0)
                 if loop_stop_here:
                     if not in_loop_zone:
                         in_loop_zone = True
-                        _parked_w = (car.array_area_m2 * car.array_efficiency * ghi
-                                     - car.p_idle_w)
+                        _avg_solar_w = _avg_parked_solar_w(
+                            solar_provider, float(t_nom[k]), float(x_pre_arr[k]),
+                            loop_stop_dur_s,
+                            int(seg_nodes[k]) if seg_nodes is not None else None,
+                            ghi_at_node_fn, poa_at_node_fn, _has_poa,
+                            car, physics.SYSTEM_DERATE)
+                        _parked_w = _avg_solar_w - car.p_idle_w
                         battery.apply_energy_wh(
                             _parked_w * loop_stop_dur_s / 3600.0)
                 else:
@@ -444,9 +623,10 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             # --- Solar underutilization tracking ---
             # Skip entirely for trailered segments (no energy flow).
             if not is_trailered:
-                # p_net = p_solar - p_electric - p_idle (core/physics.py convention)
-                # Available solar power at this instant:
-                p_solar_w = car.array_area_m2 * car.array_efficiency * ghi
+                # p_net = p_solar - p_electric - p_idle (core/physics.py
+                # convention). p_solar_w already computed above (POA*derate
+                # when available, else flat GHI) — reused here, not
+                # recomputed from raw ghi.
                 # Total consumption (motor + idle):
                 p_consumed_w = p_solar_w - float(p_net)
                 # Real, non-circular energy totals — integrated directly from
@@ -490,11 +670,10 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             # when _skip_breakdown (deterministic run, breakdown not in objective
             # and the fastened build enabled skipping).
             if not is_trailered and not _skip_breakdown:
-                # Input: motor ELECTRICAL DRAW, not physics.net_power's return.
-                # DEFAULT_SCENARIOS' "p_net" threshold (2000-4100 W) is the
-                # motor-power BMS-trip number. Back out from the solar term:
-                # p_net = p_solar - p_electric - p_idle => p_electric = p_solar - p_net - p_idle
-                motor_draw_w = max(0.0, p_solar_w - float(p_net) - car.p_idle_w)
+                # Input: motor ELECTRICAL DRAW, not physics.net_power's
+                # return. DEFAULT_SCENARIOS' "p_net" threshold (2000-4100 W)
+                # is the motor-power BMS-trip number. motor_draw_w was
+                # already computed above (now every substep, not just here).
                 inputs = {"p_net": motor_draw_w}
                 if rng is None:
                     breakdown_s = breakdown_model.expected_stop_s(inputs)
@@ -553,5 +732,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         v_kmh_trace=np.array(v_kmh_array),
         solar_w_trace=np.array(solar_w_array),
         slope_pct_trace=np.array(slope_array),
+        motor_w_trace=np.array(motor_w_array),
+        sustained_power_over_budget_s=sustained_tracker.over_budget_s,
         seg_type_trace=_seg_type_trace,
     )

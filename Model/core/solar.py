@@ -204,40 +204,110 @@ class RealSolcastSolarProvider(SolarProvider):
     node_index_array / ghi_wm2_at_node / ghi_wm2_array are also implemented
     so forward_sim's fast path (see simulator/forward_sim.py) is exercised
     exactly as it is for HourlyJSONSolarProvider — no perf regression.
+
+    POA IRRADIANCE (workplan fix — GHI-only under-credits solar noon):
+    the raw samples carry "dni" alongside "ghi" but it was previously never
+    read. poa_wm2 / poa_wm2_at_node / poa_wm2_array decompose GHI into
+    direct/diffuse using DNI (DHI = GHI - DNI*cos(zenith)) and reproject onto
+    the array plane with pvlib.irradiance.get_total_irradiance, instead of
+    treating a flat GHI number as a flat-panel proxy. This is ADDITIVE —
+    ghi_wm2 (the frozen contract) is untouched; callers opt into POA.
+
+    PERFORMANCE (bugfix): POA is precomputed ONCE per node, on that node's
+    own native sample grid, at __init__ time — pvlib's solar-position call is
+    made exactly once per node here, then splined exactly like ghi_wm2/dni,
+    so poa_wm2/poa_wm2_at_node/poa_wm2_array are plain spline lookups with NO
+    per-query pvlib cost. An earlier version of this class called pvlib fresh
+    on every poa_wm2 query; since DE/GA/SLSQP re-evaluate the full day
+    hundreds/thousands of times during singleday.solve(), that turned a
+    ~5000-call spline lookup into ~5000 fresh ephemeris calls PER DAY PER
+    OPTIMIZER RUN, which is what took a ~30 minute run to ~6 hours. Panel
+    tilt/azimuth are therefore now fixed at construction time (default 4.0 /
+    0.0, matching CarState.panel_tilt_base_deg / array_azimuth_deg) rather
+    than being a free per-query argument — build a second provider instance
+    if you genuinely need to compare tilts.
     """
-    def __init__(self, json_paths: list[str] | str, route):
+    def __init__(self, json_paths: list[str] | str, route,
+                 panel_tilt_deg: float = 4.0, panel_azimuth_deg: float = 0.0):
         if isinstance(json_paths, str):
             json_paths = [json_paths]
 
         self.route = route
+        self.panel_tilt_deg = float(panel_tilt_deg)
+        self.panel_azimuth_deg = float(panel_azimuth_deg)
         coords = []
         self.spline_models = []
+        self.dni_spline_models = []
+        self.poa_spline_models = []
         # Per-node (t_min_s, t_max_s): outside this window the real forecast
         # simply has no sample (pre-dawn / post-dusk are not requested from
         # Solcast at all, unlike the old data's explicit 0.0 night buckets),
         # so a query outside the window returns night (0.0) rather than
         # extrapolating the spline off the end of its data.
         self.t_bounds = []
+        # Calendar date of the race day this provider's data belongs to
+        # (needed for the ONE-TIME pvlib solar-position call per node below —
+        # t_s alone is only seconds-since-midnight, not a full timestamp).
+        # Taken once from the very first sample; every file passed to one
+        # provider instance is expected to be the same race day.
+        self.date_iso: str | None = None
 
         for jp in json_paths:
             with open(jp, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             for node in data:
-                coords.append([node["lat"], node["lon"]])
+                lat_deg, lon_deg = node["lat"], node["lon"]
+                coords.append([lat_deg, lon_deg])
                 samples = node["data"]
+                if self.date_iso is None and samples:
+                    self.date_iso = _solcast_time.period_end_to_local_date(
+                        samples[0]["period_end"])
                 t_local_s = np.array(
                     [_solcast_time.period_end_to_local_s(s["period_end"])
                      for s in samples], dtype=float)
                 ghi = np.array(
                     [float(s.get("ghi", 0.0) or 0.0) for s in samples],
                     dtype=float)
+                dni = np.array(
+                    [float(s.get("dni", 0.0) or 0.0) for s in samples],
+                    dtype=float)
                 order = np.argsort(t_local_s)
-                t_local_s, ghi = t_local_s[order], ghi[order]
+                t_local_s, ghi, dni = t_local_s[order], ghi[order], dni[order]
                 spline_fit = CubicSpline(t_local_s, ghi, bc_type="natural")
+                dni_spline_fit = CubicSpline(t_local_s, dni, bc_type="natural")
                 self.spline_models.append(spline_fit)
+                self.dni_spline_models.append(dni_spline_fit)
                 self.t_bounds.append((float(t_local_s[0]), float(t_local_s[-1])))
 
+                # ONE-TIME pvlib call for this node's whole sample grid (this
+                # is the perf fix — see class docstring). Only bothers with
+                # daylight samples (ghi>0 or dni>0); night samples get poa=0
+                # directly, which also sidesteps pvlib's low-sun-angle noise.
+                poa_vals = np.zeros_like(ghi)
+                daylight = (ghi > 0.0) | (dni > 0.0)
+                if np.any(daylight) and self.date_iso is not None:
+                    base = pd.Timestamp(f"{self.date_iso} 00:00:00",
+                                        tz=_solcast_time.RACE_TZ)
+                    times = pd.DatetimeIndex(
+                        base + pd.to_timedelta(t_local_s[daylight], unit="s"))
+                    solpos = pvlib.solarposition.get_solarposition(
+                        times, lat_deg, lon_deg)
+                    zenith = solpos["apparent_zenith"].values
+                    azimuth = solpos["azimuth"].values
+                    g = np.clip(ghi[daylight], 0.0, None)
+                    d = np.clip(dni[daylight], 0.0, None)
+                    cos_z = np.cos(np.radians(zenith))
+                    dhi = np.clip(g - d * cos_z, 0.0, None)
+                    poa = pvlib.irradiance.get_total_irradiance(
+                        self.panel_tilt_deg, self.panel_azimuth_deg,
+                        zenith, azimuth, d, g, dhi, model="isotropic")
+                    poa_vals[daylight] = np.clip(
+                        np.asarray(poa["poa_global"], dtype=float), 0.0, None)
+                poa_spline_fit = CubicSpline(t_local_s, poa_vals, bc_type="natural")
+                self.poa_spline_models.append(poa_spline_fit)
+
+        self.coords = coords
         self.tree = cKDTree(np.array(coords))
 
     def _in_window(self, t_s: float, idx: int) -> bool:
@@ -282,6 +352,46 @@ class RealSolcastSolarProvider(SolarProvider):
             mask = node_idx == n
             t_min, t_max = self.t_bounds[int(n)]
             vals = self.spline_models[int(n)](t_s[mask])
+            in_win = (t_s[mask] >= t_min) & (t_s[mask] <= t_max)
+            out[mask] = np.where(in_win, np.clip(vals, 0.0, None), 0.0)
+        return out
+
+    # -- POA irradiance (see class docstring) -----------------------------
+    # All three methods below are now plain spline lookups against
+    # poa_spline_models (precomputed once at __init__, not per query — see
+    # the perf note in the class docstring). Mirrors ghi_wm2 /
+    # ghi_wm2_at_node / ghi_wm2_array exactly, just reading a different
+    # spline set, so there is no meaningful per-call cost difference between
+    # GHI and POA lookups any more.
+
+    def poa_wm2(self, t_s: float, x_m: float = 0.0) -> float:
+        if self.route is None:
+            idx = len(self.poa_spline_models) // 2
+        else:
+            lat, lon = self.route.latlon_at(x_m)
+            _, idx = self.tree.query([lat, lon])
+        if not self._in_window(t_s, idx):
+            return 0.0
+        return max(0.0, float(self.poa_spline_models[idx](t_s)))
+
+    def poa_wm2_at_node(self, t_s: float, node_index: int) -> float:
+        idx = int(node_index)
+        if not self._in_window(t_s, idx):
+            return 0.0
+        return max(0.0, float(self.poa_spline_models[idx](t_s)))
+
+    def poa_wm2_array(self, t_s, x_m) -> np.ndarray:
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        node_idx = self.node_index_array(x_m)
+        out = np.zeros(np.shape(x_m), dtype=float)
+        for n in np.unique(node_idx):
+            mask = node_idx == n
+            n = int(n)
+            t_min, t_max = self.t_bounds[n]
+            vals = self.poa_spline_models[n](t_s[mask])
             in_win = (t_s[mask] >= t_min) & (t_s[mask] <= t_max)
             out[mask] = np.where(in_win, np.clip(vals, 0.0, None), 0.0)
         return out

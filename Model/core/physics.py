@@ -38,6 +38,12 @@ from configs.car_config import CarState, LEGACY_KR
 
 G = 9.81  # m/s^2 (both legacy codebases use 9.81)
 
+# Fallback system derate (soiling/temperature/mismatch/MPPT losses not
+# otherwise modeled) applied to POA irradiance in net_power(), used when
+# car.system_derate is not set. See configs/car_config.py CarState.system_derate
+# for the per-car override and TODO-VERIFY note.
+SYSTEM_DERATE = 0.90
+
 # ===========================================================================
 # 2026 PRIMARY MODEL
 # ===========================================================================
@@ -93,6 +99,7 @@ def net_power(
     yaw_deg: np.ndarray | float = 0.0,
     solar_geom_factor: np.ndarray | float = 1.0,
     regen_cap_w: float | np.ndarray | None = None,
+    poa_wm2: np.ndarray | float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Net electrical power into the battery over a segment, and dt.
 
@@ -105,6 +112,18 @@ def net_power(
     regen_cap_w (optional): clamps regenerative charge-back power to a hard
     limit, exactly like Tier 1's _regen_cap_w. Default None leaves the old
     behaviour (uncapped regen) untouched.
+
+    poa_wm2 (optional, workplan fix — "GHI-only under-credits solar noon"):
+    plane-of-array irradiance (W/m^2), e.g. from
+    core.solar.RealSolcastSolarProvider.poa_wm2 / poa_wm2_array, which
+    decomposes GHI into direct/diffuse via DNI and reprojects onto the panel
+    plane instead of treating flat GHI as a flat-panel proxy. When given,
+    p_solar = array_area * array_efficiency * poa_wm2 * system_derate
+    REPLACES the ghi_wm2 * solar_geom_factor term entirely (system_derate is
+    the explicit, tunable conservatism knob for soiling/temperature/mismatch/
+    MPPT losses — car.system_derate if set, else module SYSTEM_DERATE).
+    ghi_wm2 is still REQUIRED as an argument (frozen call signature — dt_s
+    and legacy callers depend on it) but is ignored when poa_wm2 is passed.
 
     Returns (net_power_w, dt_s). Positive net_power charges the battery.
     """
@@ -125,8 +144,24 @@ def net_power(
         regen_into_pack = np.minimum(regen_into_pack, float(regen_cap_w))
     p_electric = np.where(p_mech >= 0.0, p_mech / car.motor_eff, -regen_into_pack)
 
-    p_solar = car.array_area_m2 * car.array_efficiency * \
-        np.asarray(ghi_wm2, dtype=float) * solar_geom_factor
+    # Hard instantaneous ceiling on forward motor draw (workplan fix — there
+    # was previously NO cap anywhere on discharge; p_max_continuous_w *
+    # p_max_derating is regen-only, see car_config.py note). Only clips the
+    # positive-draw side; regen (negative p_electric) is unaffected here —
+    # that's regen_cap_w's job above.
+    p_max_peak = getattr(car, "p_max_peak_w", None)
+    if p_max_peak is not None:
+        p_electric = np.where(p_electric > 0.0,
+                              np.minimum(p_electric, float(p_max_peak)),
+                              p_electric)
+
+    if poa_wm2 is not None:
+        derate = getattr(car, "system_derate", SYSTEM_DERATE)
+        p_solar = car.array_area_m2 * car.array_efficiency * \
+            np.asarray(poa_wm2, dtype=float) * derate
+    else:
+        p_solar = car.array_area_m2 * car.array_efficiency * \
+            np.asarray(ghi_wm2, dtype=float) * solar_geom_factor
 
     return p_solar - p_electric - car.p_idle_w, dt_s
 

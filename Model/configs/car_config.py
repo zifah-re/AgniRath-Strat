@@ -72,6 +72,21 @@ class CarState:
                                          # (LEGACY_KR used 0.19 on 6 m2).
     panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
     albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
+    array_azimuth_deg: float = 0.0       # TODO-VERIFY: panel-plane azimuth
+                                         # (pvlib convention, deg from north,
+                                         # clockwise) for POA irradiance
+                                         # (core.solar.poa_wm2). Solar-car
+                                         # arrays are near-flat, so this has a
+                                         # small effect vs tilt, but is needed
+                                         # for the pvlib incidence calc.
+    system_derate: float = 0.90          # TODO-VERIFY: soiling/temperature/
+                                         # mismatch/MPPT losses not otherwise
+                                         # modeled — the explicit conservatism
+                                         # knob paired with switching GHI ->
+                                         # POA irradiance (workplan fix "two
+                                         # birds"). Applied as p_solar *=
+                                         # system_derate when core.physics.
+                                         # net_power is given poa_wm2.
 
     # ---- drivetrain -----------------------------------------------------
     motor_eff: float = 0.95              # source: DASHBOARD MOTOR_EFF.
@@ -88,6 +103,28 @@ class CarState:
                                          # the 2026 motor spec from car team.
     p_max_derating: float = 0.85         # TODO-VERIFY: thermal margin factor on
                                          # sustained climbs (Plan v3 §5.1).
+                                         # NOTE: this pair (p_max_continuous_w
+                                         # * p_max_derating) is used ONLY for
+                                         # the regen cap and the trailering
+                                         # red-flag threshold (core/physics.py)
+                                         # — it is NOT a forward-draw limit.
+                                         # See p_max_peak_w / p_max_sustained_w
+                                         # below for the actual discharge caps.
+    p_max_peak_w: float = 4000.0         # TODO-VERIFY against real motor
+                                         # controller spec: hard instantaneous
+                                         # ceiling on forward motor draw
+                                         # (short-burst). Clipped in
+                                         # core.physics.net_power. Before this
+                                         # fix there was NO cap anywhere on
+                                         # forward draw.
+    p_max_sustained_w: float = 3500.0    # TODO-VERIFY: thermal-limited average
+                                         # draw the motor can hold for a
+                                         # rolling window (~motor thermal time
+                                         # constant). Enforced by
+                                         # simulator.forward_sim.
+                                         # SustainedPowerTracker, which is a
+                                         # constraint on RECENT HISTORY (not a
+                                         # pointwise clip like p_max_peak_w).
 
     # ---- battery --------------------------------------------------------
     n_packs: int = 6                     # source: user (senior), 24 Jul 2026.

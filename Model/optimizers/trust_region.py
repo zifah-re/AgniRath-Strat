@@ -261,6 +261,12 @@ def _stage_breakdown(res: dict, tow_speed_kmh: float,
         # stage2 can be drawn side by side. ~one point per stride_m metres.
         sl = np.asarray(res.get("slope_pct_trace", []), dtype=float)
         have_sl = sl.size == x.size
+        # Motor power vs distance (workplan fix — this trace didn't exist
+        # anywhere before; forward_sim.DayEvalResult.motor_w_trace is now
+        # populated every substep). Same optional-have-guard pattern as the
+        # other traces so an older/short res dict without it doesn't crash.
+        mw = np.asarray(res.get("motor_w_trace", []), dtype=float)
+        have_mw = mw.size == x.size
         xs = x[idx]
         keep = [0]
         _lastx = xs[0]
@@ -277,6 +283,7 @@ def _stage_breakdown(res: dict, tow_speed_kmh: float,
             "solar_w": ([round(float(solar[k]), 1) for k in gi] if have_solar else []),
             "soc_pct": ([round(float(soc[k]), 2) for k in gi] if have_soc else []),
             "slope_pct": ([round(float(sl[k]), 2) for k in gi] if have_sl else []),
+            "motor_w": ([round(float(mw[k]), 1) for k in gi] if have_mw else []),
         }
         stages.append(entry)
     return stages
@@ -620,6 +627,7 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
                 "soc_pct": res.get("soc_pct_trace", []),
                 "solar_w": res.get("solar_w_trace", []),
                 "slope_pct": res.get("slope_pct_trace", []),
+                "motor_w": res.get("motor_w_trace", []),
                 "time_s": res.get("t_s", []),
             },
             getattr(_sc, "OUTPUT_TRACE_STRIDE_M", 250.0),

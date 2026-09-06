@@ -89,6 +89,22 @@ CRUISE_COMFORT_KMH = 70.0        # free-cruise centre — gentle penalty above t
 SPEED_COMFORT_PENALTY_WEIGHT = 3.0    # gentle zone (> CRUISE_COMFORT_KMH)
 SPEED_SOFTCAP_PENALTY_WEIGHT = 30.0   # steep zone (> CRUISE_SOFT_CAP_KMH)
 
+# ---- Sustained motor power (workplan fix) ----------------------------------
+# car.p_max_sustained_w (configs/car_config.py) is a rolling-window-average
+# thermal limit, not a pointwise ceiling (that's car.p_max_peak_w, enforced as
+# a hard clip in core.physics.net_power). It must NOT be enforced by shrinking
+# the v_max BOUND per segment — that collapses the V_MAX_HARD_KMH/
+# CRUISE_SOFT_CAP_KMH scheme above (see optimizers.singleday.
+# apply_sustained_power_caps' docstring for the full incident writeup: it
+# silently pulled the effective ceiling down to ~70 on any real grade,
+# inflated solve() runtime, and could make the terminal-SOC constraint
+# infeasible). Instead it's a soft objective penalty, same pattern as
+# SPEED_SOFTCAP_PENALTY_WEIGHT above: equivalent seconds of cost per second
+# the rolling-average draw (simulator.forward_sim.SustainedPowerTracker)
+# spends over budget. TODO-VERIFY: tune once real telemetry shows how the
+# motor actually behaves under sustained load.
+SUSTAINED_POWER_PENALTY_WEIGHT = 2.0
+
 # ---- Trailer / tow logistics ----------------------------------------------
 # Speed the tow vehicle moves the car through trailered stretches (mandatory
 # trailering on Day 7 Stage 2 / Day 8 Stage 1, plus any red-flag safety zones).
@@ -222,7 +238,7 @@ INCLUDE_BREAKDOWN_IN_TIME = False
 # only means something on the stochastic scenario/robustness runs anyway, which
 # pass an rng and are never skipped). Left False here so the baseline model's
 # reporting is unchanged; the hardware-fastened build flips it True.
-SKIP_BREAKDOWN_WHEN_UNUSED = False
+SKIP_BREAKDOWN_WHEN_UNUSED = True
 
 # PERFORMANCE knob (hardware-fastened build): Tier 2 samples the days in
 # parallel. The baseline uses THREADS, which the GIL throttles because
@@ -235,7 +251,7 @@ SKIP_BREAKDOWN_WHEN_UNUSED = False
 # loop-geometry DataFrames) are picklable, so results are identical; only the
 # wall-clock changes. Left False in the baseline (thread path, unchanged); the
 # fastened build flips it True. See Model_fastened_hafiz/README_PERF.md.
-TIER2_USE_PROCESS_POOL = False
+TIER2_USE_PROCESS_POOL = True
 
 # ---- Early-finish (evening) charging (strategist directive 23/08) ----------
 # If a day finishes before the 17:00 close, the panel keeps charging the pack

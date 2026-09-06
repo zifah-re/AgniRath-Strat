@@ -4,6 +4,7 @@ import { onMount } from "svelte";
 let variants = [];
 let selectedVariant = "";
 let selectedDay = "";
+let selectedSegment = "";
 let loading = true;
 let busy = false;
 let status = "";
@@ -12,6 +13,11 @@ let fileInput;
 
 $: current = variants.find((v) => v.variant === selectedVariant);
 $: days = current?.days ?? [];
+$: currentDay = days.find((d) => String(d.day) === String(selectedDay));
+$: segments = currentDay?.segments ?? [];
+$: if (!segments.some((s) => s.key === selectedSegment)) {
+  selectedSegment = segments[0]?.key ?? "";
+}
 
 async function loadOptions(preferredVariant = null) {
   loading = true;
@@ -47,23 +53,24 @@ async function uploadFile() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Upload failed");
     await loadOptions(data.variant);
-    status = `Uploaded ${data.filename}. Select a day and click Apply.`;
+    status = `Uploaded ${data.filename}. Select a day/segment and click Apply.`;
   } catch (e) { error = true; status = e.message || "Upload failed"; }
   finally { busy = false; if (fileInput) fileInput.value = ""; }
 }
 
 async function applyStrategy() {
-  if (!selectedVariant || selectedDay === "") return;
+  if (!selectedVariant || selectedDay === "" || selectedSegment === "") return;
   busy = true; error = false; status = "Applying offline model...";
   try {
     const res = await fetch("/api/strategy/push", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ variant: selectedVariant, day: Number(selectedDay) })
+      body: JSON.stringify({ variant: selectedVariant, day: Number(selectedDay), segment: selectedSegment })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Push failed");
-    status = `Applied ${selectedVariant}, Day ${selectedDay} — ${data.points} points.`;
+    const segLabel = segments.find(s => s.key === selectedSegment)?.label ?? selectedSegment;
+    status = `Applied ${selectedVariant}, Day ${selectedDay} — ${segLabel} — ${data.points} points.`;
   } catch (e) { error = true; status = e.message || "Push failed"; }
   finally { busy = false; }
 }
@@ -77,7 +84,7 @@ onMount(() => loadOptions());
     <span class="text-sm text-gray-400">Upload → select day → apply</span>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
     <div>
       <label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label>
       <input bind:this={fileInput} type="file" accept=".json,application/json" onchange={uploadFile}
@@ -96,7 +103,13 @@ onMount(() => loadOptions());
         {#each days as d}<option value={String(d.day)}>Day {d.day} — {d.route ?? "?"}</option>{/each}
       </select>
     </div>
-    <button onclick={applyStrategy} disabled={busy || !selectedVariant || selectedDay === ""}
+    <div>
+      <label class="text-sm text-gray-400 block mb-1">Segment</label>
+      <select bind:value={selectedSegment} class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600">
+        {#each segments as s}<option value={s.key}>{s.label}</option>{/each}
+      </select>
+    </div>
+    <button onclick={applyStrategy} disabled={busy || !selectedVariant || selectedDay === "" || selectedSegment === ""}
       class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">
       {busy ? "Working..." : "Apply to Dashboard"}
     </button>

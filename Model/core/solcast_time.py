@@ -25,3 +25,15 @@ def period_end_to_local_s(period_end_iso: str) -> float:
         ts = ts.tz_localize("UTC")
     local = ts.tz_convert(RACE_TZ)
     return float(local.hour * 3600.0 + local.minute * 60.0 + local.second)
+
+
+def period_end_to_local_date(period_end_iso: str) -> str:
+    """UTC ISO8601 'period_end' -> local calendar date ('YYYY-MM-DD') in
+    Africa/Johannesburg. Used for POA irradiance (core.solar.poa_wm2), which
+    needs a real calendar date (not just seconds-since-midnight) to compute
+    solar position via pvlib."""
+    ts = pd.Timestamp(period_end_iso)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    local = ts.tz_convert(RACE_TZ)
+    return local.strftime("%Y-%m-%d")

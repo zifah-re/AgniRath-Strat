@@ -267,7 +267,18 @@ current_data_default = {
         "SpeedLimit": [],
         "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
         "Headings":[],
-        "TargetProfile": [],     # List of tuples (unix time, speed)
+        "TargetProfile": [],     # List of tuples (unix time, speed) — index-aligned
+                                 #   with the live route (Distance/Coordinates), one
+                                 #   entry per route point. Consumed by the MPC
+                                 #   solver and the live "Predicted Speed" overlay
+                                 #   (main.py ~line 614), both of which index into
+                                 #   it by the SAME i as the live route — never
+                                 #   insert/remove points from this one.
+        "TargetProfileChart": [],  # List of tuples (unix time, speed) — NOT
+                                 #   index-aligned with anything; full-resolution,
+                                 #   includes real (time, 0 km/h) stop gaps for
+                                 #   control/loop stops. Used only by the Strategy
+                                 #   page's time-axis chart.
         "MPCProfile": [],        # List of tuples (unix time, speed)
         "SolarIrradiance":{}
     }
@@ -880,6 +891,12 @@ async def stats_upload(file: UploadFile = File(...)):
 async def stats_logs():
     return {"logs": stats_memory.available_logs()}
 
+@app.delete("/api/stats/logs/{log_id}")
+async def stats_remove_log(log_id: str):
+    if not stats_memory.remove_uploaded(log_id):
+        raise HTTPException(status_code=404, detail="Uploaded log not found")
+    return {"success": True}
+
 @app.post("/api/stats/load")
 async def stats_load(request: Request):
     body = await request.json()
@@ -973,15 +990,27 @@ async def get_strategy_options():
 class StrategyPushRequest(BaseModel):
     variant: str
     day: int
+    segment: str | None = None
     tz_offset: float | None = None
 
 
 @app.post("/api/strategy/push")
 async def push_strategy(payload: StrategyPushRequest):
     """Push a solved strategy's velocity profile onto the live dashboard as
-    TargetProfile, interpolated from distance onto the currently-loaded
-    route and from distance onto time (see strategy_push.py). This is the
-    on-dashboard replacement for manually running push_target_profile.py."""
+    TargetProfile (index-aligned with the live route, used by the MPC solver
+    and the "Predicted Speed" overlay) and TargetProfileChart (full-
+    resolution, includes real stop gaps, used only by the Strategy page's
+    time-axis chart) — interpolated/derived from distance onto the currently
+    -loaded route and from distance onto time (see strategy_push.py). This
+    is the on-dashboard replacement for manually running
+    push_target_profile.py.
+
+    `segment` picks which part of the day to push ("full", or a stage key
+    like "stage1"/"loop"/"stage2" — see list_strategy_variants' per-day
+    "segments" list). This matters because a stage-only KML's live Distance
+    resets to 0 for that stage alone, so it must be compared against that
+    same stage's own (rebased) window of the day's solved trace, not the
+    whole day's cumulative distance axis."""
     live_distance_km = current_data['profile'].get('Distance', [])
     tz_offset = payload.tz_offset if payload.tz_offset is not None else TZ_OFFSET_HOURS
 
@@ -991,12 +1020,17 @@ async def push_strategy(payload: StrategyPushRequest):
             day=payload.day,
             live_distance_km=live_distance_km,
             tz_offset_hours=tz_offset,
+            segment=payload.segment,
         )
     except StrategyPushError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     target_profile = result.pop("target_profile")
-    await app.state.queue.put(("C", {"TargetProfile": target_profile}))
+    target_profile_chart = result.pop("target_profile_chart", [])
+    await app.state.queue.put((
+        "C",
+        {"TargetProfile": target_profile, "TargetProfileChart": target_profile_chart},
+    ))
 
     return {"status": "success", **result}
 
@@ -1046,6 +1080,7 @@ async def save(request: Request):
         if 'MPCProfile' in data['profile'].keys():
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
+            data['profile'].pop("TargetProfileChart", None)
         file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
         file_name=file_name.replace(":","")
         with open(SCRIPT_DIR / "Saves" / file_name ,"w") as file:

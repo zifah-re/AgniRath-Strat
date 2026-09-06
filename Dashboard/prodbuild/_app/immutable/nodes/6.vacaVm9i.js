@@ -5,7 +5,7 @@ import {g as ke, s as V, c as Ae} from "../chunks/DNFaeDbv.js";
 import {b as f} from "../chunks/CqHrAp-I.js";
 import {s as Te, a as $e} from "../chunks/DkIwFic-.js";
 import {C as n, a as Le, L as Pe, P as Be, b as We, c as Me, p as Ee, d as Ie, e as Re} from "../chunks/DHTsbXwT.js";
-var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div> <div class="metric-card svelte-14ry3bj p-4 mt-4"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold">Offline Model Strategy</h3> <span class="text-sm text-gray-400">Upload &rarr; select day &rarr; apply</span></div> <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label> <input id="strategy-file-input" type="file" accept=".json,application/json" class="w-full text-sm text-gray-300 bg-gray-800 rounded border border-gray-600 p-1.5" /></div> <div><label class="text-sm text-gray-400 block mb-1">Strategy</label> <select id="strategy-variant-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"><option value="">No strategies</option></select></div> <div><label class="text-sm text-gray-400 block mb-1">Day</label> <select id="strategy-day-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <button id="strategy-apply-btn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">Apply to Dashboard</button></div> <p id="strategy-status" class="mt-2 text-sm hidden"></p></div></div>');
+var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas id="speed-time-chart" class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div> <div class="metric-card svelte-14ry3bj p-4 mt-4"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold">Offline Model Strategy</h3> <span class="text-sm text-gray-400">Upload &rarr; select day &rarr; apply</span></div> <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label> <input id="strategy-file-input" type="file" accept=".json,application/json" class="w-full text-sm text-gray-300 bg-gray-800 rounded border border-gray-600 p-1.5" /></div> <div><label class="text-sm text-gray-400 block mb-1">Strategy</label> <select id="strategy-variant-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"><option value="">No strategies</option></select></div> <div><label class="text-sm text-gray-400 block mb-1">Day</label> <select id="strategy-day-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <div><label class="text-sm text-gray-400 block mb-1">Segment</label> <select id="strategy-segment-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <button id="strategy-apply-btn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">Apply to Dashboard</button></div> <p id="strategy-status" class="mt-2 text-sm hidden"></p></div></div>');
 function De(ee, te) {
     ye(te, !0);
     const [ae,se] = $e()
@@ -222,15 +222,74 @@ function De(ee, te) {
         }
     }
     function re() {
-        // 1. Existing live telemetry charts update logic (r, l, o updates here...)
-        if (e().historic?.Timestamps?.length > 0) {
-            r && (r.data.datasets[0].data = zipToCoords(e().historic.Time_seconds, e().historic.Speed), r.data.datasets[1].data= zipToCoordsMPC(e().profile.TargetProfile),r.data.datasets[2].data= zipToCoordsMPC(e().profile.MPCProfile), r.options.scales.x.min=e().historic.Time_seconds.at(-1)-120,r.options.scales.x.max=e().historic.Time_seconds.at(-1)+900, r.update("none"));
-            l && (l.data.labels = e().historic.Timestamps, l.data.datasets[0].data = e().historic.Acceleration || [], l.update("none"));
-            o && (o.data.labels = e().historic.Timestamps, o.data.datasets[0].data = e().historic.Altitude || [], o.update("none"));
+        const historic = e().historic;
+        const profileData = e().profile;
+        const hasHistory = historic?.Timestamps?.length > 0;
+        const targetProfile = (profileData?.TargetProfileChart?.length ? profileData.TargetProfileChart : profileData?.TargetProfile) || [];
+        const hasTarget = targetProfile.length > 0;
+
+        // 🔧 FIX (self-healing): `r` is set once, at mount time, only if the
+        // Svelte-bound canvas ref (`_`) happened to be ready at that exact
+        // moment — if it wasn't (e.g. this effect firing before the mount
+        // effect finished), `r` stays null FOREVER for the rest of the
+        // component's life, silently skipping every future update below
+        // (confirmed via debug logging: "r exists: false" even after a
+        // correct 552-point TargetProfileChart arrived). Rather than rely on
+        // that fragile timing, fall back to locating the canvas directly by
+        // id and creating the chart right here if it's still missing —
+        // exactly the same self-healing approach already used for
+        // grad-dist/alt-dist below.
+        if (!r) {
+            const mainCanvas = document.getElementById("speed-time-chart");
+            if (mainCanvas) {
+                r = new n(mainCanvas, ie());
+            }
+        }
+
+        // 🔧 FIX: previously this whole block (including the "Offline model
+        // speed" dataset) only ran when live telemetry existed, and even
+        // then the x-axis was hard-pinned to a ~17min window around "now"
+        // (liveNow-120, liveNow+900) — so a pushed strategy segment
+        // spanning hours only ever showed whatever sliver happened to fall
+        // in that window. Now: TargetProfile updates independently of live
+        // telemetry, and the visible x-range always covers the FULL pushed
+        // segment (unioned with the live near-time window when live data is
+        // also present), so the whole stage/loop's planned speed curve is
+        // always visible.
+        if (r && (hasHistory || hasTarget)) {
+            if (hasHistory) {
+                r.data.datasets[0].data = zipToCoords(historic.Time_seconds, historic.Speed);
+            }
+            r.data.datasets[1].data = zipToCoordsMPC(targetProfile);
+            r.data.datasets[2].data = zipToCoordsMPC(profileData.MPCProfile);
+
+            const targetTimes = targetProfile.map(p => p[0]);
+            const targetMin = targetTimes.length ? Math.min(...targetTimes) : null;
+            const targetMax = targetTimes.length ? Math.max(...targetTimes) : null;
+
+            let xMin, xMax;
+            if (hasHistory) {
+                const liveNow = historic.Time_seconds.at(-1);
+                xMin = liveNow - 120;
+                xMax = liveNow + 900;
+                if (targetMin !== null) xMin = Math.min(xMin, targetMin);
+                if (targetMax !== null) xMax = Math.max(xMax, targetMax);
+            } else {
+                xMin = targetMin;
+                xMax = targetMax;
+            }
+            if (xMin != null && xMax != null) {
+                r.options.scales.x.min = xMin;
+                r.options.scales.x.max = xMax;
+            }
+            r.update("none");
+        }
+        if (hasHistory) {
+            l && (l.data.labels = historic.Timestamps, l.data.datasets[0].data = historic.Acceleration || [], l.update("none"));
+            o && (o.data.labels = historic.Timestamps, o.data.datasets[0].data = historic.Altitude || [], o.update("none"));
         }
 
         // 2. 🔥 FIX: Accurate Chart.js property paths for Distance profiles
-        const profileData = e().profile;
         if (profileData && profileData.Distance && profileData.Distance.length > 0) {
             
             if (window.chartAD) {
@@ -256,9 +315,10 @@ function De(ee, te) {
         const fileInput = document.getElementById("strategy-file-input");
         const variantSelect = document.getElementById("strategy-variant-select");
         const daySelect = document.getElementById("strategy-day-select");
+        const segmentSelect = document.getElementById("strategy-segment-select");
         const applyBtn = document.getElementById("strategy-apply-btn");
         const statusEl = document.getElementById("strategy-status");
-        if (!fileInput || !variantSelect || !daySelect || !applyBtn || !statusEl) return () => {};
+        if (!fileInput || !variantSelect || !daySelect || !segmentSelect || !applyBtn || !statusEl) return () => {};
 
         let variants = [];
         let busy = false;
@@ -271,12 +331,33 @@ function De(ee, te) {
         }
 
         function refreshApplyDisabled() {
-            applyBtn.disabled = busy || !variantSelect.value || daySelect.value === "";
+            applyBtn.disabled = busy || !variantSelect.value || daySelect.value === "" || segmentSelect.value === "";
         }
 
         function setBusy(b) {
             busy = b;
             applyBtn.textContent = b ? "Working..." : "Apply to Dashboard";
+            refreshApplyDisabled();
+        }
+
+        // A stage-only KML (Stage 1 / Loop / Stage 2) restarts its own live
+        // Distance count at 0, same as every other stage's own KML does. So
+        // pushing a day's solved profile needs to know WHICH stage is
+        // currently loaded, to compare against that same stage's own
+        // (rebased) window of the day's solved trace rather than the whole
+        // day's combined distance axis — see strategy_push.py's
+        // build_target_profile for the matching backend-side fix.
+        function renderSegments(day) {
+            const segments = day?.segments ?? [{ key: "full", label: day ? `Full day (${day.distance_km ?? "?"} km)` : "No day selected" }];
+            const prevValue = segmentSelect.value;
+            segmentSelect.innerHTML = "";
+            segments.forEach(s => {
+                const opt = document.createElement("option");
+                opt.value = s.key;
+                opt.textContent = s.label;
+                segmentSelect.appendChild(opt);
+            });
+            segmentSelect.value = segments.some(s => s.key === prevValue) ? prevValue : (segments[0]?.key ?? "");
             refreshApplyDisabled();
         }
 
@@ -290,6 +371,9 @@ function De(ee, te) {
                 opt.textContent = `Day ${d.day} — ${d.route ?? "?"}`;
                 daySelect.appendChild(opt);
             });
+            const selectedDay = days.find(d => String(d.day) === daySelect.value) ?? days[0];
+            if (selectedDay) daySelect.value = String(selectedDay.day);
+            renderSegments(selectedDay || null);
             refreshApplyDisabled();
         }
 
@@ -340,7 +424,7 @@ function De(ee, te) {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Upload failed");
                 await loadOptions(data.variant);
-                setStatus(`Uploaded ${data.filename}. Select a day and click Apply.`, false);
+                setStatus(`Uploaded ${data.filename}. Select a day/segment and click Apply.`, false);
             } catch (e) {
                 setStatus(e.message || "Upload failed", true);
             } finally {
@@ -352,17 +436,19 @@ function De(ee, te) {
         async function applyStrategy() {
             const variant = variantSelect.value;
             const day = daySelect.value;
-            if (!variant || day === "") return;
+            const segment = segmentSelect.value;
+            if (!variant || day === "" || segment === "") return;
             setBusy(true); setStatus("Applying offline model...", false);
             try {
                 const res = await fetch("/api/strategy/push", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ variant, day: Number(day) })
+                    body: JSON.stringify({ variant, day: Number(day), segment })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Push failed");
-                setStatus(`Applied ${variant}, Day ${day} — ${data.points} points.`, false);
+                const segLabel = segmentSelect.options[segmentSelect.selectedIndex]?.textContent || segment;
+                setStatus(`Applied ${variant}, Day ${day} — ${segLabel} — ${data.points} points.`, false);
             } catch (e) {
                 setStatus(e.message || "Push failed", true);
             } finally {
@@ -371,11 +457,17 @@ function De(ee, te) {
         }
 
         const onVariantChange = () => renderDays(variantSelect.value);
-        const onDayChange = () => refreshApplyDisabled();
+        const onDayChange = () => {
+            const v = variants.find(x => x.variant === variantSelect.value);
+            const selectedDay = v?.days?.find(d => String(d.day) === daySelect.value);
+            renderSegments(selectedDay || null);
+        };
+        const onSegmentChange = () => refreshApplyDisabled();
 
         fileInput.addEventListener("change", uploadFile);
         variantSelect.addEventListener("change", onVariantChange);
         daySelect.addEventListener("change", onDayChange);
+        segmentSelect.addEventListener("change", onSegmentChange);
         applyBtn.addEventListener("click", applyStrategy);
 
         loadOptions();
@@ -384,6 +476,7 @@ function De(ee, te) {
             fileInput.removeEventListener("change", uploadFile);
             variantSelect.removeEventListener("change", onVariantChange);
             daySelect.removeEventListener("change", onDayChange);
+            segmentSelect.removeEventListener("change", onSegmentChange);
             applyBtn.removeEventListener("click", applyStrategy);
         };
     }
@@ -395,7 +488,7 @@ function De(ee, te) {
         }
     }
     ),
-   _e( () => (_ && (r = new n(_,ie())),
+   _e( () => (_ && !r && (r = new n(_,ie())),
     y && (l = new n(y,u("Acceleration", e().historic.Acceleration || [], "#8b5cf6", "Acceleration (m/s²)"))),
     x && (o = new n(x,u("Altitude", e().historic.Altitude || [], "#06b6d4", "Altitude (m)"))),
     
