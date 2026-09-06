@@ -1422,6 +1422,52 @@ if __name__ == "__main__":
             "seg_type":        seg_type or _seg_type_for_file(filepath),
         })
 
+    def _mark_control_stop_zone(df: pd.DataFrame, day_num: int) -> pd.DataFrame:
+        """Flag rows within the mandatory-control-stop zone (SR 2.28.5).
+
+        BUGFIX (was hardcoded False everywhere a route DataFrame got built —
+        see _parse_route_file — which silently killed forward_sim's dedicated
+        30-min control-stop parked-solar credit: cs_stop_here could never be
+        True, so control stops got NONE of the averaged-parked-solar credit
+        that loop stops correctly receive via their seg_type tag. That is the
+        actual reason the control-stop SOC "jump" looked smaller than the
+        5-minute loop-stop jump, or missing entirely — nothing to do with
+        the two events happening "at the same distance".
+
+        The control stop's real-world position is exactly where Stage 1 ends
+        and Stage 2 begins (race_config.DAY_ROUTE_NOTES: each day's named
+        control stop IS the Stage-1-end / Stage-2-start town, e.g. day 1's
+        "Rustenburg Highschool" is the join between the Boiketlong->Rustenburg
+        and Rustenburg->Swartruggens files). Day 6 has no Stage 2 file
+        (stage2_km=0.0) and its control stop IS the finish, so the zone sits
+        at the very end of the assembled route instead of an internal seam.
+        Day 3 (full blind, control_stop=None) gets no zone — genuinely
+        unknown until the Golden Envelope.
+        """
+        note = (rc.DAY_ROUTE_NOTES[day_num - 1]
+                if 0 <= day_num - 1 < len(rc.DAY_ROUTE_NOTES) else None)
+        if note is None or note.get("control_stop") is None:
+            return df
+        seg_type = df["seg_type"].to_numpy(dtype=str)
+        dist = df["distance_m"].to_numpy(dtype=float)
+        is_stage1 = seg_type == "stage1"
+        is_stage2 = seg_type == "stage2"
+        zone_m = float(getattr(rc, "CONTROL_STOP_ZONE_M", 300.0))
+        if np.any(is_stage2):
+            # Normal day: CS sits at the stage1/stage2 seam.
+            cs_center_m = float(dist[is_stage1].max()) if np.any(is_stage1) else float(dist[is_stage2].min())
+        elif np.any(is_stage1):
+            # Day-6-style: no Stage 2 file — CS is the end of the route.
+            cs_center_m = float(dist[is_stage1].max())
+        else:
+            return df
+        in_zone = np.abs(dist - cs_center_m) <= zone_m
+        cs_col = df["control_stop"].to_numpy(dtype=bool)
+        cs_col = cs_col | in_zone
+        df = df.copy()
+        df["control_stop"] = cs_col
+        return df
+
     def _load_route(route_files, day_num):
         """Parse .save files into a single Route for one day.
 
@@ -1440,7 +1486,9 @@ if __name__ == "__main__":
             part_df["distance_m"] += offset
             offset = part_df["distance_m"].max()
             day_dfs.append(part_df)
-        return Route(pd.concat(day_dfs, ignore_index=True))
+        full_df = pd.concat(day_dfs, ignore_index=True)
+        full_df = _mark_control_stop_zone(full_df, day_num)
+        return Route(full_df)
 
     def _loop_name_tokens(loop_name):
         """Searchable city/place tokens for a plan loop name, generic words

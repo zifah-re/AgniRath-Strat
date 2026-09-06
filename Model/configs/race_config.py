@@ -143,6 +143,12 @@ EARLY_START_PENALTY_PER_MIN = 2          # SR 2.22.8: starting before official
 # Control stops (SR 2.28)
 # ---------------------------------------------------------------------------
 CONTROL_STOP_DURATION_S = 30 * 60        # SR 2.28.5: one mandatory 30-min stop/day
+# Half-width (m) of the "control-stop zone" flagged on route.df["control_stop"]
+# around the real CS position (the Stage-1/Stage-2 seam — see
+# optimizers.trust_region._mark_control_stop_zone). Route rows are ~10-50m
+# apart, so a 300m zone comfortably covers GPS/offset jitter around the named
+# stop without bleeding into normal driving on either side.
+CONTROL_STOP_ZONE_M = 300.0
 CONTROL_STOP_UNTOUCHABLE_S = 25 * 60     # SR 2.28.14: no team member may touch
                                          #   the vehicle for 25 min of the 30
 # SR 2.28.6: the 30-min stop may be served at ANY chosen time during the day,

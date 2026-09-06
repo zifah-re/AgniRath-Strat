@@ -53,28 +53,78 @@ DE_MAXITER = 60
 # 1. Sharp-turn speed caps
 # ===============================================================================
 
-def _sharp_turn_fraction(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
-                          heading_delta_threshold_deg: float) -> np.ndarray:
-    """Fraction of each control segment's length flagged as a sharp turn."""
-    if not route: return np.zeros(len(seg_start_m))
-    x = route.df["distance_m"].to_numpy()
-    bearing = route.df["bearing_deg"].to_numpy()
+# Cap on the physical length (m) a single flagged bearing-change point can
+# "own" for the sharp-turn fraction below — see BUGFIX note in
+# _sharp_turn_fraction. A real hairpin/sharp bend on this route class spans
+# tens of metres, not kilometres.
+MAX_TURN_SPAN_M = 50.0
+
+
+def _turn_point_lengths(x: np.ndarray, bearing: np.ndarray,
+                         heading_delta_threshold_deg: float,
+                         max_turn_span_m: float = MAX_TURN_SPAN_M
+                         ) -> np.ndarray:
+    """Physical length (m) attributable to a sharp turn at each route point.
+
+    Zero for points whose bearing change is below threshold. For flagged
+    points, the length is half the gap to the previous point + half the gap
+    to the next, CAPPED at max_turn_span_m so an isolated flagged point next
+    to a large inter-point gap (sparse routing-API sampling on an otherwise
+    straight stretch) can't inherit that whole gap as "turn length".
+    """
+    if len(x) == 0:
+        return np.zeros(0)
     raw_delta = np.diff(bearing, prepend=bearing[0])
     wrapped = (raw_delta + 180.0) % 360.0 - 180.0
     sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
+    if len(x) > 1:
+        gap_prev = np.diff(x, prepend=x[0])
+        gap_next = np.diff(x, append=x[-1])
+        own_len = np.minimum((gap_prev + gap_next) / 2.0, max_turn_span_m)
+    else:
+        own_len = np.zeros(len(x))
+    return np.where(sharp_point, own_len, 0.0)
+
+
+def _sharp_turn_fraction(route: Route, seg_start_m: np.ndarray, seg_len_m: float,
+                          heading_delta_threshold_deg: float) -> np.ndarray:
+    """Physical-length fraction of each control segment flagged as a sharp
+    turn — i.e. (metres of segment that are actually a sharp turn) / (segment
+    length), NOT (count of flagged route points) / (count of route points).
+
+    BUGFIX: the previous implementation divided the COUNT of flagged route
+    points by the COUNT of route points landing in the segment. Route points
+    come straight from the routing API's own profile output and are NOT
+    evenly spaced — curvy stretches get sampled far more densely than
+    straight ones by most routing APIs. That made the computed "fraction"
+    track point DENSITY, not real curviness: a segment with only a handful
+    of sparse points, one of which is flagged, could score frac >= 0.5 and
+    collapse apply_turn_speed_caps' blended speed bound for the WHOLE 10km
+    control segment down near SHARP_TURN_SPEED_LIMIT_KMH, even though the
+    real turn physically spans a few tens of metres of that segment. This
+    is the root cause of the "random" ~29-30 km/h 10km-segment crawls seen
+    in production output that had no relationship to actual route curvature
+    or SOC/energy pressure. Using real point spacing (_turn_point_lengths)
+    and dividing by the segment's own physical length fixes this regardless
+    of how densely any given stretch happens to be sampled.
+    """
+    if not route: return np.zeros(len(seg_start_m))
+    x = route.df["distance_m"].to_numpy()
+    bearing = route.df["bearing_deg"].to_numpy()
+    flagged_len = _turn_point_lengths(x, bearing, heading_delta_threshold_deg)
 
     seg_end_m = seg_start_m + seg_len_m
     frac = np.zeros(len(seg_start_m))
     for i, (s, e) in enumerate(zip(seg_start_m, seg_end_m)):
         in_seg = (x >= s) & (x < e)
-        n = int(np.sum(in_seg))
-        if n > 0:
-            frac[i] = float(np.sum(sharp_point[in_seg])) / n
-    return frac
+        if np.any(in_seg):
+            frac[i] = float(np.sum(flagged_len[in_seg])) / seg_len_m
+    return np.clip(frac, 0.0, 1.0)
 
 
 def _loop_local_sharp_turn_frac(loop_df: pd.DataFrame, seg_len_m: float,
-                                heading_delta_threshold_deg: float) -> np.ndarray:
+                                heading_delta_threshold_deg: float
+                                ) -> tuple[np.ndarray, float]:
     """Sharp-turn fraction computed on ONE lap's own local geometry (loop-
     relative distance starting at 0), binned into fixed-size local control
     segments — evaluated ONCE per unique loop name, then tiled identically
@@ -91,14 +141,16 @@ def _loop_local_sharp_turn_frac(loop_df: pd.DataFrame, seg_len_m: float,
     geometry and tiling it removes both: every rep sees the identical cap at
     the identical loop-relative position.
     """
+    # BUGFIX (same root cause as _sharp_turn_fraction above): use physical
+    # flagged-length / segment-length, not flagged-point-count / point-count,
+    # so this loop-local fraction isn't at the mercy of how densely the
+    # loop's own .save file happened to be sampled.
     if loop_df is None or len(loop_df) == 0:
-        return np.zeros(1)
+        return np.zeros(1), 0.0
     x_local = loop_df["distance_m"].to_numpy()
     x_local = x_local - x_local[0]
     bearing = loop_df["bearing_deg"].to_numpy()
-    raw_delta = np.diff(bearing, prepend=bearing[0])
-    wrapped = (raw_delta + 180.0) % 360.0 - 180.0
-    sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
+    flagged_len = _turn_point_lengths(x_local, bearing, heading_delta_threshold_deg)
 
     lap_len_m = float(x_local[-1]) if len(x_local) else 0.0
     n_local_segs = max(1, int(np.ceil(lap_len_m / seg_len_m))) if lap_len_m > 0 else 1
@@ -106,10 +158,9 @@ def _loop_local_sharp_turn_frac(loop_df: pd.DataFrame, seg_len_m: float,
     for i in range(n_local_segs):
         s, e = i * seg_len_m, (i + 1) * seg_len_m
         in_seg = (x_local >= s) & (x_local < e)
-        n = int(np.sum(in_seg))
-        if n > 0:
-            frac[i] = float(np.sum(sharp_point[in_seg])) / n
-    return frac, lap_len_m
+        if np.any(in_seg):
+            frac[i] = float(np.sum(flagged_len[in_seg])) / seg_len_m
+    return np.clip(frac, 0.0, 1.0), lap_len_m
 
 
 def _build_loop_local_turn_caps(loop_geoms: dict | None,
@@ -630,6 +681,32 @@ def _terminal_soc_constraint(evaluator: DayEvaluator,
         lb=0.0, ub=np.inf,
     )
 
+def _intraday_soc_floor_constraint(evaluator: DayEvaluator,
+                                    soc_min_pct: float) -> NonlinearConstraint:
+    """Hard floor on SOC at EVERY substep of the day, not just the endpoint.
+
+    BUGFIX: only the terminal SOC (_terminal_soc_constraint above, and
+    trust_region's end_soc >= soc_min_pct check) was ever constrained.
+    core.battery.Battery.apply_energy_wh deliberately clips the physical SOC
+    ledger to [0, soc_max_pct] — NOT [soc_min_pct, soc_max_pct] — leaving the
+    soc_min_pct feasibility check to "the optimizer's/checker's job" (its own
+    docstring). But nothing was actually doing that check intraday, so a
+    profile could plan a mid-day dip to single digits, or literally 0% SOC
+    (confirmed in production dashboard traces — a day cruising at 68 km/h
+    with the pack pinned at 0.00% for several minutes before recovering by
+    dusk), and still be reported "feasible" because the END-of-day number
+    looked fine. A real pack cannot sustain multi-kW motor draw at 0% SOC;
+    this is a physical/safety violation regardless of how the day finishes.
+    Uses the SAME soc_pct_trace already computed by forward_sim for the
+    dashboard, so there's no extra simulation cost.
+    """
+    def _min_soc_margin(v: np.ndarray) -> float:
+        trace = evaluator(v).soc_pct_trace
+        if trace.size == 0:
+            return 0.0  # no per-substep trace available -> nothing to check
+        return float(np.min(trace)) - soc_min_pct
+    return NonlinearConstraint(_min_soc_margin, lb=0.0, ub=np.inf)
+
 def _time_cutoff_constraint(evaluator: DayEvaluator,
                              allowed_time_s: float) -> NonlinearConstraint:
     return NonlinearConstraint(
@@ -650,7 +727,8 @@ class GlobalSearchResult(_t.NamedTuple):
 class GlobalSearchStrategy(_t.Protocol):
     def search(self, objective: _t.Callable[[np.ndarray], float], bounds: Bounds,
                constraints: list[NonlinearConstraint],
-               seed: int | None = None) -> GlobalSearchResult: ...
+               seed: int | None = None,
+               extra_seeds: list[np.ndarray] | None = None) -> GlobalSearchResult: ...
 
 class DifferentialEvolutionSearch:
     def __init__(self, popsize: int = DE_POPSIZE, maxiter: int = DE_MAXITER,
@@ -662,12 +740,27 @@ class DifferentialEvolutionSearch:
         self.mutation = mutation
         self.recombination = recombination
 
-    def search(self, objective, bounds, constraints, seed=None) -> GlobalSearchResult:
+    def search(self, objective, bounds, constraints, seed=None,
+               extra_seeds: list[np.ndarray] | None = None) -> GlobalSearchResult:
+        init = "latinhypercube"
+        if extra_seeds:
+            # Build an explicit initial population: scipy's DE accepts an
+            # (M, N) array for `init` directly. Fill the rest with a Latin
+            # hypercube sample and slot the targeted high-speed seeds in.
+            lb, ub = np.asarray(bounds.lb), np.asarray(bounds.ub)
+            dim = lb.size
+            pop_size = max(self.popsize * dim, len(extra_seeds) + 1)
+            rng = np.random.default_rng(seed)
+            base = rng.uniform(lb, ub, size=(pop_size, dim))
+            for i, s in enumerate(extra_seeds[:pop_size]):
+                base[i] = np.clip(s, lb, ub)
+            init = base
         result = differential_evolution(
             objective, bounds,
             strategy=self.strategy, popsize=self.popsize, maxiter=self.maxiter,
             mutation=self.mutation, recombination=self.recombination,
             constraints=tuple(constraints), polish=False, seed=seed, tol=1e-6,
+            init=init,
         )
         return GlobalSearchResult(x=result.x, fun=result.fun, method="de")
 
@@ -699,7 +792,8 @@ class GeneticAlgorithmSearch:
         idx = rng.integers(0, len(pop), size=k)
         return pop[idx[np.argmin(fitness[idx])]]
 
-    def search(self, objective, bounds, constraints, seed=None) -> GlobalSearchResult:
+    def search(self, objective, bounds, constraints, seed=None,
+               extra_seeds: list[np.ndarray] | None = None) -> GlobalSearchResult:
         rng = np.random.default_rng(seed)
         lb, ub = np.asarray(bounds.lb), np.asarray(bounds.ub)
         dim = lb.size
@@ -721,6 +815,28 @@ class GeneticAlgorithmSearch:
         n_seed = min(self.population, len(seed_speeds))
         for i in range(n_seed):
             pop[i] = np.clip(np.full(dim, seed_speeds[i]), lb, ub)
+
+        # BUGFIX (issue 4 — "barely goes above 70/75 even on days with clear
+        # slack"): the seeds above are all UNIFORM comfort-band speeds. With
+        # the steep quadratic softcap penalty starting right at
+        # CRUISE_SOFT_CAP_KMH and a small population/generation budget, SLSQP
+        # gradient-descends locally from whichever seed it's handed and almost
+        # never discovers that pushing into 75-85 pays off — that benefit is
+        # non-convex (it only pays off if it lets you actually beat a cutoff
+        # or bank a loop), so a local search needs to START near that basin to
+        # find it at all. `extra_seeds` (built by solve() from the day's real
+        # allowed_time_s / distance and its loop count) drops in targeted,
+        # non-uniform candidates — e.g. "the constant speed that exactly uses
+        # the day's remaining time budget" — instead of leaving the optimizer
+        # to stumble onto them by chance. Slotted in right after the uniform
+        # seeds, before the random fill, and never at the cost of losing the
+        # existing comfort-band seeds.
+        if extra_seeds:
+            n_extra = min(self.population - n_seed, len(extra_seeds))
+            for j in range(n_extra):
+                pop[n_seed + j] = np.clip(
+                    np.asarray(extra_seeds[j], dtype=float).reshape(dim), lb, ub)
+
         fitness = np.array([self._penalized_fitness(objective, constraints, ind)
                              for ind in pop])
         n_elite = max(1, int(self.elite_frac * self.population))
@@ -908,7 +1024,41 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     constraints = [
         _terminal_soc_constraint(evaluator, alpha_next_day_pct),
         _time_cutoff_constraint(evaluator, allowed_time_s),
+        _intraday_soc_floor_constraint(evaluator, car.soc_min_pct),
     ]
+
+    # ------------------------------------------------------------------
+    # Targeted high-speed GA/DE seeds for "worth-it" opportunities (issue 4
+    # fix): instead of relying on random/uniform-comfort-band seeds to
+    # stumble onto the cases where pushing past CRUISE_SOFT_CAP_KMH actually
+    # pays off, build candidates that start EXACTLY where that basin is:
+    #   1) the constant speed that exactly spends the day's whole remaining
+    #      time budget over its remaining distance — the natural "how fast do
+    #      we NEED to go" anchor. On a spacious day this sits below comfort
+    #      and does no harm (SLSQP + the speed penalty pull it back down); on
+    #      a genuinely tight day it lands above CRUISE_SOFT_CAP_KMH and gives
+    #      the local search a starting point already inside the basin it
+    #      would otherwise never find.
+    #   2) the same speed with a small margin added, in case hitting the
+    #      cutoff exactly still fails the intraday-SOC/terminal-SOC
+    #      constraints and a bit more speed is what actually closes the gap.
+    #   3) on loop days specifically (n_loops > 0 — the loop stop-time budget
+    #      already eats into allowed_time_s, so these days are structurally
+    #      the tightest), a seed pinned at the hard soft-cap so the "burst
+    #      speed, bank time, fit the loop" strategy is represented too.
+    # ------------------------------------------------------------------
+    extra_seeds: list[np.ndarray] = []
+    rem_km = rem_m / 1000.0
+    if allowed_time_s > 0.0 and rem_km > 0.0:
+        target_avg_kmh = rem_km / (allowed_time_s / 3600.0)
+        extra_seeds.append(np.clip(np.full(n_segments, target_avg_kmh),
+                                    bounds.lb, bounds.ub))
+        extra_seeds.append(np.clip(np.full(n_segments, target_avg_kmh + 5.0),
+                                    bounds.lb, bounds.ub))
+    if n_loops > 0:
+        _burst_kmh = float(getattr(SCFG, "CRUISE_SOFT_CAP_KMH", 75.0))
+        extra_seeds.append(np.clip(np.full(n_segments, _burst_kmh),
+                                    bounds.lb, bounds.ub))
 
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
         warm_x = np.asarray(kwargs["warm_start_kmh"], dtype=float).reshape(-1)
@@ -928,10 +1078,12 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
                 x=seed_x, fun=objective(seed_x), method="warm-resampled")
         else:
             global_search = get_global_search(global_method)
-            global_result = global_search.search(objective, bounds, constraints, seed=seed)
+            global_result = global_search.search(
+                objective, bounds, constraints, seed=seed, extra_seeds=extra_seeds)
     else:
         global_search = get_global_search(global_method)
-        global_result = global_search.search(objective, bounds, constraints, seed=seed)
+        global_result = global_search.search(
+            objective, bounds, constraints, seed=seed, extra_seeds=extra_seeds)
 
     _iter_count = [0]
     def _cb(xk):
