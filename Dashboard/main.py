@@ -669,6 +669,7 @@ async def update_processor(queue: asyncio.Queue):
                         profiles={
                             "Gradient":current_data['profile']['Gradient'],
                             "SpeedProfile":current_data['profile']['SpeedProfile'],
+                            "SpeedLimit":current_data['profile']['SpeedLimit'],
                             "TargetProfile":current_data['profile']['TargetProfile'],
                             "Distance":current_data['profile']['Distance'],
                             "Coordinates":current_data['profile']['Coordinates'],

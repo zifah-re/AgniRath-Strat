@@ -19,8 +19,8 @@ G_MS2 = 9.81
 CRR = 0.007
 CDA_M2 = 0.16
 AIR_DENSITY = 1.2
-ARRAY_AREA_M2 = 5.95
-ARRAY_EFFICIENCY = 0.18
+ARRAY_AREA_M2 = 5.79
+ARRAY_EFFICIENCY = 0.21
 PANEL_TILT = 4
 ALBEDO = 0.2
 
@@ -71,7 +71,7 @@ DAYWISE_FILES = {
 }
 
 # ____ CACHING & FAST LOOKUPS ____ #
-weather_folder = Path(r'Solar_Processed')
+weather_folder = Path(r'Solar_real')
 CACHE_FILE = "solar_grid_cache.pkl"
 
 SOLAR_GRID_CACHE = {}

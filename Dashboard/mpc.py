@@ -119,13 +119,13 @@ def mpc_cost_function(v_horizon, current_soc, current_v, target_profile, terrain
         
     return cost
 
-def compute_optimal_velocity(current_v, current_soc, current_time, targets, terrain, altitude, heading, coords, solar, distance):
+def compute_optimal_velocity(current_v, current_soc, current_time, targets, speedlimit, terrain, altitude, heading, coords, solar, distance):
     history_v = [current_v]
     history_soc = [current_soc]
     dt_array = [current_time]
     
     for i in range(1, N + 1):
-        speed_bounds = [(0.1, 25.0) for _ in range(N)] # Lower bound 0.1 to avoid division by zero
+        speed_bounds = list(zip([0.1 for _ in range(N)],speedlimit[i-1:i+N-1])) # Lower bound 0.1 to avoid division by zero
         u_guess = np.ones(N) * current_v
         
         # --- PRECOMPUTE THE TIME WINDOW ---
@@ -184,10 +184,11 @@ def main(results=None, profiles=None):
     current_time = results['Time_seconds']
     
     if not profiles:
-        profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance", "TargetProfile", "Distance"])
+        profiles = get_profile(["Gradient", "SpeedProfile", "SpeedLimit", "SolarIrradiance", "TargetProfile", "Distance"])
         
     distance_profile = profiles.get("Distance")
     terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
+    speed_limits = profiles.get("SpeedLimit", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     altitude_profile = profiles.get("Altitude", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     heading_profile = profiles.get("Headings", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)
@@ -199,6 +200,8 @@ def main(results=None, profiles=None):
         
     terrain_profile = slice_profiles(terrain_profile, distance_profile, current_distance, 0)
     altitude_profile = slice_profiles(altitude_profile, distance_profile, current_distance, 0)
+    speed_limits = slice_profiles(speed_limits, distance_profile, current_distance, 75)
+    speed_limits=np.clip(speed_limits,a_max=75) * (5/18)
     heading_profile = slice_profiles(heading_profile, distance_profile, current_distance, 0)
     target_profile = slice_profiles(target_profile, distance_profile, current_distance, current_speed)
     target_profile = target_profile * (5 / 18)
@@ -206,4 +209,4 @@ def main(results=None, profiles=None):
     distance_profile = slice_profiles(distance_profile, distance_profile, current_distance, 0)
     
     current_speed *= 5 / 18
-    return compute_optimal_velocity(current_speed, current_soc, current_time, target_profile, terrain_profile, altitude_profile, heading_profile, coords, solar_profile, distance_profile)
+    return compute_optimal_velocity(current_speed, current_soc, current_time, target_profile, speed_limits, terrain_profile, altitude_profile, heading_profile, coords, solar_profile, distance_profile)
