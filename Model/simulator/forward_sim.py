@@ -144,6 +144,17 @@ class DayEvalResult:
     # the day's start SOC so a day with zero substeps still reports something
     # sane.
     peak_soc_pct: float = 0.0
+    # Lowest battery.soc_pct reached at ANY point during the day (mirrors
+    # peak_soc_pct's tracking exactly, moving substeps AND parked/stop-time
+    # charging, seeded at the day's start SOC). Nothing previously tracked
+    # the INTRADAY minimum — only the end-of-day final_soc_pct was checked
+    # against car.soc_min_pct — so a mid-day trough (a climb, a headwind
+    # stretch) could punch through the usable floor and recover by the end
+    # of the day without ever being caught. singleday.py's trough-SOC-floor
+    # NonlinearConstraint reads this to HARD-forbid a candidate speed
+    # profile from ever actually dipping below car.soc_min_pct, not just
+    # its terminal value.
+    trough_soc_pct: float = 0.0
 
 
 class DriverSwapScheduler:
@@ -345,7 +356,7 @@ def _apply_parked_charge(battery: Battery, car: CarState,
 def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                             solar_provider, wind_provider, t0_s: float,
                             start_soc_pct: float, seg_start_m: np.ndarray,
-                            seg_len_m: float, energy_grid_m: float,
+                            seg_len_m: float | np.ndarray, energy_grid_m: float,
                             rng: _t.Optional[random.Random] = None, *,
                             regen_cap_w: float | None = None,
                             cs_taken: bool = False,
@@ -401,6 +412,9 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     # the day's actual start SOC so it's meaningful even if the loop below
     # never executes (zero-length day).
     peak_soc_pct = float(start_soc_pct)
+    # Mirrors peak_soc_pct above, tracking the running MINIMUM instead — see
+    # DayEvalResult.trough_soc_pct.
+    trough_soc_pct = float(start_soc_pct)
     # PERF: in a deterministic run whose objective ignores breakdown time, the
     # per-substep BreakdownModel calls only produce a discarded number. Skip
     # them entirely when the fastened build asks for it (no result changes; the
@@ -416,11 +430,22 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     # CONTROL_SEGMENT_M; without this clamp the integrator would drive up to
     # one full phantom control segment (~10 km) past the end of the day's
     # route, inflating driven_km / trailered_km / total_time_s in the report.
-    seg_lens_m = np.full(n_seg, float(seg_len_m))
+    #
+    # BUGFIX: seg_len_m was assumed scalar (np.full(n_seg, float(seg_len_m))
+    # crashes with "only 0-dimensional arrays can be converted to Python
+    # scalars" the moment a caller passes a per-segment array — which is a
+    # legitimate input per the type hint's intent and is exactly what the
+    # route-end-clamp regression test does). Broadcast instead, so both a
+    # single scalar (every existing call site) and a per-segment array both
+    # work; the clamp on the final segment now reads that segment's own
+    # nominal length rather than assuming it's the same as every other one.
+    seg_lens_m = np.broadcast_to(
+        np.asarray(seg_len_m, dtype=float), (n_seg,)
+    ).copy()
     if route is not None and n_seg > 0:
         seg_lens_m[-1] = max(
             0.0,
-            min(float(seg_len_m), float(route.total_m) - float(seg_start_m[-1])),
+            min(float(seg_lens_m[-1]), float(route.total_m) - float(seg_start_m[-1])),
         )
 
     # Audit fix: t_array/x_array must be function-scope — the original had
@@ -653,6 +678,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                     solar_underutil_j += _apply_parked_charge(
                         battery, car, _parked_w, _parked_s) * 3600.0
                     peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
+                    trough_soc_pct = min(trough_soc_pct, battery.soc_pct)
                 if loop_stop_here:
                     if not in_loop_zone:
                         in_loop_zone = True
@@ -666,6 +692,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                         solar_underutil_j += _apply_parked_charge(
                             battery, car, _parked_w, loop_stop_dur_s) * 3600.0
                         peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
+                        trough_soc_pct = min(trough_soc_pct, battery.soc_pct)
                 else:
                     in_loop_zone = False
 
@@ -695,6 +722,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
             # p_net == 0 for trailered segments → no SOC change.
             battery.apply_energy_wh(float(p_net) * float(dt_s_step) / 3600.0)
             peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
+            trough_soc_pct = min(trough_soc_pct, battery.soc_pct)
 
             t_array.append(t_s)
             x_array.append(x_m)
@@ -779,6 +807,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         driven_km=driven_km_accum,
         soc_over_safe_pct_s=soc_over_safe_accum,
         peak_soc_pct=peak_soc_pct,
+        trough_soc_pct=trough_soc_pct,
         soc_pct_trace=np.array(soc_array),
         v_kmh_trace=np.array(v_kmh_array),
         solar_w_trace=np.array(solar_w_array),

@@ -405,7 +405,7 @@ def _synthetic_loop_leg(km: float, route: Route | None) -> pd.DataFrame:
         "bearing_deg": 0.0,
         "lat": last_lat,
         "lon": last_lon,
-        "v_max_ms": 90.0 / 3.6,
+        "v_max_ms": 85.0 / 3.6,  # DASHBOARD max_speed_kmh=85 (was a stray 90)
         "curvature_1pm": 0.0,
         "circle_id": 0,
         "red_flag_trailer": False,
@@ -711,9 +711,59 @@ def _peak_soc_ceiling_constraint(evaluator: DayEvaluator,
     solve()'s existing infeasibility handling) rather than silently clip —
     that's a genuine "this day needs more loops, not just more speed"
     signal that belongs at Tier 3, not something to paper over here.
+
+    BUGFIX: peak_soc_pct is a running MAX seeded at start_soc_pct
+    (forward_sim.simulate_variable_speed: ``peak_soc_pct = float(
+    start_soc_pct)``), so it can only stay flat or grow — it is never less
+    than start_soc_pct for ANY candidate. Any day that legitimately starts
+    at/above ceiling_pct (Day 1's 100% pre-race charge, guaranteed every
+    time) therefore made this constraint unsatisfiable by construction,
+    for every single speed profile. That silently broke three things at
+    once: SLSQP had no feasible point to converge to; the GA's penalty
+    term became a constant added to every candidate's fitness (no gradient
+    away from clipping); and project_to_integer_kmh's `_feasible` gate
+    rejected every candidate, collapsing its per-segment local search into
+    a no-op that just returned SLSQP's raw, poorly-converged x — the
+    source of Day 1's 100%-SOC plateau and the erratic low-speed dips
+    inside it. Anchoring at max(ceiling_pct, start_soc_pct) keeps the
+    constraint doing its job (still hard-forbids the trace climbing ANY
+    higher than wherever it legitimately started) while making it
+    satisfiable again, which frees the existing soft terms
+    (SOC_HIGH_PENALTY_WEIGHT / SOLAR_UNDERUTIL_WEIGHT) to do what they're
+    for: push the profile to spend a full-at-start pack down fast via
+    speed instead of coasting.
     """
+    start_pct = float(evaluator.start_soc_pct)
+    effective_ceiling = max(float(ceiling_pct), start_pct)
     return NonlinearConstraint(
-        lambda v: ceiling_pct - evaluator(v).peak_soc_pct,
+        lambda v: effective_ceiling - evaluator(v).peak_soc_pct,
+        lb=0.0, ub=np.inf,
+    )
+
+
+def _trough_soc_floor_constraint(evaluator: DayEvaluator,
+                                  floor_pct: float) -> NonlinearConstraint:
+    """Symmetric counterpart to _peak_soc_ceiling_constraint: HARD-forbid a
+    candidate speed profile from ever letting the trace SOC
+    (DayEvalResult.trough_soc_pct, tracked the same way as peak_soc_pct)
+    dip below `floor_pct` at ANY point during the day — not just at the
+    end.
+
+    Previously the only floor check was the terminal-SOC constraint
+    (final_soc_pct >= alpha_next_day_pct), which only looks at the LAST
+    sample. A profile that punches through car.soc_min_pct mid-day (e.g.
+    a sustained climb or headwind stretch) and recovers by day's end was
+    invisible to that check — the exact asymmetry that let Day 4 dip to
+    ~19.8% against a 20% floor while still closing the day above it.
+    Anchored at min(floor_pct, start_soc_pct) for the same reason the peak
+    constraint is anchored at max(...): trough_soc_pct can only fall or
+    stay flat from start_soc_pct, so a day that (legitimately) already
+    starts below floor_pct must not be made unsatisfiable by construction.
+    """
+    start_pct = float(evaluator.start_soc_pct)
+    effective_floor = min(float(floor_pct), start_pct)
+    return NonlinearConstraint(
+        lambda v: evaluator(v).trough_soc_pct - effective_floor,
         lb=0.0, ub=np.inf,
     )
 
@@ -1004,6 +1054,10 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
             evaluator,
             car.soc_max_pct - float(getattr(SCFG, "SOC_ZERO_CLIP_GUARD_PCT", 0.0)),
         ),
+        # Symmetric floor counterpart (see _trough_soc_floor_constraint
+        # docstring) — hard-forbid the trace dipping below car.soc_min_pct
+        # at ANY point mid-day, not just checking the terminal SOC.
+        _trough_soc_floor_constraint(evaluator, car.soc_min_pct),
     ]
 
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
