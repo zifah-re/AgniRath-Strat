@@ -118,6 +118,12 @@ BATTERY_CAPACITY_AH= 30.0 #5.0Ah * 28
 # CMU reports cell voltage in mV; dashboard displays volts (valid ~2.5–4.2 V).
 INVALID_CELL_MV = 10_000.0
 
+
+# ==========================================
+# CONSTANTS FOR STRATEGY PUSH (Strategy page "Push Strategy" control)
+# ==========================================
+TZ_OFFSET_HOURS = 2.0  # Race-local timezone offset from UTC, SAST default
+
 # ==========================================
 # CONSTANTS FOR MPC.PY
 # ==========================================

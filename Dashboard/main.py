@@ -22,7 +22,8 @@ import numpy as np
 import copy
 from pathlib import Path
 from downlink import main as run_downlink
-from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED
+from constants import SOC_CURVE,BATTERY_CAPACITY_AH,BATTERY_CAPACITY_WH,INVALID_CELL_MV,MAX_SPEED,TZ_OFFSET_HOURS
+from strategy_push import list_strategy_variants, push_strategy_for_day, StrategyPushError
 import uuid
 import xml.etree.ElementTree as ET
 from fastapi import UploadFile, File, HTTPException
@@ -266,7 +267,18 @@ current_data_default = {
         "SpeedLimit": [],
         "SpeedProfile":[],       # Speeds of traffic at that particular distance, not to be confused with target velocity profile
         "Headings":[],
-        "TargetProfile": [],     # List of tuples (unix time, speed)
+        "TargetProfile": [],     # List of tuples (unix time, speed) — index-aligned
+                                 #   with the live route (Distance/Coordinates), one
+                                 #   entry per route point. Consumed by the MPC
+                                 #   solver and the live "Predicted Speed" overlay
+                                 #   (main.py ~line 614), both of which index into
+                                 #   it by the SAME i as the live route — never
+                                 #   insert/remove points from this one.
+        "TargetProfileChart": [],  # List of tuples (unix time, speed) — NOT
+                                 #   index-aligned with anything; full-resolution,
+                                 #   includes real (time, 0 km/h) stop gaps for
+                                 #   control/loop stops. Used only by the Strategy
+                                 #   page's time-axis chart.
         "MPCProfile": [],        # List of tuples (unix time, speed)
         "SolarIrradiance":{}
     }
@@ -864,18 +876,21 @@ def get_live_car_gps():
             }
         ]
     }
+@app.post("/api/stats/upload")
+async def stats_upload(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        result = stats_memory.upload_file(file.filename, content)
+        return {"success": True, "log": result}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(error))
+
 @app.get("/api/stats/logs")
 async def stats_logs():
     return {"logs": stats_memory.available_logs()}
-
-@app.post("/api/stats/upload")
-async def stats_upload(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith((".jsonl", ".json")):
-        raise HTTPException(status_code=400, detail="Please select a JSONL telemetry log.")
-    try:
-        return stats_memory.upload_file(file.filename, await file.read())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
 
 @app.delete("/api/stats/logs/{log_id}")
 async def stats_remove_log(log_id: str):
@@ -918,12 +933,108 @@ async def root():
     headers = {"Clear-Site-Data": '"cache"'}
     return HTMLResponse(content=content, headers=headers)
 
-@app.get("/{full_path:path}")
-async def spa_catch_all(full_path: str):
-    file_path = os.path.join(frontend_dir, full_path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-    return FileResponse(os.path.join(frontend_dir, "index.html"))
+@app.post("/api/strategy/upload")
+async def upload_strategy(file: UploadFile = File(...)):
+    """Upload an offline solver JSON into output/ so it can be selected
+    immediately from the Strategy page. The JSON must contain a `days` object.
+    """
+    if not file.filename or not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Please upload a .json offline model output file.")
+
+    try:
+        raw = await file.read()
+        data = json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="The uploaded file is not valid UTF-8 JSON.")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e.msg} (line {e.lineno}, column {e.colno}).")
+
+    if not isinstance(data, dict) or not isinstance(data.get("days"), dict) or not data["days"]:
+        raise HTTPException(status_code=400, detail="This does not look like an offline strategy output: missing non-empty `days` object.")
+
+    # Prefer the solver's embedded variant; otherwise derive it from the filename.
+    variant = str(data.get("variant") or "").strip()
+    if not variant:
+        stem = Path(file.filename).stem
+        variant = stem
+        if variant.startswith("strategy_"):
+            variant = variant[len("strategy_"):]
+        for suffix in ("_final", "_fixed"):
+            if variant.endswith(suffix):
+                variant = variant[:-len(suffix)]
+                break
+
+    safe_variant = "".join(c for c in variant if c.isalnum() or c in "-_")
+    if not safe_variant:
+        raise HTTPException(status_code=400, detail="Could not determine a safe strategy name from the upload.")
+
+    data["variant"] = safe_variant
+    STRATEGY_DIR = Path(__file__).resolve().parent / "output"
+    STRATEGY_DIR.mkdir(parents=True, exist_ok=True)
+    destination = STRATEGY_DIR / f"strategy_{safe_variant}_final.json"
+    destination.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    return {
+        "status": "success",
+        "variant": safe_variant,
+        "filename": destination.name,
+        "days": sorted([int(k) for k in data["days"].keys() if str(k).isdigit()]),
+    }
+
+@app.get("/api/strategy/options")
+async def get_strategy_options():
+    """List available strategy variants + the race days solved within each,
+    for the Strategy page's variant/day pickers."""
+    return {"variants": list_strategy_variants()}
+
+
+class StrategyPushRequest(BaseModel):
+    variant: str
+    day: int
+    segment: str | None = None
+    tz_offset: float | None = None
+
+
+@app.post("/api/strategy/push")
+async def push_strategy(payload: StrategyPushRequest):
+    """Push a solved strategy's velocity profile onto the live dashboard as
+    TargetProfile (index-aligned with the live route, used by the MPC solver
+    and the "Predicted Speed" overlay) and TargetProfileChart (full-
+    resolution, includes real stop gaps, used only by the Strategy page's
+    time-axis chart) — interpolated/derived from distance onto the currently
+    -loaded route and from distance onto time (see strategy_push.py). This
+    is the on-dashboard replacement for manually running
+    push_target_profile.py.
+
+    `segment` picks which part of the day to push ("full", or a stage key
+    like "stage1"/"loop"/"stage2" — see list_strategy_variants' per-day
+    "segments" list). This matters because a stage-only KML's live Distance
+    resets to 0 for that stage alone, so it must be compared against that
+    same stage's own (rebased) window of the day's solved trace, not the
+    whole day's cumulative distance axis."""
+    live_distance_km = current_data['profile'].get('Distance', [])
+    tz_offset = payload.tz_offset if payload.tz_offset is not None else TZ_OFFSET_HOURS
+
+    try:
+        result = push_strategy_for_day(
+            variant=payload.variant,
+            day=payload.day,
+            live_distance_km=live_distance_km,
+            tz_offset_hours=tz_offset,
+            segment=payload.segment,
+        )
+    except StrategyPushError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    target_profile = result.pop("target_profile")
+    target_profile_chart = result.pop("target_profile_chart", [])
+    await app.state.queue.put((
+        "C",
+        {"TargetProfile": target_profile, "TargetProfileChart": target_profile_chart},
+    ))
+
+    return {"status": "success", **result}
+
 
 @app.post("/api/simulate")
 async def simulate_endpoint(request: Request):
@@ -970,6 +1081,7 @@ async def save(request: Request):
         if 'MPCProfile' in data['profile'].keys():
             data['profile'].pop('MPCProfile')
             data['profile'].pop("TargetProfile")
+            data['profile'].pop("TargetProfileChart", None)
         file_name=data['file_name'][:len(data['file_name'])-4]+'_'+str(data['folder_name'])+'_'+str(data['placemark_name'])+".kml.save"
         file_name=file_name.replace(":","")
         with open(SCRIPT_DIR / "Saves" / file_name ,"w") as file:
@@ -1097,6 +1209,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        
+
+# IMPORTANT: this catch-all must stay the LAST route registered in this file.
+# FastAPI/Starlette matches routes in registration order, and "/{full_path:path}"
+# matches literally any path — if it were registered earlier, it would swallow
+# every GET request meant for a real API route (as it did with
+# /api/strategy/options) before that route ever got a chance to run.
+@app.get("/{full_path:path}")
+async def spa_catch_all(full_path: str):
+    file_path = os.path.join(frontend_dir, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join(frontend_dir, "index.html"))
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

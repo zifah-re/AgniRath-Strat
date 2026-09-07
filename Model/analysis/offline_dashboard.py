@@ -148,10 +148,11 @@ def _day_figure(day_idx0: int, day: dict):
     stages = _stage_ordered(day)
 
     fig = make_subplots(
-        rows=2, cols=2,
+        rows=3, cols=2,
         subplot_titles=("Velocity (km/h)", "State of Charge (%)",
-                        "Solar input (W)", "Road gradient (%)"),
-        vertical_spacing=0.13, horizontal_spacing=0.08)
+                        "Solar input (W)", "Road gradient (%)",
+                        "Motor Power (W)", ""),
+        vertical_spacing=0.10, horizontal_spacing=0.08)
 
     # metric -> (trace key, row, col)
     metrics = [
@@ -159,6 +160,7 @@ def _day_figure(day_idx0: int, day: dict):
         ("soc_pct",      1, 2),
         ("solar_w",      2, 1),
         ("slope_pct",    2, 2),
+        ("motor_w",      3, 1),
     ]
 
     offset_km = 0.0
@@ -214,15 +216,15 @@ def _day_figure(day_idx0: int, day: dict):
     # Light shading per stage across all panels, using the SAME span the curve
     # was drawn with so the band lines up exactly under its stage.
     for (start_km, span_km, name) in boundaries:
-        for r, c in ((1, 1), (1, 2), (2, 1), (2, 2)):
+        for r, c in ((1, 1), (1, 2), (2, 1), (2, 2), (3, 1)):
             fig.add_vrect(x0=start_km, x1=start_km + span_km,
                           fillcolor=_STAGE_COLOR.get(name, "#6b7280"),
                           opacity=0.05, line_width=0, row=r, col=c)
 
-    fig.update_xaxes(title_text="Cumulative distance (km)", row=2, col=1)
+    fig.update_xaxes(title_text="Cumulative distance (km)", row=3, col=1)
     fig.update_xaxes(title_text="Cumulative distance (km)", row=2, col=2)
     fig.update_layout(
-        height=680, margin=dict(t=60, b=40, l=50, r=20),
+        height=940, margin=dict(t=60, b=40, l=50, r=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.06,
                     xanchor="center", x=0.5),
         template="plotly_white",
@@ -274,13 +276,14 @@ def _day_summary_html(day_idx0: int, day: dict) -> str:
             extra = (f" ×{int(_num(s.get('n_loops')))}"
                      if k == "loop" and _num(s.get("n_loops")) else "")
             tr = f" · {_fmt(s.get('trailered_km'),' km trailered')}" if _num(s.get("trailered_km")) else ""
+            eta_txt = f" · ETA {s.get('eta')}" if s.get("eta") else ""
             stage_pills += (
                 f'<span class="pill" style="border-color:{_STAGE_COLOR[k]}">'
                 f'<b style="color:{_STAGE_COLOR[k]}">{_STAGE_LABEL[k]}{extra}</b> '
                 f'{_fmt(s.get("distance_km"), " km")} · '
                 f'{_fmt(s.get("speed_avg_kmh"), "")}<span class="u">km/h avg</span> · '
                 f'SOC {_fmt(s.get("soc_start_pct"),"%",0)}→{_fmt(s.get("soc_end_pct"),"%",0)} · '
-                f'{_fmt(s.get("solar_wh")," Wh",0)}{tr}</span>')
+                f'{_fmt(s.get("solar_wh")," Wh",0)}{tr}{eta_txt}</span>')
 
     stats = "".join([
         _stat("Counted distance", _fmt(driven, " km"),

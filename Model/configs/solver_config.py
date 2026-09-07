@@ -89,13 +89,29 @@ CRUISE_COMFORT_KMH = 70.0        # free-cruise centre — gentle penalty above t
 SPEED_COMFORT_PENALTY_WEIGHT = 3.0    # gentle zone (> CRUISE_COMFORT_KMH)
 SPEED_SOFTCAP_PENALTY_WEIGHT = 30.0   # steep zone (> CRUISE_SOFT_CAP_KMH)
 
+# ---- Sustained motor power (workplan fix) ----------------------------------
+# car.p_max_sustained_w (configs/car_config.py) is a rolling-window-average
+# thermal limit, not a pointwise ceiling (that's car.p_max_peak_w, enforced as
+# a hard clip in core.physics.net_power). It must NOT be enforced by shrinking
+# the v_max BOUND per segment — that collapses the V_MAX_HARD_KMH/
+# CRUISE_SOFT_CAP_KMH scheme above (see optimizers.singleday.
+# apply_sustained_power_caps' docstring for the full incident writeup: it
+# silently pulled the effective ceiling down to ~70 on any real grade,
+# inflated solve() runtime, and could make the terminal-SOC constraint
+# infeasible). Instead it's a soft objective penalty, same pattern as
+# SPEED_SOFTCAP_PENALTY_WEIGHT above: equivalent seconds of cost per second
+# the rolling-average draw (simulator.forward_sim.SustainedPowerTracker)
+# spends over budget. TODO-VERIFY: tune once real telemetry shows how the
+# motor actually behaves under sustained load.
+SUSTAINED_POWER_PENALTY_WEIGHT = 2.0
+
 # ---- Trailer / tow logistics ----------------------------------------------
 # Speed the tow vehicle moves the car through trailered stretches (mandatory
 # trailering on Day 7 Stage 2 / Day 8 Stage 1, plus any red-flag safety zones).
 # The car draws/stores NO energy while trailered (inert cargo), but this time
 # IS counted into the day's ETA, so the value matters. Strategist-set (22/08):
 # keep 80 km/h (a conservative highway tow) rather than 90.
-TRAILER_TOW_SPEED_KMH = 80.0
+TRAILER_TOW_SPEED_KMH = 65.0
 
 # Future-SOC value discount in the Tier 3 allocator (0 < d <= 1). The DP's
 # value-to-go term rewards ending a day with high SOC (more options tomorrow),
@@ -134,6 +150,30 @@ SOC_HIGH_PENALTY_WEIGHT = 4.0
 # Nudges the allocator toward more loops / higher speed instead of banking an
 # unusable, unsafe charge surplus into the next day.
 DP_HIGH_SOC_END_PENALTY_KM_PER_PCT = 1.5
+
+# ---- Zero-clipping-at-ceiling policy (strategist directive, 2026 review) ----
+# SOC_HIGH_PENALTY_WEIGHT/DP_HIGH_SOC_END_PENALTY_KM_PER_PCT above are SOFT —
+# they discourage lingering near the top of the band, but core.battery.Battery
+# still silently np.clip()s at car.soc_max_pct (100%) if a candidate profile's
+# solar income exceeds what the chosen speed can draw down. That clip is not
+# "free": on the real pack it means the array keeps pushing current into a
+# cell stack with nowhere left to go, i.e. an actual overcharge/float-at-max-
+# voltage event ("cook the pack"), not just a rounding artifact in the sim.
+# The soft penalties were never strong enough to outweigh the steep
+# SPEED_SOFTCAP_PENALTY_WEIGHT above CRUISE_SOFT_CAP_KMH, so L2 kept finding
+# it cheaper to let the pack sit pinned at 100% for long stretches than to pay
+# the objective cost of drawing it down with speed — see optimizers.singleday.
+# solve()'s peak-SOC ceiling NonlinearConstraint, which enforces this as a
+# HARD feasibility requirement (same tier as the terminal-SOC floor) instead
+# of another soft term competing with the speed penalty. SOC_ZERO_CLIP_GUARD_
+# PCT is the headroom kept below car.soc_max_pct: the optimizer must find a
+# speed profile whose peak trace SOC never exceeds
+# (car.soc_max_pct - SOC_ZERO_CLIP_GUARD_PCT), guaranteeing the real clip
+# event in core.battery.Battery.apply_energy_wh is never actually reached.
+# 1.0 leaves a firm 1%-SOC margin; raise it for more safety buffer at the
+# cost of a harder-to-satisfy constraint (more days may need higher speed to
+# stay feasible), lower it (never to 0) to give the solver more room.
+SOC_ZERO_CLIP_GUARD_PCT = 1.0
 
 # ---- Late-finish pricing in the Tier 3 allocator ---------------------------
 # The strategist's directive (20/08): "arriving by 17:00 is good and must be
@@ -222,7 +262,7 @@ INCLUDE_BREAKDOWN_IN_TIME = False
 # only means something on the stochastic scenario/robustness runs anyway, which
 # pass an rng and are never skipped). Left False here so the baseline model's
 # reporting is unchanged; the hardware-fastened build flips it True.
-SKIP_BREAKDOWN_WHEN_UNUSED = False
+SKIP_BREAKDOWN_WHEN_UNUSED = True
 
 # PERFORMANCE knob (hardware-fastened build): Tier 2 samples the days in
 # parallel. The baseline uses THREADS, which the GIL throttles because
@@ -235,7 +275,7 @@ SKIP_BREAKDOWN_WHEN_UNUSED = False
 # loop-geometry DataFrames) are picklable, so results are identical; only the
 # wall-clock changes. Left False in the baseline (thread path, unchanged); the
 # fastened build flips it True. See Model_fastened_hafiz/README_PERF.md.
-TIER2_USE_PROCESS_POOL = False
+TIER2_USE_PROCESS_POOL = True
 
 # ---- Early-finish (evening) charging (strategist directive 23/08) ----------
 # If a day finishes before the 17:00 close, the panel keeps charging the pack

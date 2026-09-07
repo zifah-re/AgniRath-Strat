@@ -19,6 +19,8 @@ import typing as _t
 import numpy as np
 from scipy.spatial import cKDTree
 
+from core import solcast_time as _solcast_time
+
 class WindProvider:
     def wind(self, t_s: float, x_m: float) -> tuple[float, float]:
         """Return (speed_ms, dir_deg_from)."""  # pragma: no cover
@@ -135,6 +137,96 @@ class HourlyJSONWindProvider(WindProvider):
 # ---------------------------------------------------------------------------
 # Decomposition helpers
 # ---------------------------------------------------------------------------
+
+class RealSolcastWindProvider(WindProvider):
+    """
+    Same ACTUAL race-week Solcast schema as core.solar.RealSolcastSolarProvider
+    (see that class's docstring): node keys "lat"/"lon", 5-minute UTC-stamped
+    samples under "data", "wind_speed_10m"/"wind_direction_10m" per sample.
+
+    Unlike HourlyJSONWindProvider's old Open-Meteo source, Solcast reports
+    wind_speed_10m directly in m/s — no /3.6 km/h->m/s conversion here.
+
+    Outside the recorded forecast window, np.interp naturally clamps to the
+    nearest edge sample rather than extrapolating (matches np.interp's
+    default behaviour, and wind has no "night" concept the way GHI does).
+    """
+    def __init__(self, json_paths: list[str] | str, route):
+        if isinstance(json_paths, str):
+            json_paths = [json_paths]
+
+        self.route = route
+        coords = []
+        self.t_arrays = []
+        self.speed_arrays = []
+        self.dir_arrays = []
+
+        for jp in json_paths:
+            with open(jp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            for node in data:
+                coords.append([node["lat"], node["lon"]])
+                samples = node["data"]
+                t_local_s = np.array(
+                    [_solcast_time.period_end_to_local_s(s["period_end"])
+                     for s in samples], dtype=float)
+                speed_ms = np.array(
+                    [float(s.get("wind_speed_10m", 0.0) or 0.0)
+                     for s in samples], dtype=float)
+                dir_deg = np.array(
+                    [float(s.get("wind_direction_10m", 0.0) or 0.0)
+                     for s in samples], dtype=float)
+                order = np.argsort(t_local_s)
+                self.t_arrays.append(t_local_s[order])
+                self.speed_arrays.append(speed_ms[order])
+                self.dir_arrays.append(dir_deg[order])
+
+        self.tree = cKDTree(np.array(coords))
+
+    def wind(self, t_s: float, x_m: float = 0.0) -> tuple[float, float]:
+        if self.route is None:
+            idx = len(self.speed_arrays) // 2
+        else:
+            lat, lon = self.route.latlon_at(x_m)
+            _, idx = self.tree.query([lat, lon])
+
+        speed_ms = float(np.interp(t_s, self.t_arrays[idx], self.speed_arrays[idx]))
+        dir_deg = float(np.interp(t_s, self.t_arrays[idx], self.dir_arrays[idx]))
+        return speed_ms, dir_deg
+
+    def node_index_array(self, x_m: np.ndarray) -> np.ndarray:
+        x_m = np.asarray(x_m, dtype=float)
+        if self.route is None:
+            return np.full(np.shape(x_m), len(self.speed_arrays) // 2,
+                           dtype=np.intp)
+        lats, lons = self.route.latlon_array(x_m)
+        _, idx = self.tree.query(
+            np.column_stack([lats.ravel(), lons.ravel()]))
+        return idx.reshape(np.shape(x_m)).astype(np.intp)
+
+    def wind_at_node(self, t_s: float, node_index: int) -> tuple[float, float]:
+        idx = int(node_index)
+        speed_ms = float(np.interp(t_s, self.t_arrays[idx], self.speed_arrays[idx]))
+        dir_deg = float(np.interp(t_s, self.t_arrays[idx], self.dir_arrays[idx]))
+        return speed_ms, dir_deg
+
+    def wind_array(self, t_s, x_m) -> tuple[np.ndarray, np.ndarray]:
+        t_s = np.asarray(t_s, dtype=float)
+        x_m = np.asarray(x_m, dtype=float)
+        if t_s.shape != x_m.shape:
+            raise ValueError("t_s and x_m must have identical shapes")
+        node_idx = self.node_index_array(x_m)
+        spd = np.empty(t_s.shape, dtype=float)
+        d = np.empty(t_s.shape, dtype=float)
+        for n in np.unique(node_idx):
+            mask = node_idx == n
+            spd[mask] = np.interp(t_s[mask], self.t_arrays[int(n)],
+                                  self.speed_arrays[int(n)])
+            d[mask] = np.interp(t_s[mask], self.t_arrays[int(n)],
+                                self.dir_arrays[int(n)])
+        return spd, d
+
 
 def along_track_ms(speed_ms: float, dir_deg_from: float,
                    bearing_deg: float) -> float:

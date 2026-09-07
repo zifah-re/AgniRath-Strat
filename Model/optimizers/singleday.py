@@ -23,6 +23,7 @@ from configs.car_config import CarState
 from configs import solver_config as SCFG
 from configs import race_config
 from core.route import Route
+from core import physics
 
 # Import the centralized forward integrator
 from simulator import forward_sim
@@ -37,6 +38,12 @@ CONTROL_SEGMENT_M = SCFG.CONTROL_SEGMENT_M
 
 SHARP_TURN_HEADING_DELTA_DEG = 30.0      
 SHARP_TURN_SPEED_LIMIT_KMH = 20.0       
+
+# Hoisted from _splice_loops (was a local variable there) so
+# apply_turn_speed_caps' loop-periodicity fix can use the EXACT same gap
+# when computing the real-distance modulo period of a repeated lap
+# (lap_len_m + this separator) — see _loop_local_turn_caps below.
+_LOOP_SEPARATOR_M = 300.0
 
 DE_POPSIZE = 8                            
 DE_MAXITER = 60                           
@@ -66,18 +73,291 @@ def _sharp_turn_fraction(route: Route, seg_start_m: np.ndarray, seg_len_m: float
     return frac
 
 
+def _loop_local_sharp_turn_frac(loop_df: pd.DataFrame, seg_len_m: float,
+                                heading_delta_threshold_deg: float) -> np.ndarray:
+    """Sharp-turn fraction computed on ONE lap's own local geometry (loop-
+    relative distance starting at 0), binned into fixed-size local control
+    segments — evaluated ONCE per unique loop name, then tiled identically
+    across every rep of that loop (see _loop_local_turn_caps).
+
+    Root cause this fixes (workplan "loop velocity not periodic"): the old
+    _sharp_turn_fraction rebinned bearing deltas over the FULL ABSOLUTE
+    spliced-route position. That meant (a) the single synthetic separator
+    row _splice_loops inserts between reps could manufacture a bogus heading
+    discontinuity right at the lap seam, and (b) a real sharp turn near a lap
+    boundary could land in control-segment N on lap 1 but N+1 on lap 2 purely
+    from floating-point/offset drift between reps — a binning artifact, not a
+    real speed limit changing. Computing the cap once on the lap's own local
+    geometry and tiling it removes both: every rep sees the identical cap at
+    the identical loop-relative position.
+    """
+    if loop_df is None or len(loop_df) == 0:
+        return np.zeros(1)
+    x_local = loop_df["distance_m"].to_numpy()
+    x_local = x_local - x_local[0]
+    bearing = loop_df["bearing_deg"].to_numpy()
+    raw_delta = np.diff(bearing, prepend=bearing[0])
+    wrapped = (raw_delta + 180.0) % 360.0 - 180.0
+    sharp_point = np.abs(wrapped) >= heading_delta_threshold_deg
+
+    lap_len_m = float(x_local[-1]) if len(x_local) else 0.0
+    n_local_segs = max(1, int(np.ceil(lap_len_m / seg_len_m))) if lap_len_m > 0 else 1
+    frac = np.zeros(n_local_segs)
+    for i in range(n_local_segs):
+        s, e = i * seg_len_m, (i + 1) * seg_len_m
+        in_seg = (x_local >= s) & (x_local < e)
+        n = int(np.sum(in_seg))
+        if n > 0:
+            frac[i] = float(np.sum(sharp_point[in_seg])) / n
+    return frac, lap_len_m
+
+
+def _build_loop_local_turn_caps(loop_geoms: dict | None,
+                                loops_committed: list[tuple[str, float]],
+                                seg_len_m: float,
+                                heading_delta_threshold_deg: float) -> dict:
+    """One (local_frac_array, lap_len_m) pair per UNIQUE loop name in
+    loops_committed, built from that loop's own geometry file (or a
+    zero-turns synthetic fallback — flat placeholder legs have no real
+    bearing data to flag turns from)."""
+    caps: dict[str, tuple[np.ndarray, float]] = {}
+    for name, km in loops_committed:
+        if name in caps:
+            continue
+        geom = loop_geoms.get(name) if loop_geoms else None
+        if geom is not None and len(geom) > 1:
+            caps[name] = _loop_local_sharp_turn_frac(
+                geom, seg_len_m, heading_delta_threshold_deg)
+        else:
+            caps[name] = (np.zeros(1), km * 1000.0)
+    return caps
+
+
+def _loop_occurrence_ranges(route: Route, name: str) -> list[tuple[float, float]]:
+    """Exact (x_start_m, x_end_m) for every contiguous rep of loop `name`
+    found directly in the spliced route's own seg_type column — NOT sampled
+    at CONTROL_SEGMENT_M points. This is exact regardless of how a control
+    segment's start happens to quantize against a lap boundary, which is
+    what made the modulo-period approach still show occasional non-periodic
+    dips right at the FIRST/LAST control segment of a lap (the segment whose
+    CONTROL_SEGMENT_M window straddles the lap boundary): that boundary
+    segment's single-point seg_type sample could land on the wrong side of
+    the join, silently falling back to the buggy globally-binned fraction
+    for exactly the segments most likely to sit near a real corner.
+    """
+    tag = f"loop_{name}"
+    seg_type = route.df["seg_type"].to_numpy()
+    x = route.df["distance_m"].to_numpy(dtype=float)
+    is_loop = (seg_type == tag)
+    ranges: list[tuple[float, float]] = []
+    n = len(is_loop)
+    i = 0
+    while i < n:
+        if is_loop[i]:
+            j = i
+            while j + 1 < n and is_loop[j + 1]:
+                j += 1
+            ranges.append((float(x[i]), float(x[j])))
+            i = j + 1
+        else:
+            i += 1
+    return ranges
+
+
+def _fill_occurrence_gaps(ranges: list[tuple[float, float]],
+                           edge_pad_m: float) -> list[tuple[float, float]]:
+    """Extend a sorted list of per-occurrence (rx0, rx1) ranges so every
+    position in the loop zone is claimed by exactly one occurrence — root-
+    cause fix for the "one random low-speed block, not periodic" bug.
+
+    _loop_occurrence_ranges returns each rep's EXACT real-geometry span, with
+    nothing covering the ~_LOOP_SEPARATOR_M gap _splice_loops inserts between
+    reps (a synthetic `loop_separator` row whose bearing is copied from the
+    END of the previous rep, immediately followed by the NEXT rep's own
+    first real bearing — a genuine large heading swing at the turnaround,
+    concatenated across an ABSOLUTE-position seam). A control segment whose
+    MIDPOINT lands in that gap was "in_rep" for neither neighbour, so
+    apply_turn_speed_caps fell back to _sharp_turn_fraction's plain
+    absolute-position bearing-delta scan for it — which sees that seam
+    discontinuity and can flag a large chunk of an otherwise ordinary 10 km
+    segment as a sharp turn, capping it down toward turn_speed_limit_kmh.
+    Because CONTROL_SEGMENT_M rarely divides the loop length evenly, the
+    gap drifts to a different position relative to the control-segment grid
+    on every rep — so this only ever bites whichever ONE seam happens to
+    have a segment midpoint land inside it, which is exactly the observed
+    symptom (a single ~10 km low-speed block at one lap boundary, not
+    repeated at the others).
+
+    Extends each occurrence to the midpoint of the gap to its neighbour
+    (so internal gaps are split, not double-claimed), and pads the outer
+    edges of the first/last occurrence by edge_pad_m so a segment sitting
+    just before the very first rep or just after the very last one is also
+    claimed instead of falling through to the global scan.
+    """
+    if not ranges:
+        return ranges
+    ranges = sorted(ranges)
+    filled = []
+    for i, (rx0, rx1) in enumerate(ranges):
+        lo = (ranges[i - 1][1] + rx0) / 2.0 if i > 0 else max(0.0, rx0 - edge_pad_m)
+        hi = (rx1 + ranges[i + 1][0]) / 2.0 if i < len(ranges) - 1 else rx1 + edge_pad_m
+        filled.append((lo, hi))
+    return filled
+
+
 def apply_turn_speed_caps(route: Route, v_max_kmh: np.ndarray,
                            seg_start_m: np.ndarray,
                            seg_len_m: float = CONTROL_SEGMENT_M,
                            heading_delta_threshold_deg: float = SHARP_TURN_HEADING_DELTA_DEG,
                            turn_speed_limit_kmh: float = SHARP_TURN_SPEED_LIMIT_KMH,
+                           loop_geoms: dict | None = None,
+                           loops_committed: list[tuple[str, float]] | None = None,
                            ) -> np.ndarray:
     """Blend v_max toward turn_speed_limit_kmh in proportion to how much of the
     segment is actually a sharp turn, instead of capping the whole segment for
-    a single flagged point."""
+    a single flagged point.
+
+    loop_geoms / loops_committed (optional — pass the same values given to
+    _splice_loops for this day): when a control segment falls inside a
+    repeated loop, its fraction is OVERRIDDEN with a loop-local, tiled value
+    (see _loop_local_sharp_turn_frac) instead of the globally-binned one, so
+    the cap is periodic across reps. Tiling is keyed to each occurrence's
+    OWN exact start position (_loop_occurrence_ranges, found directly in
+    route.df's seg_type column) rather than an assumed constant lap period —
+    this means every rep, INCLUDING its boundary control segments, maps to
+    exactly the same loop-local index with zero drift. Occurrence ranges are
+    then gap-filled (_fill_occurrence_gaps) so the small inter-rep separator
+    never falls through to the buggy global scan either (see that function's
+    docstring for the seam bug this closes). Omitting loop_geoms/
+    loops_committed keeps the prior (non-periodicity-corrected) global-
+    binning behaviour for callers that haven't been updated — nothing
+    regresses.
+    """
     frac = _sharp_turn_fraction(route, seg_start_m, seg_len_m, heading_delta_threshold_deg)
+
+    if route is not None and loops_committed:
+        seg_start_m = np.asarray(seg_start_m, dtype=float)
+        seg_mid_m = seg_start_m + seg_len_m / 2.0
+        loop_caps = _build_loop_local_turn_caps(
+            loop_geoms, loops_committed, seg_len_m, heading_delta_threshold_deg)
+        for name in {n for n, _ in loops_committed}:
+            local_frac, _lap_len_m = loop_caps.get(name, (np.zeros(1), 0.0))
+            n_local = len(local_frac)
+            occ_ranges_raw = _loop_occurrence_ranges(route, name)
+            occ_ranges_filled = _fill_occurrence_gaps(
+                occ_ranges_raw, edge_pad_m=_LOOP_SEPARATOR_M / 2.0)
+            for (rx0, rx1), (fx0, fx1) in zip(occ_ranges_raw, occ_ranges_filled):
+                # Membership test uses the GAP-FILLED range (fx0, fx1) so a
+                # segment whose midpoint sits in the inter-rep separator gets
+                # claimed by its nearest occurrence instead of falling
+                # through. local_pos/local_idx still measure against the
+                # occurrence's TRUE geometry start (rx0), so a segment
+                # sitting in the pre-rep pad clips to local bin 0 and one in
+                # the post-rep pad clips to the last local bin — both
+                # reasonable "approaching/leaving the turnaround" fallbacks,
+                # not the mid-segment absolute-position artifact this
+                # replaces.
+                in_rep = (seg_mid_m >= fx0) & (seg_mid_m < fx1)
+                if not np.any(in_rep):
+                    continue
+                local_pos = seg_start_m[in_rep] - rx0
+                local_idx = np.clip(
+                    np.floor(local_pos / seg_len_m).astype(int), 0, n_local - 1)
+                frac[in_rep] = local_frac[local_idx]
+
     v_eff = 1.0 / (frac / turn_speed_limit_kmh + (1.0 - frac) / np.maximum(v_max_kmh, 1e-6))
     return v_eff
+
+
+# ===============================================================================
+# 1c. Sustained-power-aware speed caps (workplan fix — "no power-draw cap
+# exists at all"). p_max_peak_w in core.physics.net_power is a POINTWISE
+# clip on whatever speed forward_sim ends up driving; on its own that lets
+# DE/GA/SLSQP propose a speed on a long climb that forward_sim will silently
+# clip AFTER the fact (reactive, and inefficient — the optimizer thinks it's
+# getting the mechanical power it asked for, then gets less, so its SOC/time
+# tradeoff is wrong going in). This gives the optimizer the SAME budget
+# up front, the same way apply_turn_speed_caps gives it the turn cap up
+# front instead of letting forward_sim clip speed reactively at a corner.
+# ===============================================================================
+
+def _max_speed_for_power_budget(car: CarState, slope_pct: float,
+                                 power_budget_w: float,
+                                 v_lo_ms: float = 0.5,
+                                 v_hi_ms: float | None = None,
+                                 tol_ms: float = 0.05) -> float:
+    """Largest steady-state speed (m/s) on this gradient whose electrical
+    draw (core.physics.power_required_at_speed) does not exceed
+    power_budget_w. Monotonic in v for any slope that actually draws power
+    (drag + rolling + gravity all increase with v), so a simple bisection is
+    exact and cheap — no need for scipy's general-purpose root finders here.
+    """
+    if v_hi_ms is None:
+        v_hi_ms = car.v_max_ms
+    slope_arr = np.array([slope_pct])
+
+    def _draw_at(v_ms: float) -> float:
+        return float(physics.power_required_at_speed(car, v_ms, slope_arr)[0])
+
+    if _draw_at(v_hi_ms) <= power_budget_w:
+        return float(v_hi_ms)          # whole speed range fits the budget
+    if _draw_at(v_lo_ms) > power_budget_w:
+        return float(v_lo_ms)          # even a crawl exceeds it (steep climb)
+
+    lo, hi = v_lo_ms, v_hi_ms
+    while (hi - lo) > tol_ms:
+        mid = 0.5 * (lo + hi)
+        if _draw_at(mid) <= power_budget_w:
+            lo = mid
+        else:
+            hi = mid
+    return float(lo)
+
+
+def apply_sustained_power_caps(route: Route, car: CarState,
+                               v_max_kmh: np.ndarray,
+                               seg_start_m: np.ndarray) -> np.ndarray:
+    """Cap each control segment's v_max so holding that speed over the
+    segment's OWN average gradient would not exceed car.p_max_sustained_w.
+
+    *** NOT called from solve() — see the comment at that call site. ***
+    Shrinking the v_max BOUND this way turned out to be a bug, not a fix: it
+    silently collapses the existing V_MAX_HARD_KMH=85 / CRUISE_SOFT_CAP_KMH=75
+    two-tier scheme (configs/solver_config.py), which is deliberately
+    implemented as bounds-ub=85 + a soft OBJECTIVE penalty above 70/75 — NOT
+    as a shrunk bound — precisely so short high-power bursts stay available
+    "if needed" (a loop, a cutoff, a SOC recovery) while the day-average
+    stays in the comfortable 60-70 band. Because almost any real segment with
+    a few percent of climb needs more than a few kW to hold 85 km/h, this
+    function was pulling v_max down toward ~70 EVERYWHERE there was any
+    grade at all — i.e. becoming the new de-facto hard ceiling instead of 85,
+    exactly backwards from the intended "only if needed" design, and (worse)
+    occasionally shrinking the day's feasible speed range enough that the
+    terminal-SOC NonlinearConstraint became infeasible for SLSQP to satisfy
+    (hence SOC finishing under the safety floor) and inflating solve() run
+    time (DE/SLSQP fighting a badly-conditioned, unexpectedly narrow bound
+    array instead of the wide one the objective's penalty terms were tuned
+    against).
+
+    Retained here as a standalone utility (e.g. for an analysis script that
+    wants "what speed would the sustained cap alone allow on this grade") —
+    the actual enforcement lives in _build_objective's sustained-power
+    penalty term below, which penalizes res.sustained_power_over_budget_s
+    (measured by simulator.forward_sim.SustainedPowerTracker over the
+    ACTUAL chosen speed profile) the same way the existing speed-band and
+    high-SOC terms work — pressure on the objective, not a hole cut in the
+    search space.
+    """
+    sustained_cap_w = getattr(car, "p_max_sustained_w", None)
+    if route is None or sustained_cap_w is None:
+        return v_max_kmh
+    slopes = route.slope_pct_array(np.asarray(seg_start_m, dtype=float))
+    v_cap_ms = np.array([
+        _max_speed_for_power_budget(car, float(s), float(sustained_cap_w))
+        for s in slopes
+    ])
+    v_cap_kmh = v_cap_ms * 3.6
+    return np.minimum(v_max_kmh, v_cap_kmh)
 
 
 # ===============================================================================
@@ -212,8 +492,6 @@ def _splice_loops(route: Route, loop_geoms: dict | None,
     blocks = [pre] if len(pre) else []
     pre_end_m = float(pre["distance_m"].max()) if len(pre) else 0.0
     offset = pre_end_m
-
-    _LOOP_SEPARATOR_M = 300.0  # small buffer so each rep gets its own stop-dwell cycle
 
     def _separator_row(at_m: float) -> pd.DataFrame:
         # Anchor to whatever block was most recently appended — never assume
@@ -371,6 +649,12 @@ def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float
     _v_softcap = float(getattr(SCFG, "CRUISE_SOFT_CAP_KMH", 75.0))
     _w_comfort = float(getattr(SCFG, "SPEED_COMFORT_PENALTY_WEIGHT", 0.0))
     _w_softcap = float(getattr(SCFG, "SPEED_SOFTCAP_PENALTY_WEIGHT", 0.0))
+    # Sustained-power soft penalty (bugfix — see apply_sustained_power_caps'
+    # docstring for why this must NOT be a shrunk v_max bound). Weight is
+    # equivalent seconds of objective cost per second the rolling-average
+    # draw (simulator.forward_sim.SustainedPowerTracker) spends over
+    # car.p_max_sustained_w — same units/pattern as high_soc_penalty_s below.
+    _w_sustained = float(getattr(SCFG, "SUSTAINED_POWER_PENALTY_WEIGHT", 2.0))
 
     def _speed_band_penalty_s(v_kmh: np.ndarray) -> float:
         if _w_comfort <= 0.0 and _w_softcap <= 0.0:
@@ -386,14 +670,50 @@ def _build_objective(evaluator: DayEvaluator) -> _t.Callable[[np.ndarray], float
         solar_penalty_s = _w * float(res.solar_underutil_j) / 3600.0
         high_soc_penalty_s = _w_high * float(getattr(res, "soc_over_safe_pct_s", 0.0))
         speed_penalty_s = _speed_band_penalty_s(v_kmh)
+        sustained_penalty_s = _w_sustained * float(
+            getattr(res, "sustained_power_over_budget_s", 0.0))
         return (float(res.total_time_s) + solar_penalty_s
-                + high_soc_penalty_s + speed_penalty_s)
+                + high_soc_penalty_s + speed_penalty_s + sustained_penalty_s)
     return _objective
 
 def _terminal_soc_constraint(evaluator: DayEvaluator,
                               alpha_next_day_pct: float) -> NonlinearConstraint:
     return NonlinearConstraint(
         lambda v: evaluator(v).final_soc_pct - alpha_next_day_pct,
+        lb=0.0, ub=np.inf,
+    )
+
+def _peak_soc_ceiling_constraint(evaluator: DayEvaluator,
+                                  ceiling_pct: float) -> NonlinearConstraint:
+    """"Zero clipping at 100%" — HARD feasibility constraint, not a soft
+    penalty. Forces every candidate speed profile to keep its peak trace SOC
+    (DayEvalResult.peak_soc_pct, tracked across moving substeps AND parked/
+    stop-time charging — see forward_sim._apply_parked_charge) strictly under
+    `ceiling_pct` (car.soc_max_pct - SOC_ZERO_CLIP_GUARD_PCT).
+
+    Why a hard constraint instead of strengthening SOC_HIGH_PENALTY_WEIGHT /
+    SOLAR_UNDERUTIL_WEIGHT: those soft terms were consistently outweighed by
+    SPEED_SOFTCAP_PENALTY_WEIGHT's quadratic cost above CRUISE_SOFT_CAP_KMH,
+    so the optimizer kept finding it cheaper to let the pack sit pinned at
+    the real clip (core.battery.Battery.apply_energy_wh's np.clip at
+    car.soc_max_pct) than to pay the objective cost of a faster profile that
+    draws the surplus down instead. On the real pack that clip isn't free —
+    it's the array continuing to push current into a full cell stack with
+    nowhere to go. Making this a constraint (same tier as the terminal-SOC
+    floor) means SLSQP must satisfy it before the objective is even
+    consulted, so a day with genuine solar surplus is forced to spend it as
+    speed rather than silently discarding it — this is also the fix for
+    "velocity never reaches 75 km/h on days it clearly could".
+
+    If a day's solar income is so large that literally no speed profile up
+    to V_MAX_HARD_KMH can avoid the ceiling, this constraint will be
+    infeasible and solve() should be allowed to fall back / report it (see
+    solve()'s existing infeasibility handling) rather than silently clip —
+    that's a genuine "this day needs more loops, not just more speed"
+    signal that belongs at Tier 3, not something to paper over here.
+    """
+    return NonlinearConstraint(
+        lambda v: ceiling_pct - evaluator(v).peak_soc_pct,
         lb=0.0, ub=np.inf,
     )
 
@@ -603,7 +923,20 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
 
     v_max_kmh = sim_route.v_max_ms_at(seg_start_m) * 3.6 if sim_route else np.full(n_segments, car.v_max_ms * 3.6)
     if sim_route:
-        v_max_kmh = apply_turn_speed_caps(sim_route, v_max_kmh, seg_start_m)
+        # loop_geoms/loops_committed passed through so repeated-lap control
+        # segments get the periodicity-corrected loop-local turn cap (see
+        # apply_turn_speed_caps docstring) instead of the globally-binned one.
+        v_max_kmh = apply_turn_speed_caps(sim_route, v_max_kmh, seg_start_m,
+                                          loop_geoms=loop_geoms,
+                                          loops_committed=loops_committed)
+        # NOTE: sustained power is deliberately NOT enforced by shrinking
+        # v_max_kmh here (see apply_sustained_power_caps' docstring for why
+        # that was a bug: it collapses the intended V_MAX_HARD_KMH=85 /
+        # CRUISE_SOFT_CAP_KMH=75 two-tier scheme by silently pulling the
+        # actual upper BOUND itself down to ~70 on any real climb). It's
+        # enforced instead as a soft objective penalty on
+        # sustained_power_over_budget_s in _build_objective below — same
+        # pattern as the existing speed-band and high-SOC penalties.
 
     # Enforce the CAR's physical max speed. The route's own speed-limit column
     # can read up to ~120 km/h, which was leaking into the bounds and letting
@@ -662,6 +995,15 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
     constraints = [
         _terminal_soc_constraint(evaluator, alpha_next_day_pct),
         _time_cutoff_constraint(evaluator, allowed_time_s),
+        # "Zero clipping at 100%" (see _peak_soc_ceiling_constraint docstring):
+        # hard-forbid the plan from ever actually reaching the pack's real
+        # SOC ceiling, instead of only softly discouraging it. Guard band is
+        # relative to THIS car's own soc_max_pct so it stays correct if that
+        # ever changes from the default 100.0.
+        _peak_soc_ceiling_constraint(
+            evaluator,
+            car.soc_max_pct - float(getattr(SCFG, "SOC_ZERO_CLIP_GUARD_PCT", 0.0)),
+        ),
     ]
 
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
@@ -729,6 +1071,11 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         v_kmh_trace=getattr(final_eval, 'v_kmh_trace', np.array([])),
         solar_w_trace=getattr(final_eval, 'solar_w_trace', np.array([])),
         slope_pct_trace=getattr(final_eval, 'slope_pct_trace', np.array([])),
+        # Motor power vs distance (workplan fix) + sustained-power-cap
+        # exposure (see simulator.forward_sim.SustainedPowerTracker).
+        motor_w_trace=getattr(final_eval, 'motor_w_trace', np.array([])),
+        sustained_power_over_budget_s=getattr(
+            final_eval, 'sustained_power_over_budget_s', 0.0),
         # Per-point seg_type, for splitting the day into stage1/loop/stage2.
         seg_type_trace=getattr(final_eval, 'seg_type_trace', np.array([])),
         diagnostics=dict(
