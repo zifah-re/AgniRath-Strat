@@ -135,6 +135,15 @@ class DayEvalResult:
     # doesn't coast at ~100% for long (pack-cooking + wasted solar); the more
     # time near the ceiling, the bigger this grows.
     soc_over_safe_pct_s: float = 0.0
+    # Highest battery.soc_pct reached at ANY point during the day (moving
+    # substeps AND parked/stop-time charging credits — see the "zero clipping
+    # at 100%" fix). singleday.py's peak-SOC ceiling NonlinearConstraint reads
+    # this to HARD-forbid a candidate speed profile from ever actually
+    # reaching core.battery.Battery's soc_max_pct clip, instead of only
+    # softly discouraging it (SOC_HIGH_PENALTY_WEIGHT above). Initialized to
+    # the day's start SOC so a day with zero substeps still reports something
+    # sane.
+    peak_soc_pct: float = 0.0
 
 
 class DriverSwapScheduler:
@@ -301,6 +310,38 @@ class SustainedPowerTracker:
         return self.rolling_avg_w
 
 
+def _apply_parked_charge(battery: Battery, car: CarState,
+                          parked_w: float, dur_s: float) -> float:
+    """Apply a parked/stop-time solar charging credit (control stop or loop
+    turnaround), tracking any energy the pack can't absorb as wasted — the
+    same SOC-headroom accounting the moving-substep loop already does below
+    ("Solar underutilization tracking").
+
+    BUGFIX ("zero clipping at 100%" review): this credit used to go straight
+    to battery.apply_energy_wh with NO headroom check at all. If the credit
+    pushed SOC into/through car.soc_max_pct, core.battery.Battery's np.clip
+    silently absorbed the excess and solar_underutil_j never saw it —
+    turnaround stops are exactly when the array keeps producing while the
+    motor draws nothing, so a day whose SOC-ceiling exposure was mostly from
+    PARKED charging could still report solar_underutil_wh near zero, hiding
+    the waste from the L2 objective's solar-underutil penalty entirely and
+    giving the optimizer no signal that anything needed to change.
+
+    Returns the wasted Wh (0.0 if fully absorbed or parked_w <= 0).
+    """
+    if dur_s <= 0.0:
+        return 0.0
+    energy_wh = parked_w * dur_s / 3600.0
+    if energy_wh <= 0.0:
+        battery.apply_energy_wh(energy_wh)
+        return 0.0
+    soc_headroom_wh = max(0.0, car.soc_max_pct - battery.soc_pct) / 100.0 * car.battery_nominal_wh
+    absorbable_wh = soc_headroom_wh / car.charge_eff
+    wasted_wh = max(0.0, energy_wh - absorbable_wh)
+    battery.apply_energy_wh(energy_wh)
+    return wasted_wh
+
+
 def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                             solar_provider, wind_provider, t0_s: float,
                             start_soc_pct: float, seg_start_m: np.ndarray,
@@ -355,6 +396,11 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
     driven_km_accum = 0.0
     soc_over_safe_accum = 0.0
     _soc_safe_max = getattr(_sc_forward, "SOC_SAFE_MAX_PCT", 100.0)
+    # "Zero clipping at 100%" tracking (see DayEvalResult.peak_soc_pct):
+    # highest SOC touched anywhere in the day, moving or parked. Seeded with
+    # the day's actual start SOC so it's meaningful even if the loop below
+    # never executes (zero-length day).
+    peak_soc_pct = float(start_soc_pct)
     # PERF: in a deterministic run whose objective ignores breakdown time, the
     # per-substep BreakdownModel calls only produce a discarded number. Skip
     # them entirely when the fastened build asks for it (no result changes; the
@@ -604,7 +650,9 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                         ghi_at_node_fn, poa_at_node_fn, _has_poa,
                         car, physics.SYSTEM_DERATE)
                     _parked_w = _avg_solar_w - car.p_idle_w
-                    battery.apply_energy_wh(_parked_w * _parked_s / 3600.0)
+                    solar_underutil_j += _apply_parked_charge(
+                        battery, car, _parked_w, _parked_s) * 3600.0
+                    peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
                 if loop_stop_here:
                     if not in_loop_zone:
                         in_loop_zone = True
@@ -615,8 +663,9 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
                             ghi_at_node_fn, poa_at_node_fn, _has_poa,
                             car, physics.SYSTEM_DERATE)
                         _parked_w = _avg_solar_w - car.p_idle_w
-                        battery.apply_energy_wh(
-                            _parked_w * loop_stop_dur_s / 3600.0)
+                        solar_underutil_j += _apply_parked_charge(
+                            battery, car, _parked_w, loop_stop_dur_s) * 3600.0
+                        peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
                 else:
                     in_loop_zone = False
 
@@ -645,6 +694,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
 
             # p_net == 0 for trailered segments → no SOC change.
             battery.apply_energy_wh(float(p_net) * float(dt_s_step) / 3600.0)
+            peak_soc_pct = max(peak_soc_pct, battery.soc_pct)
 
             t_array.append(t_s)
             x_array.append(x_m)
@@ -728,6 +778,7 @@ def simulate_variable_speed(v_kmh: np.ndarray, route: Route, car: CarState,
         trailered_km=trailered_km_accum,
         driven_km=driven_km_accum,
         soc_over_safe_pct_s=soc_over_safe_accum,
+        peak_soc_pct=peak_soc_pct,
         soc_pct_trace=np.array(soc_array),
         v_kmh_trace=np.array(v_kmh_array),
         solar_w_trace=np.array(solar_w_array),

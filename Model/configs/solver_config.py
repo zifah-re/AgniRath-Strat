@@ -151,6 +151,30 @@ SOC_HIGH_PENALTY_WEIGHT = 4.0
 # unusable, unsafe charge surplus into the next day.
 DP_HIGH_SOC_END_PENALTY_KM_PER_PCT = 1.5
 
+# ---- Zero-clipping-at-ceiling policy (strategist directive, 2026 review) ----
+# SOC_HIGH_PENALTY_WEIGHT/DP_HIGH_SOC_END_PENALTY_KM_PER_PCT above are SOFT —
+# they discourage lingering near the top of the band, but core.battery.Battery
+# still silently np.clip()s at car.soc_max_pct (100%) if a candidate profile's
+# solar income exceeds what the chosen speed can draw down. That clip is not
+# "free": on the real pack it means the array keeps pushing current into a
+# cell stack with nowhere left to go, i.e. an actual overcharge/float-at-max-
+# voltage event ("cook the pack"), not just a rounding artifact in the sim.
+# The soft penalties were never strong enough to outweigh the steep
+# SPEED_SOFTCAP_PENALTY_WEIGHT above CRUISE_SOFT_CAP_KMH, so L2 kept finding
+# it cheaper to let the pack sit pinned at 100% for long stretches than to pay
+# the objective cost of drawing it down with speed — see optimizers.singleday.
+# solve()'s peak-SOC ceiling NonlinearConstraint, which enforces this as a
+# HARD feasibility requirement (same tier as the terminal-SOC floor) instead
+# of another soft term competing with the speed penalty. SOC_ZERO_CLIP_GUARD_
+# PCT is the headroom kept below car.soc_max_pct: the optimizer must find a
+# speed profile whose peak trace SOC never exceeds
+# (car.soc_max_pct - SOC_ZERO_CLIP_GUARD_PCT), guaranteeing the real clip
+# event in core.battery.Battery.apply_energy_wh is never actually reached.
+# 1.0 leaves a firm 1%-SOC margin; raise it for more safety buffer at the
+# cost of a harder-to-satisfy constraint (more days may need higher speed to
+# stay feasible), lower it (never to 0) to give the solver more room.
+SOC_ZERO_CLIP_GUARD_PCT = 1.0
+
 # ---- Late-finish pricing in the Tier 3 allocator ---------------------------
 # The strategist's directive (20/08): "arriving by 17:00 is good and must be
 # followed more or less — only run past it if the extra distance is genuinely

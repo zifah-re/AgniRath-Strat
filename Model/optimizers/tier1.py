@@ -97,12 +97,13 @@ def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
 
 # Explicit ground-truth trailering override (0-indexed day -> seg_type).
 # The KML-derived mask below depends on manually-drawn (False) zones in a
-# routeshader KML that may be missing or incomplete for a given day (e.g.
-# Day 7 previously showed trailered=0 because no KML zone existed for it,
-# not because the day isn't actually trailered). These two are confirmed
-# ground truth regardless of what the KML contains.
+# routeshader KML that may be missing or incomplete for a given day. This is
+# now confirmed ground truth ONLY for Day 8 Stage 1. Day 7 Stage 2's forced
+# override has been REMOVED per strategist directive (07/09): let it receive
+# the same treatment as every other stage and find its own velocity profile
+# from the KML-derived mask (+ singleday.solve's real physics) rather than
+# being forced trailered regardless of what the KML/route data actually say.
 HARDCODED_TRAILER_STAGES: dict[int, str] = {
-    6: "stage2",  # Day 7 (0-indexed 6): Stage 2 is trailered
     7: "stage1",  # Day 8 (0-indexed 7): Stage 1 is trailered
 }
 
