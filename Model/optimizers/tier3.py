@@ -58,8 +58,13 @@ def allocate(car: CarState, solar_providers: dict, per_day_samples: dict, plans:
     n_days = len(plans)
     soc_buckets = np.arange(car.soc_min_pct, car.soc_max_pct + 1e-9, sc.DP_SOC_BUCKET_PCT)
     nb = len(soc_buckets)
-    completion = (rc.RACE_MODE == "completion")
-    floor = car.soc_min_pct + (_completion_margin() if completion else 0.0)
+    # Always keep a nonzero DP floor buffer, not just in completion mode —
+    # same fix as tier1.py's guess_baseline(). Tier 3 allocates loop counts
+    # off a per-day surrogate model; without this margin it will happily
+    # commit to a (reps, model) pair whose predicted end_soc sits exactly at
+    # soc_min_pct, leaving nothing to absorb the gap between the surrogate's
+    # prediction and what tier2/singleday.solve() actually realizes.
+    floor = car.soc_min_pct + _completion_margin()
 
     V = np.full((n_days + 1, nb), -np.inf)
     V[n_days, :] = 0.0

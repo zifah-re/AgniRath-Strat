@@ -77,35 +77,6 @@ class Route:
     def v_max_ms_at(self, x_m):
         return self._v_max[self._idx(x_m)]
 
-    def v_max_ms_min_over(self, seg_start_m: np.ndarray, seg_len_m: float) -> np.ndarray:
-        """Minimum v_max_ms over each [seg_start, seg_start+seg_len) window.
-
-        BUGFIX: v_max_ms_at / v_max_ms_array sample a SINGLE nearest point
-        per query. That's the wrong reduction for a hard per-segment speed
-        BOUND (singleday.py's control-segment v_max_kmh, seg_len_m=
-        CONTROL_SEGMENT_M=10km): a short erroneous/unmapped-data stretch
-        (see optimizers.trust_region._parse_route_file's SpeedLimit==0
-        handling) is invisible if it doesn't happen to sit at the exact
-        sampled point, while — more consequentially — a single-point sample
-        that DOES land on such a stretch drags the bound for the WHOLE 10km
-        segment down to that one bad sample, even though the rest of the
-        segment may carry a much higher posted limit. The minimum over the
-        whole window is the only reduction consistent with "must never
-        exceed the posted limit anywhere in this segment".
-        """
-        seg_start_m = np.asarray(seg_start_m, dtype=float)
-        seg_end_m = seg_start_m + seg_len_m
-        lo = np.searchsorted(self._x, seg_start_m, side="left")
-        hi = np.searchsorted(self._x, seg_end_m, side="left")
-        out = np.empty(len(seg_start_m), dtype=float)
-        for i in range(len(seg_start_m)):
-            a, b = int(lo[i]), int(hi[i])
-            if b > a:
-                out[i] = float(np.min(self._v_max[a:b]))
-            else:
-                out[i] = float(self._v_max[self._idx(seg_start_m[i])])
-        return out
-
     def circle_id_at(self, x_m) -> int:
         return int(self._circle_id[self._idx(x_m)])
 

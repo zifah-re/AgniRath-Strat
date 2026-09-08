@@ -1011,6 +1011,25 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         v_max_kmh = apply_turn_speed_caps(sim_route, v_max_kmh, seg_start_m,
                                           loop_geoms=loop_geoms,
                                           loops_committed=loops_committed)
+        # DIAGNOSTIC ONLY (not a fix): the Day 1 low-speed dip (29 km/h at
+        # n_loops=8, 38 km/h at n_loops=7) is still an open question — is it
+        # a residual loop-splice-seam artifact, or a genuine repeating turn
+        # feature that different rep-counts just sample differently against
+        # the CONTROL_SEGMENT_M grid? Do NOT "fix" this by touching
+        # LOOP_CRUISE_SPEED_MS again (that reintroduces the days-5/7
+        # under-looping bug it was added to solve). Log the per-segment
+        # v_max next to the committed loop count so the actual cause can be
+        # read off directly instead of guessed at again.
+        if loops_committed:
+            _min_i = int(np.argmin(v_max_kmh))
+            _low_segs = [(int(i), round(float(seg_start_m[i] / 1000.0), 1),
+                          round(float(v_max_kmh[i]), 1))
+                         for i in np.where(v_max_kmh < 40.0)[0]]
+            logger.info(
+                "Day %d turn-cap trace (reps=%s): min v_max=%.1f km/h at "
+                "seg %d (x=%.1f km); segments <40 km/h [idx, x_km, v_max]: %s",
+                day_index + 1, loops_committed, float(v_max_kmh[_min_i]),
+                _min_i, seg_start_m[_min_i] / 1000.0, _low_segs)
         # NOTE: sustained power is deliberately NOT enforced by shrinking
         # v_max_kmh here (see apply_sustained_power_caps' docstring for why
         # that was a bug: it collapses the intended V_MAX_HARD_KMH=85 /
@@ -1143,7 +1162,44 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         objective=objective)
     final_eval = evaluator(v_final_kmh)
 
+    # FEASIBILITY REPORTING (root-cause fix for days silently landing at
+    # literal 0% SOC): previously this dict carried no signal at all about
+    # whether the hard SOC constraints were actually satisfied for the
+    # committed loop count — project_to_integer_kmh returns its best
+    # candidate even when every candidate violates a constraint, and that
+    # became "the answer" with nothing telling Tier 2/Tier 3 to back off.
+    # Recompute the same effective floor/ceiling the constraints above were
+    # built with (they anchor at start_soc_pct so a day that legitimately
+    # starts outside the band isn't unsatisfiable by construction), and
+    # check the final realized trace against them, plus the terminal-SOC
+    # and time-cutoff constraints and the SLSQP convergence flag.
+    _tol = 1e-6
+    _floor_pct = car.soc_min_pct + float(getattr(SCFG, "SOC_TROUGH_GUARD_PCT", 0.0))
+    _ceiling_pct = car.soc_max_pct - float(getattr(SCFG, "SOC_ZERO_CLIP_GUARD_PCT", 0.0))
+    _eff_floor = min(_floor_pct, float(start_soc_pct))
+    _eff_ceiling = max(_ceiling_pct, float(start_soc_pct))
+    peak_soc_pct = float(getattr(final_eval, "peak_soc_pct", final_eval.final_soc_pct))
+    trough_soc_pct = float(getattr(final_eval, "trough_soc_pct", final_eval.final_soc_pct))
+    feasible = (
+        trough_soc_pct >= _eff_floor - _tol
+        and peak_soc_pct <= _eff_ceiling + _tol
+        and final_eval.final_soc_pct >= alpha_next_day_pct - _tol
+        and final_eval.total_time_s <= allowed_time_s + _tol
+        and bool(slsqp_result.success)
+    )
+    if not feasible:
+        logger.error(
+            "Day %d solve() INFEASIBLE: trough=%.2f%% (floor=%.2f%%) "
+            "peak=%.2f%% (ceiling=%.2f%%) final=%.2f%% (target>=%.2f%%) "
+            "time=%.0fs (allowed=%.0fs) slsqp_success=%s",
+            day_index + 1, trough_soc_pct, _eff_floor, peak_soc_pct,
+            _eff_ceiling, final_eval.final_soc_pct, alpha_next_day_pct,
+            final_eval.total_time_s, allowed_time_s, slsqp_result.success)
+
     return dict(
+        feasible=feasible,
+        peak_soc_pct=peak_soc_pct,
+        trough_soc_pct=trough_soc_pct,
         v_kmh=v_final_kmh,
         seg_start_m=seg_start_m,
         final_soc_pct=final_eval.final_soc_pct,

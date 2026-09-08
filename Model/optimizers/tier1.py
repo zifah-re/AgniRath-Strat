@@ -644,7 +644,17 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                     kml_paths=kml_paths
                 )
 
-                floor = car.soc_min_pct + (_completion_margin() if completion else 0.0)
+                # Always keep a nonzero DP floor buffer, not just in
+                # completion mode. The DP's floor check here is the only
+                # thing standing between a committed loop-count decision and
+                # the surrogate's optimistic (coarse) estimate of what L2
+                # will actually deliver. Gating this margin behind
+                # RACE_MODE == "completion" meant loops-mode races (the
+                # normal case) planned days right down to soc_min_pct with
+                # zero reserve to absorb that surrogate-vs-L2 gap — which is
+                # how days ended up landing at literal 0% SOC instead of a
+                # small guard-band slip. Apply the same margin unconditionally.
+                floor = car.soc_min_pct + _completion_margin()
                 if end_soc < floor:
                     continue
 

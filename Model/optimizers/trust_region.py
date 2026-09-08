@@ -598,6 +598,55 @@ def extract_final_profiles(routes: list, base_car: CarState, solar_providers: di
             return (day_start_s + carryover_penalty_s
                     + float(_res.get("total_time_s", 0.0))
                     + _day_mandatory_stop_s(len(_loops), _cs_taken_day))
+        # ── HARD SOC-feasibility backstop ─────────────────────────────────
+        # ROOT-CAUSE FIX: singleday.solve() now reports `feasible` (see its
+        # docstring) — whether the REAL physics for this committed loop
+        # count actually respect the hard SOC floor/ceiling, not just
+        # whatever Tier 2/3's coarse surrogate predicted. Previously nothing
+        # here ever looked at that flag, so a day whose surrogate said "end
+        # SOC is fine" but whose real singleday.solve() trace punched
+        # through the floor (or ceiling) mid-day shipped anyway — this is
+        # exactly how a day landed at a literal 0% SOC dip despite the DP
+        # margin fix in tier1.py/tier3.py: that margin only guards the
+        # DP's OWN estimate, not the gap between the estimate and reality.
+        # Same remedy as the finish-time backstop below: drop the
+        # last-committed loop rep (fewer loops => less distance => less
+        # energy spent that day => higher SOC trough) and re-solve until
+        # the real profile is feasible or no loops remain. If a day is
+        # still infeasible with zero loops committed (a same-day physics
+        # problem, not a loop-count problem — e.g. Day 4's stage1-only
+        # dip), dropping loops can't fix it; that's a signal the PREVIOUS
+        # day's end-SOC allocation needs to be higher, which is a Tier 3
+        # multi-day problem, not something this single-day backstop can
+        # repair — it's logged instead of silently shipped.
+        _dropped_soc = 0
+        while loops_committed and not res.get("feasible", True):
+            loops_committed = loops_committed[:-1]
+            _dropped_soc += 1
+            res = singleday.solve(
+                route=route_d, car=car, solar_provider=solar_provider,
+                wind_provider=wind_provider, day_index=d, start_soc_pct=s_start,
+                alpha_next_day_pct=alpha_next, loops_committed=loops_committed,
+                loop_geoms=loop_geoms, penalty_stoppage_s=carryover_penalty_s)
+        if _dropped_soc:
+            logger.warning(
+                "Day %d: dropped %d loop rep(s) — real singleday.solve() "
+                "trace violated the hard SOC floor/ceiling with the "
+                "originally committed loop count (trough=%.1f%%, "
+                "peak=%.1f%%).",
+                d + 1, _dropped_soc, res.get("trough_soc_pct", float("nan")),
+                res.get("peak_soc_pct", float("nan")))
+        if not res.get("feasible", True):
+            logger.error(
+                "Day %d: STILL SOC-infeasible with zero loops committed "
+                "(trough=%.1f%%, peak=%.1f%%, start_soc=%.1f%%) — this is "
+                "a multi-day allocation problem (prior day's end-SOC "
+                "target too low), not a same-day loop-count problem. "
+                "Shipping the best available profile; Tier 3's DP margin "
+                "should be re-examined for this day.",
+                d + 1, res.get("trough_soc_pct", float("nan")),
+                res.get("peak_soc_pct", float("nan")), s_start)
+
         _dropped = 0
         while loops_committed and _true_finish_s(res, loops_committed) > cutoff_s:
             loops_committed = loops_committed[:-1]
