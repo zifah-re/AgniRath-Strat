@@ -33,7 +33,6 @@ target_profile=list(zip(interpolated_secs,interpolated_velocity))
 URL="http://127.0.0.1:8000/api/simulate"
 pkt={
     "type":"C",
-    "TargetProfile":target_profile,
     "SolarIrradiance": [{"lat":13.037206951836724,"lon":79.89299347657726,"data":dict_list}]
 }
 req=requests.post(URL,json=pkt)
