@@ -36,14 +36,29 @@ from .tier1 import _adjust_plan_for_today
 
 logger = logging.getLogger(__name__)
 
-# Trust-region convergence. The SOC trajectory drift oscillates in the single
-# digits after the first pass (tier1 baseline -> tier3 reallocation is the big
-# jump), so a 5% window never triggered and every run burned the full 4
-# iterations (~1 h/variant EACH just from that). A 12% window converges in ~2
-# passes on real data — the residual few-% SOC drift is well within planning
-# tolerance — and the hard cap keeps the worst case bounded so two variants
-# finish inside the 2 h budget.
-MAX_ITERS = 2
+# Trust-region convergence.
+#
+# BUGFIX: the reasoning below ("drift settles in ~2 passes") was calibrated
+# against a pipeline that had a since-fixed bug: singleday.py's peak-SOC
+# ceiling constraint was UNSATISFIABLE BY CONSTRUCTION on any day starting
+# at/above it (guaranteed every time on Day 1's 100% pre-race charge), which
+# broke that day's per-day solve into an unconstrained, largely degenerate
+# search. That made early trust-region passes converge fast for the wrong
+# reason — Day 1 (and its knock-on effect on every later day's start SOC)
+# wasn't doing genuine work for the drift metric to reflect. Now that every
+# day's solve is real, every observed run hits iterations=2 with
+# converged=False (drift still >15 points after both passes), and the
+# under-convergence shows up exactly where you'd expect: day-to-day loop
+# counts and speeds swinging between extremes (a fast, many-loop day
+# followed by a slow, zero-loop, bank-everything day) instead of settling
+# on a balanced allocation, because Tier 3's DP never gets the 3rd+ pass
+# needed to re-center Tier 2's per-day sampling window on the actual
+# equilibrium. Raised to 5 so the loop has a real chance to settle; this
+# roughly triples wall-clock time per variant (the old ~1h/variant budget
+# this 2 h cap was tuned against) — lower it back down if that's not
+# survivable for your iteration speed, but 2 was never enough for an
+# honestly-constrained solve to begin with.
+MAX_ITERS = 5
 CONVERGENCE_WINDOW_PCT = 15.0
 
 def _alpha_floors_from_traj(s1_pct: np.ndarray, car: CarState, start_day: int,
