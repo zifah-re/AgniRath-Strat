@@ -4,6 +4,7 @@ pandas>=2.2
 scipy>=1.14          # SLSQP (L2/L3)
 pyarrow>=17.0        # route parquet
 pvlib>=0.11          # clear-sky fallback + solar position cross-checks
+tqdm>=4.66           # GA generation progress bar (optimizers/singleday.py)
 pytest>=8.0
 # optional (challenger backend; only if IPOPT wins the benchmark):
 # cyipopt

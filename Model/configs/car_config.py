@@ -55,9 +55,12 @@ class CarState:
     """
 
     # ---- mass & rolling -------------------------------------------------
-    mass_kg: float = 310.0               # source: DASHBOARD constants.py
-                                         # (car+driver). TODO-VERIFY 2026 mass
-                                         # incl. >=80 kg driver/ballast rule.
+    mass_kg: float = 336.5               # source: DASHBOARD constants.py
+                                         # (car+driver). Was 310.0 — did not
+                                         # match the DASHBOARD source-of-truth
+                                         # dict below (336.5); corrected per
+                                         # strategist directive: CarState
+                                         # must take DASHBOARD's values only.
     crr: float = 0.007                   # source: DASHBOARD. TODO-VERIFY
                                          # (LEGACY_KR used 0.0045).
 
@@ -66,10 +69,15 @@ class CarState:
                                          # (LEGACY_KR used 0.092).
 
     # ---- solar array ----------------------------------------------------
-    array_area_m2: float = 5.95          # source: DASHBOARD. TODO-VERIFY class
-                                         # decision (4 vs 6 m2) is car team's.
-    array_efficiency: float = 0.22     # source: DASHBOARD. TODO-VERIFY
-                                         # (LEGACY_KR used 0.19 on 6 m2).
+    array_area_m2: float = 5.78          # source: DASHBOARD. Was 5.95 — did
+                                         # not match the DASHBOARD dict below
+                                         # (5.78); corrected per strategist
+                                         # directive (CarState takes DASHBOARD
+                                         # values only).
+    array_efficiency: float = 0.21     # source: DASHBOARD. Was 0.22 — did
+                                         # not match the DASHBOARD dict below
+                                         # (0.21); corrected (LEGACY_KR used
+                                         # 0.19 on 6 m2, for reference only).
     panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
     albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
     array_azimuth_deg: float = 0.0       # TODO-VERIFY: panel-plane azimuth
@@ -91,12 +99,14 @@ class CarState:
     # ---- drivetrain -----------------------------------------------------
     motor_eff: float = 0.95              # source: DASHBOARD MOTOR_EFF.
     regen_eff: float = 0.70              # source: DASHBOARD REGEN_EFF.
-    p_idle_w: float = 10.0             # source: user directive (18/08) — set
-                                         # equal to PARC_FERME_IDLE_W per team
-                                         # decision, superseding the previous
-                                         # DASHBOARD POWER_LOSS placeholder.
-                                         # Plan v3 §6.1 P_idle: also subtracted
-                                         # during stationary charging intervals.
+    p_idle_w: float = 5.0               # source: DASHBOARD power_loss_w.
+                                         # Was 10.0 (an 18/08 team directive
+                                         # to use PARC_FERME_IDLE_W instead) —
+                                         # reverted per strategist directive
+                                         # (CarState takes DASHBOARD values
+                                         # only: power_loss_w=5.0). Plan v3
+                                         # §6.1 P_idle: also subtracted during
+                                         # stationary charging intervals.
     p_max_continuous_w: float = 3000.0   # TODO-VERIFY: continuous motor power
                                          # limit for trailering red-flag
                                          # (Plan v3 §5.1). PLACEHOLDER — need
@@ -138,8 +148,12 @@ class CarState:
     discharge_eff: float = 0.96          # TODO-VERIFY (Paper 4 eta_bd=0.96).
 
     # ---- speed/accel envelope ------------------------------------------
-    v_max_ms: float = 90.0 / 3.6         # source: DASHBOARD MAX_SPEED=85 km/h.
-                                         # TODO-VERIFY 2026 car max.
+    v_max_ms: float = 85.0 / 3.6         # source: DASHBOARD max_speed_kmh=85.
+                                         # Was 90.0/3.6 (i.e. 90 km/h) — the
+                                         # value didn't match its own cited
+                                         # source (DASHBOARD's 85); corrected
+                                         # per strategist directive (CarState
+                                         # takes DASHBOARD values only).
     a_max_ms2: float = 2.0               # Paper 1 field finding: <=0.5 m/s^2 is
                                          # safe & driver-followable (Plan v3 §8).
 
