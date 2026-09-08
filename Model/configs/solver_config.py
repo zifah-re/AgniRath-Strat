@@ -175,6 +175,13 @@ DP_HIGH_SOC_END_PENALTY_KM_PER_PCT = 1.5
 # stay feasible), lower it (never to 0) to give the solver more room.
 SOC_ZERO_CLIP_GUARD_PCT = 1.0
 
+# Mirror-image guard for the floor (car.soc_min_pct), used by
+# optimizers.singleday._trough_soc_floor_constraint. Without this, an SLSQP
+# constraint-tolerance nudge at the floor is a real over-discharge event
+# with nothing absorbing it (see that constraint's docstring for the Day-4
+# 19.53%-against-a-20%-floor incident this closes).
+SOC_TROUGH_GUARD_PCT = 1.0
+
 # ---- Late-finish pricing in the Tier 3 allocator ---------------------------
 # The strategist's directive (20/08): "arriving by 17:00 is good and must be
 # followed more or less — only run past it if the extra distance is genuinely

@@ -162,7 +162,24 @@ CONTROL_STOP_UNTOUCHABLE_S = 25 * 60     # SR 2.28.14: no team member may touch
 # ---------------------------------------------------------------------------
 LOOP_STOP_DURATION_S = 5 * 60            # SR 2.29.5: mandatory 5-min loop stop
                                          #   BEFORE EVERY loop attempt
-LOOP_CRUISE_SPEED_MS = 55 / 3.6
+LOOP_CRUISE_SPEED_MS = 65 / 3.6
+# BUGFIX (strategist review, found via strategy_aryaman.json): this was
+# 55 km/h — a stale, uncoordinated placeholder — while configs/solver_config.
+# py's DP_BASE_PLANNING_SPEED_KMH (used for the STAGE1/STAGE2 portion of this
+# exact same time-budget estimate, two lines away in tier1.relaxed_loop_combos
+# / guess_baseline) is 65 km/h, the strategist-set "realistic sustainable
+# cruise" (21/08 directive). Real achieved average speeds run 61-70 km/h on
+# loop-heavy days (e.g. 11 loops at 61.5 km/h avg, 8 loops at 64.0 km/h avg),
+# so budgeting loop time at only 55 km/h OVERESTIMATES how long each loop rep
+# takes, which UNDERCOUNTS relaxed_loop_combos' per-day `caps` (max feasible
+# reps within the daylight window) — Tier 2 never even SAMPLES the higher-rep
+# combos this silently excludes, so Tier 3's DP has no way to choose them no
+# matter how good its scoring is. This was the actual mechanism behind days
+# doing far fewer loops than their solar/time budget could support and
+# banking the unspent charge as SOC instead (Day 5: 1 loop, SOC 47.6%->91.5%;
+# Day 7: 2 loops, SOC 71.2%->94.3%, briefly clipping the pack at exactly
+# 100%) — a Tier-3-scoring-looking symptom that was actually a Tier-1
+# candidate-generation bug. Aligning both speeds removes the inconsistency.
 # SR 2.29.6: loops optional; teams must declare intent to Loop Stop Manager
 # each time (maps 1:1 to MPC commit/abort decision point, Plan v3 §2.2).
 # SR 2.29.2: loop-km determine "most km clocked" -> 2026 Champions.

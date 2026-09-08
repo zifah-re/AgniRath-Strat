@@ -922,6 +922,38 @@ def project_to_integer_kmh(evaluator: DayEvaluator, v_kmh: np.ndarray,
     if not _feasible(v_int):
         v_int = np.clip(np.asarray(v_kmh, dtype=float), v_min_kmh, np.floor(v_max_kmh))
 
+    if not _feasible(v_int):
+        # BUGFIX: rounding one segment can silently reintroduce a violation
+        # of an AGGREGATE, whole-trajectory constraint (the peak/trough SOC
+        # ceiling & floor, each a max/min over every substep in the day)
+        # that the continuous SLSQP solution respected — e.g. rounding one
+        # segment down raises that segment's solar income, which can push
+        # peak_soc_pct back over the ceiling with no single coordinate
+        # obviously "at fault". The ±1 km/h per-segment local search below
+        # can't repair that: it evaluates one coordinate at a time, but an
+        # aggregate constraint usually needs a COORDINATED, whole-profile
+        # change. This was letting genuinely-infeasible (still-clipping /
+        # still-over-discharging) integer profiles through silently — e.g.
+        # Day 7 reporting a literal peak SOC of exactly 100.0 despite the
+        # hard ceiling constraint. Try a uniform whole-profile speed-scale
+        # repair first — scaling up spends more energy (fixes a ceiling
+        # breach), scaling down spends less (fixes a floor breach) — before
+        # falling through to whatever the raw continuous solution gives.
+        v_base = np.asarray(v_kmh, dtype=float)
+        for scale in (1.02, 1.05, 1.10, 1.20, 1.35, 0.98, 0.95, 0.90, 0.80, 0.65):
+            cand = np.clip(v_base * scale, v_min_kmh, np.floor(v_max_kmh))
+            if _feasible(cand):
+                v_int = cand
+                rounded = np.clip(np.round(cand), v_min_kmh, np.floor(v_max_kmh))
+                if _feasible(rounded):
+                    v_int = rounded
+                break
+        # If NOTHING above is feasible either, v_int stays at the raw clip —
+        # a genuinely infeasible day (no speed profile can satisfy the SOC
+        # band given how few/many loops Tier 3 committed to) belongs to Tier
+        # 3 to fix by changing the loop count, not something this function
+        # can paper over by construction.
+
     best = v_int.copy()
     best_obj = float(objective(best)) if _feasible(best) else float('inf')
     for i in range(len(best)):
@@ -1057,7 +1089,18 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         # Symmetric floor counterpart (see _trough_soc_floor_constraint
         # docstring) — hard-forbid the trace dipping below car.soc_min_pct
         # at ANY point mid-day, not just checking the terminal SOC.
-        _trough_soc_floor_constraint(evaluator, car.soc_min_pct),
+        # BUGFIX: this had ZERO guard margin, unlike the ceiling's
+        # SOC_ZERO_CLIP_GUARD_PCT — any small SLSQP constraint-tolerance
+        # slack (scipy's NonlinearConstraint is satisfied to within a
+        # numerical tolerance, not exactly) translated directly into a real
+        # floor breach with nothing to absorb it. Day 4 dipped to 19.53%
+        # against the 20% floor for exactly this reason. Mirrors the
+        # ceiling's guard band so both ends of the SOC band have the same
+        # safety margin.
+        _trough_soc_floor_constraint(
+            evaluator,
+            car.soc_min_pct + float(getattr(SCFG, "SOC_TROUGH_GUARD_PCT", 0.0)),
+        ),
     ]
 
     if "warm_start_kmh" in kwargs and kwargs["warm_start_kmh"] is not None:
