@@ -232,7 +232,10 @@ def list_strategy_variants() -> list[dict]:
                 "label": f"Full day ({day.get('distance_km', 0):.1f} km)" if day.get("distance_km") is not None else "Full day",
             }]
             for seg in _stage_segments(day):
-                segments.append({"key": seg["key"], "label": seg["label"]})
+                entry = {"key": seg["key"], "label": seg["label"]}
+                if seg["key"] == "loop":
+                    entry["n_loops"] = int(day.get("n_loops") or 0)
+                segments.append(entry)
 
             days.append({
                 "day": int(day_key),
@@ -458,6 +461,50 @@ def build_target_profile_chart(
     return [[float(epoch0 + t), float(v)] for t, v in points]
 
 
+def build_loop_target_profiles(day: dict, live_distance_km: np.ndarray, epoch0: float) -> list[list]:
+    """Return one route-index-aligned TargetProfile for every solved lap.
+
+    The live loop KML describes one physical lap, while dashboard_trace's
+    loop window describes all n laps consecutively.  A single TargetProfile
+    therefore cannot represent the whole solved window without ceasing to be
+    index-aligned with the KML.  Keep one profile per lap instead; main.py
+    selects the active one from cumulative driven distance.
+    """
+    if live_distance_km.size < 2 or float(live_distance_km[-1]) <= 0:
+        raise StrategyPushError("The loaded loop route has no usable distance grid.")
+
+    segments = {s["key"]: s for s in _stage_segments(day)}
+    loop_bounds = segments.get("loop")
+    loop_stage = day.get("loop") or {}
+    n_loops = int(loop_stage.get("n_loops") or 0)
+    if not loop_bounds or n_loops < 1:
+        raise StrategyPushError("This strategy day has no solved loop count.")
+
+    tr = day["dashboard_trace"]
+    full_dist_km = np.asarray(tr["distance_m"], dtype=float) / 1000.0
+    full_v_kmh = np.asarray(tr["v_kmh"], dtype=float)
+    offsets = np.array([_stop_offset_at_km(d, list(segments.values()), day) for d in full_dist_km])
+    full_t_s = np.asarray(tr["time_s"], dtype=float) + offsets
+    mask = (full_dist_km >= loop_bounds["start_km"] - 1e-6) & (full_dist_km <= loop_bounds["end_km"] + 1e-6)
+    loop_dist_km = full_dist_km[mask] - loop_bounds["start_km"]
+    loop_v_kmh = full_v_kmh[mask]
+    loop_t_s = full_t_s[mask]
+    if loop_dist_km.size < 2:
+        raise StrategyPushError("No solved trace points found for the loop segment.")
+
+    solved_lap_km = float(loop_dist_km[-1]) / n_loops
+    # KML and optimiser routes can differ slightly in total distance.  Scale
+    # each physical-lap grid to its solved-lap window instead of clipping it.
+    within_lap_km = live_distance_km * (solved_lap_km / float(live_distance_km[-1]))
+    profiles = []
+    for lap in range(n_loops):
+        solved_positions = np.clip(within_lap_km + lap * solved_lap_km, 0.0, float(loop_dist_km[-1]))
+        velocities = np.interp(solved_positions, loop_dist_km, loop_v_kmh)
+        times = np.interp(solved_positions, loop_dist_km, loop_t_s)
+        profiles.append([[float(epoch0 + t), float(v)] for t, v in zip(times, velocities)])
+    return profiles
+
+
 def push_strategy_for_day(
     variant: str,
     day: int,
@@ -472,22 +519,33 @@ def push_strategy_for_day(
         raise StrategyPushError(
             "No route is currently loaded on the dashboard — load/select a KML first."
         )
-    k= "s1" if "Stage 1" in segment else ("s2" if "Stage 2" in segment else "l")
+    # The API sends stable segment keys (stage1/loop/stage2), not the human
+    # labels displayed in the picker.  Full-day strategies retain the loop
+    # solar file as the historical fallback.
+    k = {"stage1": "s1", "stage2": "s2", "loop": "l"}.get(segment or "", "l")
     with open(SOLAR_DIR / f"mean_{DAYWISE_FILES[f"Day {day}"][k]}.jsonl") as f:
         solar=json.load(f)
     data = _load_strategy(variant)
     day_data = _get_day(data, day)
     epoch0 = local_midnight_epoch(tz_offset_hours)
 
-    target_profile = build_target_profile(
-        day_data, np.asarray(live_distance_km, dtype=float), epoch0, segment=segment
-    )
+    live_distance_km = np.asarray(live_distance_km, dtype=float)
+    loop_target_profiles = []
+    if segment == "loop":
+        loop_target_profiles = build_loop_target_profiles(day_data, live_distance_km, epoch0)
+        target_profile = loop_target_profiles[0]
+    else:
+        target_profile = build_target_profile(day_data, live_distance_km, epoch0, segment=segment)
     target_profile_chart = build_target_profile_chart(day_data, epoch0, segment=segment)
 
     return {
         "solar": solar,
         "target_profile": target_profile,
         "target_profile_chart": target_profile_chart,
+        "loop_target_profiles": loop_target_profiles,
+        # Expose the solved count for the UI even when the user has pushed a
+        # full-day strategy before selecting its loop-only KML.
+        "loop_count": len(loop_target_profiles) or int((day_data.get("loop") or {}).get("n_loops") or 0),
         "variant": variant,
         "day": day,
         "segment": segment or "full",

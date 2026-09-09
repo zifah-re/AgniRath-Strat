@@ -203,9 +203,16 @@ def main(results=None, profiles=None):
     current_soc = (results['SoC'] / BATTERY_CAPACITY_AH) * 100.0 
     current_distance = results['Distance']
     current_time = results['Time_seconds']
+
+    # A loop stop is time-only: there is intentionally no synthetic point in
+    # the distance-indexed route arrays.  Do not optimise a moving plan while
+    # race control requires the car to remain stopped.
+    loop_control = (profiles or {}).get("LoopControl", {})
+    if loop_control.get("is_paused"):
+        return [(current_time, 0.0)]
     
     if not profiles:
-        profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance", "TargetProfile", "Distance", "Altitude", "Headings", "Coordinates"])
+        profiles = get_profile(["Gradient", "SpeedProfile", "SolarIrradiance", "TargetProfile", "Distance", "Altitude", "Headings", "Coordinates", "LoopControl"])
         
     distance_profile = profiles.get("Distance")
     terrain_profile = profiles.get("Gradient", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)

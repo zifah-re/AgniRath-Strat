@@ -1,9 +1,32 @@
 from helper import get_profile
 import numpy as np
 
-target_profile,time_profile=np.array(get_profile(["TargetProfile"])['TargetProfile'])[:,1],np.array(get_profile(["TargetProfile"])['TargetProfile'])[:,0]
+# TargetProfile is deliberately one-lap long so it stays index-aligned with
+# the one-lap KML Distance array.  A pushed loop strategy also provides one
+# such profile per solved lap; concatenate them here so the simulator drives
+# through the complete strategy instead of stopping after lap one.
+profiles = get_profile(["TargetProfile", "TargetProfilesByLap"])
+lap_profiles = profiles.get("TargetProfilesByLap") or []
+if lap_profiles:
+    # The per-lap profiles contain the solved driving points.  Add explicit
+    # stationary points at each boundary so the simulator also represents the
+    # mandatory five-minute stop instead of teleporting into the next lap.
+    frames = []
+    for lap_index, lap in enumerate(lap_profiles):
+        if lap_index and frames:
+            frames.append((frames[-1][0], 0.0, True))
+            frames.append((lap[0][0], 0.0, True))
+        frames.extend((point[0], point[1], False) for point in lap)
+    full_profile = np.asarray([[time_s, speed] for time_s, speed, _ in frames], dtype=float)
+    stop_frames = np.asarray([is_stop for _, _, is_stop in frames], dtype=bool)
+else:
+    full_profile = np.asarray(profiles["TargetProfile"], dtype=float)
+    stop_frames = np.zeros(len(full_profile), dtype=bool)
+
+target_profile, time_profile = full_profile[:, 1], full_profile[:, 0]
 
 noise_data=target_profile+np.random.uniform(-5,5,len(target_profile))
+noise_data[stop_frames] = 0.0
 
 import time
 import json

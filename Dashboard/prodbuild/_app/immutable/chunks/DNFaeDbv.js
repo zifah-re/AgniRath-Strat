@@ -199,6 +199,7 @@ const u = {
         SpeedProfile:[],
         Headings:[],
         TargetProfile: [],
+        TargetProfileChart: [],
         MPCProfile: []
     }
 }

@@ -280,10 +280,71 @@ current_data_default = {
                                  #   control/loop stops. Used only by the Strategy
                                  #   page's time-axis chart.
         "MPCProfile": [],        # List of tuples (unix time, speed)
+        "TargetProfilesByLap": [],  # One distance-indexed TargetProfile per loop lap.
+        "StrategyLoopStartDistance": None,
+        # Loop-mode state is deliberately separate from the distance-indexed
+        # route profiles.  A five-minute stop has no distance, so inserting
+        # points into Distance/TargetProfile would break their index alignment.
+        "LoopControl": {
+            "enabled": False,
+            "total_loops": 0,
+            "completed_loops": 0,
+            "pause_until": None,
+            "loop_distance_km": 0.0,
+            "start_distance_km": 0.0,
+        },
         "SolarIrradiance":{}
     }
 }
 current_data = copy.deepcopy(current_data_default)
+LOOP_STOP_DURATION_SECONDS = 5 * 60
+
+
+def loop_control_snapshot(now=None):
+    """Return UI/MPC-ready loop state without altering any route arrays."""
+    now = time.time() if now is None else now
+    control = dict(current_data["profile"].get("LoopControl") or {})
+    pause_until = control.get("pause_until")
+    paused = bool(control.get("enabled") and pause_until and now < pause_until)
+    control["is_paused"] = paused
+    control["pause_remaining_s"] = max(0, int(math.ceil(pause_until - now))) if paused else 0
+    return control
+
+
+def update_loop_control(distance_travelled_km, now=None):
+    """Start the next mandatory stop whenever cumulative distance completes a lap."""
+    now = time.time() if now is None else now
+    control = current_data["profile"].get("LoopControl") or {}
+    if not control.get("enabled"):
+        return
+    lap_length = float(control.get("loop_distance_km") or 0)
+    total = int(control.get("total_loops") or 0)
+    if lap_length <= 0 or total <= 0:
+        return
+
+    driven_in_loop = max(0.0, distance_travelled_km - float(control.get("start_distance_km") or 0.0))
+    completed = min(int(driven_in_loop // lap_length), total)
+    if completed > int(control.get("completed_loops") or 0):
+        control["completed_loops"] = completed
+        # The final lap has no following loop attempt, hence no new stop.
+        if completed < total:
+            control["pause_until"] = now + LOOP_STOP_DURATION_SECONDS
+    current_data["profile"]["LoopControl"] = control
+
+
+def active_target_profile():
+    """Choose the solved lap matching cumulative distance on a one-lap KML."""
+    profile = current_data["profile"]
+    lap_profiles = profile.get("TargetProfilesByLap") or []
+    route_distance = profile.get("Distance") or []
+    if not lap_profiles or not route_distance or float(route_distance[-1]) <= 0:
+        return profile.get("TargetProfile", [])
+    start = profile.get("StrategyLoopStartDistance")
+    if start is None:
+        return lap_profiles[0]
+    driven = max(0.0, float(current_data["metric"].get("distance_travelled") or 0.0) - float(start))
+    lap = min(int(driven // float(route_distance[-1])), len(lap_profiles) - 1)
+    return lap_profiles[lap]
 # In-memory session data store to hold file contents between requests
 TRACK_SESSIONS = {}
 
@@ -557,7 +618,11 @@ async def update_processor(queue: asyncio.Queue):
                     tracker_state['last_update_time'] = rx_dt
                 else:
                     dt_seconds = (rx_dt - tracker_state['last_update_time']).total_seconds()
-                    if dt_seconds < 0 or dt_seconds > 300:
+                    # A multi-lap strategy deliberately has a five-minute
+                    # timestamp gap between laps.  It is not a lost session;
+                    # test_mpc.py emits a zero-speed packet over that gap.
+                    expected_loop_pause = bool(current_data['profile'].get("TargetProfilesByLap")) and 0 < dt_seconds <= LOOP_STOP_DURATION_SECONDS + 60
+                    if (dt_seconds < 0 or dt_seconds > 300) and not expected_loop_pause:
                         metric['distance_travelled'] = 0.0
                         for k in current_data['historic']:
                             current_data['historic'][k] = []
@@ -576,6 +641,8 @@ async def update_processor(queue: asyncio.Queue):
                         distance_increment_km = (v * dt_seconds) / 1000.0
                         metric['distance_travelled'] += distance_increment_km
                     tracker_state["last_update_time"] = rx_dt
+
+                update_loop_control(metric['distance_travelled'])
                 
                 metric['SOC_Ah'] = tracker_state["current_soc_percentage"]
                 if len(current_data['profile']['Coordinates'])>0:
@@ -621,9 +688,15 @@ async def update_processor(queue: asyncio.Queue):
                     metric['Altitude']=alt1 +f*(alt2-alt1)
                     metric['Gradient']=grad1 + f*(grad2-grad1)
                     metric['Heading']=current_data['profile']['Headings'][i]
-                    if current_data['profile']['TargetProfile']:
-                        v1,v2=current_data['profile']['TargetProfile'][i][1],current_data['profile']['TargetProfile'][i+1][1]
-                        metric['predicted']=v1 + f*(v2-v1)
+                    loop_control = current_data['profile'].get("LoopControl", {})
+                    loop_paused = bool(loop_control.get("enabled") and loop_control.get("pause_until") and time.time() < loop_control["pause_until"])
+                    if loop_paused:
+                        metric['predicted'] = 0.0
+                    else:
+                        target_profile = active_target_profile()
+                        if target_profile:
+                            v1,v2=target_profile[i][1],target_profile[i+1][1]
+                            metric['predicted']=v1 + f*(v2-v1)
                 historic = {
                     'Timestamps': rx_dt.strftime('%H:%M:%S'),
                     'Time_seconds': float(rx_dt.timestamp()),
@@ -682,11 +755,12 @@ async def update_processor(queue: asyncio.Queue):
                             "Gradient":current_data['profile']['Gradient'],
                             "SpeedProfile":current_data['profile']['SpeedProfile'],
                             "SpeedLimit":current_data['profile']['SpeedLimit'],
-                            "TargetProfile":current_data['profile']['TargetProfile'],
+                            "TargetProfile":active_target_profile(),
                             "Distance":current_data['profile']['Distance'],
                             "Coordinates":current_data['profile']['Coordinates'],
                             "Headings":current_data['profile']['Headings'],
-                            "SolarIrradiance":current_data['profile']['SolarIrradiance']
+                            "SolarIrradiance":current_data['profile']['SolarIrradiance'],
+                            "LoopControl": loop_control_snapshot()
                         }
                         current_data['profile']['MPCProfile']=solver_main(results=results,profiles=profiles)
                     except Exception as e:
@@ -831,6 +905,15 @@ async def clear_historical_data():
     profile=current_data['profile']
     current_data = copy.deepcopy(current_data_default)
     current_data['profile']={**profile}
+    # A fresh simulator run restarts cumulative distance at zero, so rebase
+    # the multi-lap profile selector and its lap counter at zero as well.
+    if current_data['profile'].get("TargetProfilesByLap"):
+        current_data['profile']["StrategyLoopStartDistance"] = 0.0
+        control = current_data['profile'].get("LoopControl") or {}
+        control["completed_loops"] = 0
+        control["start_distance_km"] = 0.0
+        control["pause_until"] = None
+        current_data['profile']["LoopControl"] = control
     tracker_state["count"] = 0
     tracker_state["current_soc_percentage"] = None
     tracker_state["initial_SOC_Ah"] = None
@@ -995,6 +1078,49 @@ class StrategyPushRequest(BaseModel):
     tz_offset: float | None = None
 
 
+class LoopControlRequest(BaseModel):
+    action: str
+    total_loops: int | None = None
+
+
+@app.get("/api/strategy/loop-control")
+async def get_loop_control():
+    """Live loop-mode state for the Strategy page countdown/counter."""
+    return loop_control_snapshot()
+
+
+@app.post("/api/strategy/loop-control")
+async def set_loop_control(payload: LoopControlRequest):
+    """Start or stop manual loop mode. Starting includes the first required stop."""
+    action = payload.action.lower()
+    if action == "stop":
+        current_data["profile"]["LoopControl"] = {
+            "enabled": False, "total_loops": 0, "completed_loops": 0,
+            "pause_until": None, "loop_distance_km": 0.0, "start_distance_km": 0.0,
+        }
+        return loop_control_snapshot()
+    if action != "start":
+        raise HTTPException(status_code=400, detail="Loop action must be 'start' or 'stop'.")
+
+    total_loops = payload.total_loops or 0
+    route_distance = current_data["profile"].get("Distance") or []
+    if not route_distance:
+        raise HTTPException(status_code=400, detail="Load the loop KML before starting loop mode.")
+    if not 1 <= total_loops <= 100:
+        raise HTTPException(status_code=400, detail="Loop count must be between 1 and 100.")
+
+    current_data["profile"]["LoopControl"] = {
+        "enabled": True,
+        "total_loops": total_loops,
+        "completed_loops": 0,
+        "pause_until": time.time() + LOOP_STOP_DURATION_SECONDS,
+        "loop_distance_km": float(route_distance[-1]),
+        "start_distance_km": float(current_data["metric"].get("distance_travelled") or 0.0),
+    }
+    current_data["profile"]["StrategyLoopStartDistance"] = current_data["profile"]["LoopControl"]["start_distance_km"]
+    return loop_control_snapshot()
+
+
 @app.post("/api/strategy/push")
 async def push_strategy(payload: StrategyPushRequest):
     """Push a solved strategy's velocity profile onto the live dashboard as
@@ -1028,9 +1154,21 @@ async def push_strategy(payload: StrategyPushRequest):
     solar=result.pop("solar")
     target_profile = result.pop("target_profile")
     target_profile_chart = result.pop("target_profile_chart", [])
+    loop_target_profiles = result.pop("loop_target_profiles", [])
+    loop_count = result.get("loop_count", 0)
+    loop_control = current_data["profile"].get("LoopControl", {})
+    if loop_target_profiles:
+        loop_control = {
+            "enabled": False, "total_loops": loop_count, "completed_loops": 0,
+            "pause_until": None, "loop_distance_km": float(live_distance_km[-1]),
+            "start_distance_km": float(current_data["metric"].get("distance_travelled") or 0.0),
+        }
     await app.state.queue.put((
         "C",
-        {"SolarIrradiance":solar, "TargetProfile": target_profile, "TargetProfileChart": target_profile_chart},
+        {"SolarIrradiance":solar, "TargetProfile": target_profile, "TargetProfileChart": target_profile_chart,
+         "TargetProfilesByLap": loop_target_profiles,
+         "StrategyLoopStartDistance": loop_control.get("start_distance_km") if loop_target_profiles else None,
+         "LoopControl": loop_control},
     ))
 
     return {"status": "success", **result}

@@ -5,7 +5,7 @@ import {g as ke, s as V, c as Ae} from "../chunks/DNFaeDbv.js";
 import {b as f} from "../chunks/CqHrAp-I.js";
 import {s as Te, a as $e} from "../chunks/DkIwFic-.js";
 import {C as n, a as Le, L as Pe, P as Be, b as We, c as Me, p as Ee, d as Ie, e as Re} from "../chunks/DHTsbXwT.js";
-var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas id="speed-time-chart" class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div> <div class="metric-card svelte-14ry3bj p-4 mt-4"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold">Offline Model Strategy</h3> <span class="text-sm text-gray-400">Upload &rarr; select day &rarr; apply</span></div> <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label> <input id="strategy-file-input" type="file" accept=".json,application/json" class="w-full text-sm text-gray-300 bg-gray-800 rounded border border-gray-600 p-1.5" /></div> <div><label class="text-sm text-gray-400 block mb-1">Strategy</label> <select id="strategy-variant-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"><option value="">No strategies</option></select></div> <div><label class="text-sm text-gray-400 block mb-1">Day</label> <select id="strategy-day-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <div><label class="text-sm text-gray-400 block mb-1">Segment</label> <select id="strategy-segment-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <button id="strategy-apply-btn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">Apply to Dashboard</button></div> <p id="strategy-status" class="mt-2 text-sm hidden"></p></div></div>');
+var Ze = Se('<div class="space-y-6 p-6"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"><div><div class="flex items-center justify-between mb-2"><h3 class="text-lg font-semibold">Speed Status</h3> <div></div></div> <div class="grid grid-cols-2 gap-4"><div><div class="metric-value text-blue-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Speed</div></div> <div><div class="metric-value text-gray-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Predicted Speed</div></div></div> <div class="mt-2 text-sm"><span class="text-gray-400">Margin:</span> <span> </span></div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-purple-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Current Acceleration</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-green-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">Battery Level</div></div> <div class="metric-card svelte-14ry3bj"><div class="metric-value text-red-400 svelte-14ry3bj"> </div> <div class="metric-label svelte-14ry3bj">ETA</div></div></div> <div class="grid grid-cols-1 xl:grid-cols-2 gap-6"><div class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas id="speed-time-chart" class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div> <div style="display:none;" class="plot-container xl:col-span-2 svelte-14ry3bj"><canvas class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="grad-dist" class="w-full h-80"></canvas></div><div class="plot-container svelte-14ry3bj"><canvas id="alt-dist" class="w-full h-80"></canvas></div></div> <div class="metric-card svelte-14ry3bj p-4 mt-4"><div class="flex items-center justify-between mb-3"><h3 class="text-lg font-semibold">Offline Model Strategy</h3> <span class="text-sm text-gray-400">Upload &rarr; select day &rarr; apply</span></div> <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Offline model output (.json)</label> <input id="strategy-file-input" type="file" accept=".json,application/json" class="w-full text-sm text-gray-300 bg-gray-800 rounded border border-gray-600 p-1.5" /></div> <div><label class="text-sm text-gray-400 block mb-1">Strategy</label> <select id="strategy-variant-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"><option value="">No strategies</option></select></div> <div><label class="text-sm text-gray-400 block mb-1">Day</label> <select id="strategy-day-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <div><label class="text-sm text-gray-400 block mb-1">Segment</label> <select id="strategy-segment-select" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600"></select></div> <button id="strategy-apply-btn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded px-4 py-1.5 font-medium">Apply to Dashboard</button></div> <p id="strategy-status" class="mt-2 text-sm hidden"></p> <div class="mt-4 border-t border-gray-700 pt-3"><div class="flex items-center justify-between mb-2"><h3 class="text-base font-semibold">Loop Mode</h3> <span id="loop-mode-state" class="text-sm text-gray-400">Off</span></div><div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end"><div><label class="text-sm text-gray-400 block mb-1">Number of loops</label><input id="loop-count-input" type="number" min="1" max="100" value="1" class="w-full bg-gray-800 text-white rounded px-2 py-1.5 border border-gray-600" /></div><div><div id="loop-counter" class="text-lg font-medium">Lap 0 / 0</div><div id="loop-pause-countdown" class="text-sm text-gray-400">Load the loop KML, then start.</div></div><button id="loop-mode-btn" class="bg-amber-600 hover:bg-amber-500 text-white rounded px-4 py-1.5 font-medium">Start Loop Mode</button></div></div></div></div>');
 function De(ee, te) {
     ye(te, !0);
     const [ae,se] = $e()
@@ -318,10 +318,66 @@ function De(ee, te) {
         const segmentSelect = document.getElementById("strategy-segment-select");
         const applyBtn = document.getElementById("strategy-apply-btn");
         const statusEl = document.getElementById("strategy-status");
-        if (!fileInput || !variantSelect || !daySelect || !segmentSelect || !applyBtn || !statusEl) return () => {};
+        const loopCountInput = document.getElementById("loop-count-input");
+        const loopCounter = document.getElementById("loop-counter");
+        const loopState = document.getElementById("loop-mode-state");
+        const loopCountdown = document.getElementById("loop-pause-countdown");
+        const loopBtn = document.getElementById("loop-mode-btn");
+        if (!fileInput || !variantSelect || !daySelect || !segmentSelect || !applyBtn || !statusEl || !loopCountInput || !loopCounter || !loopState || !loopCountdown || !loopBtn) return () => {};
 
         let variants = [];
         let busy = false;
+        let loopBusy = false;
+        let loopPoll = null;
+
+        function formatCountdown(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${String(secs).padStart(2, "0")}`;
+        }
+
+        function renderLoopControl(control) {
+            const enabled = !!control?.enabled;
+            const paused = !!control?.is_paused;
+            const completed = Number(control?.completed_loops || 0);
+            const total = Number(control?.total_loops || 0);
+            loopCounter.textContent = `Lap ${completed} / ${total}`;
+            loopState.textContent = !enabled ? "Off" : paused ? "Mandatory 5-min pause" : completed >= total ? "Complete" : "Driving";
+            loopState.className = `text-sm ${paused ? "text-amber-400" : enabled ? "text-green-400" : "text-gray-400"}`;
+            loopCountdown.textContent = paused ? `Resume in ${formatCountdown(Number(control.pause_remaining_s || 0))}` : enabled && completed < total ? "Next lap is being counted from route distance." : enabled ? "All requested laps completed." : "Load the loop KML, then start.";
+            loopBtn.textContent = enabled ? "Pause Loop Mode" : "Start Loop Mode";
+            loopBtn.disabled = loopBusy;
+            loopBtn.className = `${enabled ? "bg-red-600 hover:bg-red-500" : "bg-amber-600 hover:bg-amber-500"} disabled:bg-gray-600 text-white rounded px-4 py-1.5 font-medium`;
+        }
+
+        async function refreshLoopControl() {
+            try {
+                const res = await fetch("/api/strategy/loop-control", { cache: "no-store" });
+                if (!res.ok) return;
+                renderLoopControl(await res.json());
+            } catch (_) { /* dashboard may still be starting; keep the last displayed state */ }
+        }
+
+        async function toggleLoopMode() {
+            loopBusy = true;
+            loopBtn.disabled = true;
+            try {
+                const active = loopBtn.textContent === "Pause Loop Mode";
+                const res = await fetch("/api/strategy/loop-control", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(active ? { action: "stop" } : { action: "start", total_loops: Number(loopCountInput.value) })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Could not change loop mode");
+                renderLoopControl(data);
+            } catch (e) {
+                setStatus(e.message || "Could not change loop mode", true);
+            } finally {
+                loopBusy = false;
+                refreshLoopControl();
+            }
+        }
 
         function setStatus(msg, isError) {
             statusEl.textContent = msg || "";
@@ -358,6 +414,8 @@ function De(ee, te) {
                 segmentSelect.appendChild(opt);
             });
             segmentSelect.value = segments.some(s => s.key === prevValue) ? prevValue : (segments[0]?.key ?? "");
+            const selected = segments.find(s => s.key === segmentSelect.value);
+            if (selected?.key === "loop" && selected.n_loops) loopCountInput.value = selected.n_loops;
             refreshApplyDisabled();
         }
 
@@ -447,6 +505,11 @@ function De(ee, te) {
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || "Push failed");
+                if (Number(data.loop_count) > 0) {
+                    loopCountInput.value = data.loop_count;
+                    loopCounter.textContent = `Lap 0 / ${data.loop_count}`;
+                    loopCountdown.textContent = "Loop strategy loaded — start loop mode when ready.";
+                }
                 const segLabel = segmentSelect.options[segmentSelect.selectedIndex]?.textContent || segment;
                 setStatus(`Applied ${variant}, Day ${day} — ${segLabel} — ${data.points} points.`, false);
             } catch (e) {
@@ -469,8 +532,11 @@ function De(ee, te) {
         daySelect.addEventListener("change", onDayChange);
         segmentSelect.addEventListener("change", onSegmentChange);
         applyBtn.addEventListener("click", applyStrategy);
+        loopBtn.addEventListener("click", toggleLoopMode);
 
         loadOptions();
+        refreshLoopControl();
+        loopPoll = window.setInterval(refreshLoopControl, 1000);
 
         return () => {
             fileInput.removeEventListener("change", uploadFile);
@@ -478,6 +544,8 @@ function De(ee, te) {
             daySelect.removeEventListener("change", onDayChange);
             segmentSelect.removeEventListener("change", onSegmentChange);
             applyBtn.removeEventListener("click", applyStrategy);
+            loopBtn.removeEventListener("click", toggleLoopMode);
+            if (loopPoll) window.clearInterval(loopPoll);
         };
     }
     xe( () => {
