@@ -201,7 +201,7 @@ def main(results=None, profiles=None):
     terrain_profile = slice_profiles(terrain_profile, distance_profile, current_distance, 0)
     altitude_profile = slice_profiles(altitude_profile, distance_profile, current_distance, 0)
     speed_limits = slice_profiles(speed_limits, distance_profile, current_distance, 75)
-    speed_limits=np.clip(speed_limits,a_max=75) * (5/18)
+    speed_limits=np.clip(speed_limits,40,75) * (5/18)
     heading_profile = slice_profiles(heading_profile, distance_profile, current_distance, 0)
     target_profile = slice_profiles(target_profile, distance_profile, current_distance, current_speed)
     target_profile = target_profile * (5 / 18)
