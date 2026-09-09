@@ -192,7 +192,7 @@ def main(results=None, profiles=None):
     altitude_profile = profiles.get("Altitude", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     heading_profile = profiles.get("Headings", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)
-    solar_profile = SolarIrradiance(profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile))
+    solar_profile = SolarIrradiance(profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile),"period_end","PT5M",6)
     coords = profiles.get("Coordinates", [(0,0)]*len(distance_profile)) or [(0,0)]*len(distance_profile)
     
     if isinstance(target_profile[0], (tuple, list)):
