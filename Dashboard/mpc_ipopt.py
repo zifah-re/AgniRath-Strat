@@ -162,10 +162,8 @@ def compute_optimal_velocity(current_v, current_soc, current_time, targets, spee
             estimated_time += dt_est
 
         a_headings, b_constants = precompute_solar_gti_factors(estimated_timestamps, chunk_coords, chunk_heading, chunk_altitude)
-        solar_profile = np.array([solar[chunk_coords[j], estimated_timestamps[j]].data(['dni','ghi']) for j in range(N)])
+        solar_dni_num, solar_ghi_num = solar[(chunk_coords[:N+1], estimated_timestamps[:N+1])].data(['dni','ghi'])
         
-        solar_dni_num = solar_profile[:, 0]
-        solar_ghi_num = solar_profile[:, 1]
         
         p_num = ca.vertcat(
             history_v[-1], 
@@ -215,7 +213,7 @@ def main(results=None, profiles=None):
     altitude_profile = profiles.get("Altitude", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     heading_profile = profiles.get("Headings", [0.0]*len(distance_profile)) or [0.0]*len(distance_profile)
     target_profile = profiles.get("TargetProfile", [current_speed]*len(distance_profile)) or [current_speed]*len(distance_profile)
-    solar_profile = SolarIrradiance(profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile))
+    solar_profile = SolarIrradiance(profiles.get("SolarIrradiance", [500.0]*len(distance_profile)) or [500.0]*len(distance_profile),time_key="period_end",interval="PT5M",radius=6)
     coords = profiles.get("Coordinates", [(0,0)]*len(distance_profile)) or [(0,0)]*len(distance_profile)
     
     if len(target_profile) > 0 and isinstance(target_profile[0], (tuple, list)):
@@ -227,7 +225,7 @@ def main(results=None, profiles=None):
     altitude_profile = slice_profiles(altitude_profile, distance_profile, current_distance, 0)
     heading_profile = slice_profiles(heading_profile, distance_profile, current_distance, 0)
     speed_limits = slice_profiles(speed_limits, distance_profile, current_distance, 75)
-    speed_limits=np.clip(speed_limits,a_max=75) * (5/18)
+    speed_limits=np.clip(speed_limits,40,75) * (5/18)
     target_profile = slice_profiles(target_profile, distance_profile, current_distance, current_speed)
     target_profile = target_profile * (5 / 18)
     coords = slice_profiles(coords, distance_profile, current_distance, (0, 0))

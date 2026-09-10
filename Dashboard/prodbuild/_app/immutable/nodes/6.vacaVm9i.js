@@ -262,18 +262,18 @@ function De(ee, te) {
             }
             r.data.datasets[1].data = zipToCoordsMPC(targetProfile);
             r.data.datasets[2].data = zipToCoordsMPC(profileData.MPCProfile);
-
             const targetTimes = targetProfile.map(p => p[0]);
             const targetMin = targetTimes.length ? Math.min(...targetTimes) : null;
             const targetMax = targetTimes.length ? Math.max(...targetTimes) : null;
 
-            let xMin, xMax;
+            let xMin, xMax, yMin, yMax;
             if (hasHistory) {
                 const liveNow = historic.Time_seconds.at(-1);
+                const speedNow = historic.Speed.at(-1);
                 xMin = liveNow - 120;
                 xMax = liveNow + 900;
-                if (targetMin !== null) xMin = Math.min(xMin, targetMin);
-                if (targetMax !== null) xMax = Math.max(xMax, targetMax);
+                yMin = speedNow - 20;
+                yMax = speedNow + 20;
             } else {
                 xMin = targetMin;
                 xMax = targetMax;

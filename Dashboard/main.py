@@ -1025,12 +1025,12 @@ async def push_strategy(payload: StrategyPushRequest):
         )
     except StrategyPushError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
+    solar=result.pop("solar")
     target_profile = result.pop("target_profile")
     target_profile_chart = result.pop("target_profile_chart", [])
     await app.state.queue.put((
         "C",
-        {"TargetProfile": target_profile, "TargetProfileChart": target_profile_chart},
+        {"SolarIrradiance":solar, "TargetProfile": target_profile, "TargetProfileChart": target_profile_chart},
     ))
 
     return {"status": "success", **result}

@@ -99,13 +99,26 @@ def _adjust_plan_for_today(plan: _DayPlan, distance_done_km_today: float,
 # The KML-derived mask below depends on manually-drawn (False) zones in a
 # routeshader KML that may be missing or incomplete for a given day.
 # Day 7 Stage 2's forced override was REMOVED per strategist directive
-# (07/09), and Day 8 Stage 1's forced override has now ALSO been removed
-# per strategist directive: neither stage is forced trailered regardless of
-# what the KML/route data actually say — each finds its own velocity
-# profile from the KML-derived mask (+ singleday.solve's real physics)
-# like every other stage. Left empty (not deleted) so a future confirmed
-# ground-truth override has an obvious place to go.
+# (07/09), and Day 8 Stage 1's forced INCLUSION override was also removed at
+# the same time. Left empty (not deleted) so a future confirmed ground-truth
+# override has an obvious place to go.
 HARDCODED_TRAILER_STAGES: dict[int, str] = {}
+
+# Explicit ground-truth EXCLUSION override (0-indexed day -> seg_type): the
+# opposite of HARDCODED_TRAILER_STAGES above — these stages must NEVER be
+# marked trailered, no matter what the KML (False)-zone data says.
+# BUGFIX: removing Day 8 Stage 1 from HARDCODED_TRAILER_STAGES did NOT stop
+# it from being trailered (strategy_aryaman.json still showed 180.3 trailered
+# km on Day 8) because that dict only ever forced INCLUSION — the KML file
+# for Day 8 Stage 1 has its own genuine (False)-tagged placemark(s), which
+# compute_trailered_mask_full's normal parsing path picks up independently
+# of the hardcode, and the "whole stage" rule below then expands even a
+# single flagged point to the ENTIRE stage. Per repeated strategist directive
+# (this stage must not be trailered, full stop), force it back out here —
+# applied AFTER the whole-stage expansion so it can't be re-triggered by it.
+FORCE_NOT_TRAILERED_STAGES: dict[int, str] = {
+    7: "stage1",  # Day 8 (0-indexed 7): Stage 1 must never be trailered
+}
 
 
 def compute_trailered_mask_full(route, kml_paths: dict | None, day_index: int) -> np.ndarray:
@@ -161,6 +174,13 @@ def compute_trailered_mask_full(route, kml_paths: dict | None, day_index: int) -
         mask = route_df["seg_type"] == seg
         if is_trailered[mask].any():
             is_trailered[mask] = True
+
+    # Ground-truth EXCLUSION override — applied LAST so it can't be
+    # re-triggered by the whole-stage expansion above (see
+    # FORCE_NOT_TRAILERED_STAGES docstring).
+    excluded_stage = FORCE_NOT_TRAILERED_STAGES.get(day_index)
+    if excluded_stage is not None:
+        is_trailered = is_trailered & (route_df["seg_type"].to_numpy() != excluded_stage)
 
     return is_trailered
 
@@ -624,7 +644,17 @@ def guess_baseline(routes: list, car: CarState, solar_providers: dict, wind_prov
                     kml_paths=kml_paths
                 )
 
-                floor = car.soc_min_pct + (_completion_margin() if completion else 0.0)
+                # Always keep a nonzero DP floor buffer, not just in
+                # completion mode. The DP's floor check here is the only
+                # thing standing between a committed loop-count decision and
+                # the surrogate's optimistic (coarse) estimate of what L2
+                # will actually deliver. Gating this margin behind
+                # RACE_MODE == "completion" meant loops-mode races (the
+                # normal case) planned days right down to soc_min_pct with
+                # zero reserve to absorb that surrogate-vs-L2 gap — which is
+                # how days ended up landing at literal 0% SOC instead of a
+                # small guard-band slip. Apply the same margin unconditionally.
+                floor = car.soc_min_pct + _completion_margin()
                 if end_soc < floor:
                     continue
 

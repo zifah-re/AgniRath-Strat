@@ -59,13 +59,25 @@ begins, rather than dumping all of it at once at the loop's start.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
+
 
 import numpy as np
 
+SOLAR_DIR = Path(__file__).resolve().parent / "Solar"
 STRATEGY_DIR = Path(__file__).resolve().parent / "output"
 STRATEGY_FILE_SUFFIXES = ("_fixed.json", "_final.json", ".json")
+DAYWISE_FILES = {
+    "Day 1": {"date": date(2026, 9, 10), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 1 Boiketlong to Rustenburg", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _Rustenburg Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 1 _10 Sept Stage 2 Rustenburg to Swartruggens"},
+    "Day 2": {"date": date(2026, 9, 11), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 1 Swart Ruggens to Zeerust", "l": "SSC ROUTE FINAL_Day 2 Half Blind_Day 2 Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 2 Half Blind_11 Sept Stage 2 Zeerust to Vryburg"},
+    "Day 3": {"date": date(2026, 9, 12), "s1": "Day 3 probables_Probable Prahlad Route_Stage 1", "l": "Day 3 probables_Probable Prahlad Route_Day 3 Loop", "s2": "Day 3 probables_Probable Prahlad Route_Stage 2"},
+    "Day 4": {"date": date(2026, 9, 13), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek"},
+    "Day 5": {"date": date(2026, 9, 14), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 1 Olifantshoek to Upington", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _Upington Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 5 _14 Sept Stage 2 Upington to Augrabies"},
+    "Day 6": {"date": date(2026, 9, 15), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 6 _15 Sept Stage 1 Augrabies to Springbok", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 6 _Springbok Loop", "s2": None},
+    "Day 7": {"date": date(2026, 9, 16), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 1 Springbok to Van Rhynsdorp", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 7_Van Rhynsdorp Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 7_16 Sept Stage 2 Van Rhynsdorp to Clanwilliam"},
+    "Day 8": {"date": date(2026, 9, 17), "s1": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 1 Clanwilliam to Ceres", "l": "2026 Sasol Solar Challenge Route (Publish)_Day 8_Ceres Loop", "s2": "2026 Sasol Solar Challenge Route (Publish)_Day 8_17 Sept Stage 2 Ceres to Paarl"}
+}
 
 
 class StrategyPushError(Exception):
@@ -460,7 +472,9 @@ def push_strategy_for_day(
         raise StrategyPushError(
             "No route is currently loaded on the dashboard — load/select a KML first."
         )
-
+    k= "s1" if "Stage 1" in segment else ("s2" if "Stage 2" in segment else "l")
+    with open(SOLAR_DIR / f"mean_{DAYWISE_FILES[f"Day {day}"][k]}.jsonl") as f:
+        solar=json.load(f)
     data = _load_strategy(variant)
     day_data = _get_day(data, day)
     epoch0 = local_midnight_epoch(tz_offset_hours)
@@ -471,6 +485,7 @@ def push_strategy_for_day(
     target_profile_chart = build_target_profile_chart(day_data, epoch0, segment=segment)
 
     return {
+        "solar": solar,
         "target_profile": target_profile,
         "target_profile_chart": target_profile_chart,
         "variant": variant,
