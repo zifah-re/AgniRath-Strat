@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>Zeerust Loop TEST.kmz</name>
+	<visibility>0</visibility>
+	<gx:CascadingStyle kml:id="__managed_style_0C57AF435141C1DAA771_normal">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff04ff0f</color>
+				<width>3.2</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_0C57AF435141C1DAA771_highlight">
+		<styleUrl>https://earth.google.com/balloon_components/base/1.1.0.0/card_template.kml#main</styleUrl>
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff04ff0f</color>
+				<width>4.8</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_0C57AF435141C1DAA771">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_0C57AF435141C1DAA771_normal</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_0C57AF435141C1DAA771_highlight</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="026F9F40B5407318456F">
+		<name>Zeerust Loop</name>
+		<LookAt>
+			<longitude>26.08298516048771</longitude>
+			<latitude>-25.40403444836332</latitude>
+			<altitude>1.414648398423424e-09</altitude>
+			<heading>0</heading>
+			<tilt>0</tilt>
+			<gx:fovy>30</gx:fovy>
+			<range>9212.91872303687</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_0C57AF435141C1DAA771</styleUrl>
+		<LineString>
+			<coordinates>
+				26.08254021915084,-25.54094791982403,0 26.08268250408649,-25.54125969178191,0 26.07922707582033,-25.54210330617706,0 26.07977585029408,-25.54397396736679,0 26.07875951361018,-25.54423071709962,0 26.07731650186637,-25.53937066006289,0 26.07717428217788,-25.53718822329961,0 26.0745661578622,-25.52555177339338,0 26.07418270330008,-25.52461433702078,0 26.07345408214739,-25.52387554280642,0 26.07284471912265,-25.52354334029592,0 26.07179745493226,-25.5231186619631,0 26.07023107880028,-25.52284875104207,0 26.0691336332675,-25.5223967131905,0 26.06825667412319,-25.52185020360064,0 26.06456775034648,-25.5176599979575,0 26.06240388954368,-25.514888867827,0 26.06179200415567,-25.51364128111411,0 26.06179468854904,-25.51242769747352,0 26.06214530262257,-25.51147242893321,0 26.0653237280271,-25.50769405309574,0 26.07276991528061,-25.49730211713834,0 26.07954347220399,-25.47487366384136,0 26.08573387898083,-25.45505810065669,0 26.08436155462612,-25.44365947133345,0 26.08377716092075,-25.44005524200016,0 26.08415712887371,-25.43443800957762,0 26.08347972956171,-25.4180609693804,0 26.08391698213638,-25.40280692571863,0 26.08347972956171,-25.4180609693804,0 26.08415712887371,-25.43443800957762,0 26.08377716092075,-25.44005524200016,0 26.08436155462612,-25.44365947133345,0 26.08573387898083,-25.45505810065669,0 26.07954347220399,-25.47487366384136,0 26.07276991528061,-25.49730211713834,0 26.0653237280271,-25.50769405309574,0 26.06214530262257,-25.51147242893321,0 26.06179468854904,-25.51242769747352,0 26.06179200415567,-25.51364128111411,0 26.06240388954368,-25.514888867827,0 26.06456775034648,-25.5176599979575,0 26.06825667412319,-25.52185020360064,0 26.0691336332675,-25.5223967131905,0 26.07023107880028,-25.52284875104207,0 26.07179745493226,-25.5231186619631,0 26.07284471912265,-25.52354334029592,0 26.07345408214739,-25.52387554280642,0 26.07418270330008,-25.52461433702078,0 26.0745661578622,-25.52555177339338,0 26.07717428217788,-25.53718822329961,0 26.07731650186637,-25.53937066006289,0 26.07875951361018,-25.54423071709962,0 26.07977585029408,-25.54397396736679,0 26.07922707582033,-25.54210330617706,0 26.08268250408649,-25.54125969178191,0 26.08254021915084,-25.54094791982403,0
+			</coordinates>
+		</LineString>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.7.1155"></atom:link>
+	</Placemark>
+</Document>
+</kml>
