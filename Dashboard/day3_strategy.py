@@ -96,8 +96,8 @@ SOC_CURVE_V_PCT_HEALTHY: list[tuple[float, float]] = [
     (68.60, 0.0),
 ]
 
-N_MODULES_HEALTHY = 6
-N_MODULES_NOW = 5          # one bypassed
+N_MODULES_HEALTHY = 28
+N_MODULES_NOW = 22         # one bypassed
 PACK_WH_ASSUMED = 3200.0   # per your instruction: use 3200 Wh, not the 3528 Wh nameplate
 WH_PER_MODULE = PACK_WH_ASSUMED / N_MODULES_HEALTHY            # 533.33 Wh
 USABLE_WH_NOW = WH_PER_MODULE * N_MODULES_NOW                  # 2666.67 Wh nameplate on 5 modules

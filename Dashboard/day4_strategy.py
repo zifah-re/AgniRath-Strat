@@ -1,22 +1,26 @@
 """
-day3_strategy.py -- AgniRath Sasol Solar Challenge, Day 3 strategy engine
+day4_strategy.py -- AgniRath Sasol Solar Challenge, Day 4 strategy engine
 ==========================================================================
 
-Context (as given by the strategist, 2026-09-11):
-  * One of the 6 series battery modules died (bus-bar fault) and has been
-    fully bypassed. The pack now runs on 5 of 6 modules.
-  * Rated pack energy is 3528 Wh (6 x 588 Wh), but we plan conservatively
-    on 3200 Wh nominal, split equally across the 6 modules -> 533.33 Wh
-    per module. With one bypassed, usable NAMEPLATE capacity is now
-    5 x 533.33 = 2666.67 Wh.
-  * Hard floor from management: never discharge below 80 V pack terminal
-    voltage (measured on the Bus_Voltage-scale signal, i.e. the same
-    voltage domain as the SOC_CURVE_V_PCT table below -- NOT the raw
-    "Pack_Voltage" telemetry field, which is logged ~1000x scaled).
-  * Cars run at a constant 60 km/h target on Day 3 (easy terrain) to
-    maximise solar income and time, not to minimise time -- speed is
-    fixed, loops are used to soak up spare daylight/time while holding
-    2nd place, instead of sitting idle at a control stop.
+Context (as given by the strategist, 2026-09-13 morning):
+  * Same degraded pack as Day 3: 6 of the 28 series modules were
+    bypassed. Pack now runs on 22 of 28 modules.
+    3200 Wh assumed nameplate over 28 modules -> 114.29 Wh/module ->
+    2514.29 Wh usable on 22 modules.
+  * Hard floor: never discharge below 80 V pack terminal voltage
+    (Bus_Voltage-scale signal, same domain as SOC_CURVE_V_PCT below).
+  * End of Day 3: pack measured at 79.5 V -- already just under the
+    80V floor at the start of today, same situation as the Day 3 morning.
+  * Route: Stage 1 Kimberley->Postmasburg (197.1 km) -> 46-min control
+    stop at Postmasburg (sun-tracking charge) -> N x Postmasburg Loop
+    (14.0 km each, 5-min charge stop after each lap) -> Stage 2
+    Postmasburg->Olifantshoek (63.4 km) -> finish.
+  * Unlike Day 3, the Day-4 solar forecast files pair 1:1 with the real
+    route files (same names, matching lat/lon, correct 2026-09-13 dates)
+    -- no route/solar mismatch workaround needed this time.
+  * Speed is a free variable per stage (Stage 1 / Loop / Stage 2) --
+    tune STAGE1_TARGET_SPEED_KMH / LOOP_TARGET_SPEED_KMH /
+    STAGE2_TARGET_SPEED_KMH independently to see the SOC effect.
 
 Everything below is one self-contained, editable script. Constants that
 are assumptions (not hard facts from the brief) are flagged "ASSUMPTION"
@@ -37,34 +41,30 @@ import numpy as np
 # ---------------------------------------------------------------------
 # 0. FILE LOCATIONS  (point these at your local repo checkout)
 # ---------------------------------------------------------------------
-DASH = Path(".")                # <- you're already running this from inside Dashboard/
+DASH = Path(".")                # <- run this from inside Dashboard/
 SAVES = DASH / "Saves"
 SOLAR = DASH / "Solar"
 
 ROUTE_FILES = {
-    "stage1": SAVES / "Day3_Stage 1_Stage 1.kml.save",
-    "loop":   SAVES / "Day3_Loop_Jan Kempdorp Loop.kml.save",
-    "stage2": SAVES / "Day3_Stage 2_Stage 2.kml.save",
+    "stage1": SAVES / "2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg.kml.save",
+    "loop":   SAVES / "2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop.kml.save",
+    "stage2": SAVES / "2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek.kml.save",
 }
 
-# The solar *forecast* files are the only Day-3-dated irradiance data we
-# have. Their embedded route geometry does NOT match the real Day3_*
-# route files (confirmed: "Probable Prahlad" Stage 2 starts ~1 degree of
-# latitude away from the real Day3 Stage 2 start). So we throw away their
-# geometry entirely and use ONLY their time-of-day irradiance curve
-# (dni/ghi vs local clock time), applied to the real route via elapsed
-# drive time. This is the "offset by time, not by km" fix you asked for.
+# Day 4's solar forecast files pair 1:1 with the real route files (same
+# names, matching lat/lon, correct 2026-09-13 dates) -- no offset/mismatch
+# workaround needed here, unlike Day 3.
 SOLAR_FILES = {
-    "stage1": SOLAR / "mean_Day 3 probables_Probable Prahlad Route_Stage 1.jsonl",
-    "loop":   SOLAR / "mean_Day 3 probables_Probable Prahlad Route_Day 3 Loop.jsonl",
-    "stage2": SOLAR / "mean_Day 3 probables_Probable Prahlad Route_Stage 2.jsonl",
+    "stage1": SOLAR / "mean_2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 1 Kimberley to Postmasburg.jsonl",
+    "loop":   SOLAR / "mean_2026 Sasol Solar Challenge Route (Publish)_Day 4_Postmasburg Loop.jsonl",
+    "stage2": SOLAR / "mean_2026 Sasol Solar Challenge Route (Publish)_Day 4_13 Sept Stage 2 Postmasburg to Olifantshoek.jsonl",
 }
 
 LOCAL_TZ = timezone(timedelta(hours=2))  # South Africa Standard Time (SAST, UTC+2)
 
 
 # =======================================================================
-# 1. BATTERY MODEL -- degraded 5/6-module pack
+# 1. BATTERY MODEL -- degraded 22/28-module pack
 # =======================================================================
 
 # Original, healthy 6-module pack SOC<->V curve (as given), 100% -> 0%.
@@ -98,15 +98,15 @@ SOC_CURVE_V_PCT_HEALTHY: list[tuple[float, float]] = [
 ]
 
 N_MODULES_HEALTHY = 28
-N_MODULES_NOW = 22          # one bypassed
+N_MODULES_NOW = 22          # bypassed modules removed (confirmed: pack is 28 series modules, 22 remain)
 PACK_WH_ASSUMED = 3200.0   # per your instruction: use 3200 Wh, not the 3528 Wh nameplate
-WH_PER_MODULE = PACK_WH_ASSUMED / N_MODULES_HEALTHY            # 533.33 Wh
-USABLE_WH_NOW = WH_PER_MODULE * N_MODULES_NOW                  # 2666.67 Wh nameplate on 5 modules
+WH_PER_MODULE = PACK_WH_ASSUMED / N_MODULES_HEALTHY            # 114.29 Wh
+USABLE_WH_NOW = WH_PER_MODULE * N_MODULES_NOW                  # 2514.29 Wh nameplate on 22 modules
 
 VOLTAGE_FLOOR_V = 80.0     # hard instruction: never go below this
 
 # Degraded curve: identical modules assumed in series, so removing one of
-# six drops total voltage at every SOC point by the same 5/6 ratio.
+# six drops total voltage at every SOC point by the same 22/28 ratio.
 SCALE = N_MODULES_NOW / N_MODULES_HEALTHY   # 0.8333...
 
 SOC_CURVE_V_PCT_DEGRADED = [(v * SCALE, p) for v, p in SOC_CURVE_V_PCT_HEALTHY]
@@ -139,14 +139,14 @@ def wh_to_soc_delta(wh: float, charge_eff: float = 0.96, discharge_eff: float = 
 
 def print_battery_summary(current_voltage_v: float | None = None) -> None:
     print("=" * 78)
-    print("BATTERY: degraded 5/6-module pack")
+    print("BATTERY: degraded 22/28-module pack")
     print("=" * 78)
-    print(f"Module count: healthy={N_MODULES_HEALTHY}, now={N_MODULES_NOW} (1 bypassed)")
-    print(f"Assumed usable capacity: {PACK_WH_ASSUMED:.0f} Wh nameplate over 6 modules "
-          f"-> {WH_PER_MODULE:.2f} Wh/module -> {USABLE_WH_NOW:.2f} Wh on 5 modules")
-    print(f"Voltage scale factor (5/6 series modules): {SCALE:.4f}")
+    print(f"Module count: healthy={N_MODULES_HEALTHY}, now={N_MODULES_NOW} ({N_MODULES_HEALTHY - N_MODULES_NOW} bypassed)")
+    print(f"Assumed usable capacity: {PACK_WH_ASSUMED:.0f} Wh nameplate over {N_MODULES_HEALTHY} modules "
+          f"-> {WH_PER_MODULE:.2f} Wh/module -> {USABLE_WH_NOW:.2f} Wh on {N_MODULES_NOW} modules")
+    print(f"Voltage scale factor ({N_MODULES_NOW}/{N_MODULES_HEALTHY} series modules): {SCALE:.4f}")
     print()
-    print(f"{'SOC%':>6}  {'V_healthy(6mod)':>16}  {'V_degraded(5mod)':>17}")
+    print(f"{'SOC%':>6}  {'V_healthy(28mod)':>17}  {'V_degraded(22mod)':>18}")
     for pct in [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0]:
         v_h = float(np.interp(pct, np.array([p for _, p in SOC_CURVE_V_PCT_HEALTHY])[::-1],
                                np.array([v for v, _ in SOC_CURVE_V_PCT_HEALTHY])[::-1]))
@@ -216,7 +216,7 @@ def derive_mppt_d_shade_factor() -> float:
     return float(np.mean(ratios))
 
 
-MPPT_D_SHADE_FACTOR = 0.25   # ~0.086 -> ~91% blocked
+MPPT_D_SHADE_FACTOR = 0.25   # human-set value carried over from Day 3 (derived telemetry value was ~0.086)
 
 
 def load_solar_series(path: Path) -> list[tuple[datetime, float, float]]:
@@ -304,7 +304,7 @@ STAGE1_TARGET_SPEED_MS = STAGE1_TARGET_SPEED_KMH / 3.6
 LOOP_TARGET_SPEED_MS = LOOP_TARGET_SPEED_KMH / 3.6
 STAGE2_TARGET_SPEED_MS = STAGE2_TARGET_SPEED_KMH / 3.6
 
-CONTROL_STOP_PENALTY_MIN = 30 + 16   # 46 minutes, per instruction
+CONTROL_STOP_PENALTY_MIN = 30 + 7   # 46 minutes, per instruction
 LOOP_PENALTY_MIN = 5                  # per-loop charging stop after each lap
 
 
@@ -415,10 +415,10 @@ def drive_leg_energy_wh(
 
 
 # =======================================================================
-# 4. FULL DAY-3 ASSEMBLY
+# 4. FULL DAY-4 ASSEMBLY
 # =======================================================================
 
-RACE_DATE = "2026-09-12"
+RACE_DATE = "2026-09-13"
 
 
 def local_to_utc(hh: int, mm: int) -> datetime:
@@ -455,10 +455,12 @@ def run_day(n_loops: int, start_pack_voltage_v: float, verbose: bool = True) -> 
     record("Start of day (end-Day-2 reading)", 0.0,
            f"{start_pack_voltage_v:.2f} V -> {soc:.2f}% on degraded curve")
 
-    # ---- 1) 06:00-08:00 morning charge at Vryburg / Kameelboom Lodge, sun-tracking ----
+    # ---- 1) 06:00-08:00 morning charge at Kimberley start line, sun-tracking ----
+    # ASSUMPTION: same 06:00-08:00 window and 08:02 departure as Day 3 -- change
+    # MORNING_CHARGE_START/END below if today's actual schedule differs.
     t0, t1 = local_to_utc(6, 0), local_to_utc(8, 0)
     wh_morning = energy_over_window_wh(solar_s1, t0, t1, stationary_charge_power_w)
-    record("06:00-08:00 morning charge (sun-tracking, Vryburg)", wh_morning,
+    record("06:00-08:00 morning charge (sun-tracking, Kimberley)", wh_morning,
            f"{wh_morning:.1f} Wh harvested")
     soc_after_morning_charge = soc
 
@@ -611,7 +613,7 @@ def trace_floor_crossing(
 
 def print_day_log(result: dict) -> None:
     print("=" * 78)
-    print(f"DAY-3 SOC PROGRESSION  (loops = {result['n_loops']})")
+    print(f"DAY-4 SOC PROGRESSION  (loops = {result['n_loops']})")
     print("=" * 78)
     print(f"{'Event':52s} {'Wh':>9s} {'dSOC%':>7s} {'SOC%':>7s}")
     for row in result["log"]:
@@ -637,20 +639,19 @@ if __name__ == "__main__":
     import sys
 
     # ---- 1. Battery ----
-    # ASSUMPTION: end-of-Day-2 pack terminal voltage. Change this to the
-    # actual last-known-good Bus_Voltage reading from the car before you run
-    # this for real -- 71.58 V is pulled from the last row of your pasted
-    # telemetry excerpt (17:13 local, car slowing to a stop).
-    END_DAY2_VOLTAGE_V = 71.58
-    print_battery_summary(END_DAY2_VOLTAGE_V)
+    # End-of-Day-3 pack terminal voltage, as given: 79.5 V.
+    END_DAY3_VOLTAGE_V = 79.5
+    print_battery_summary(END_DAY3_VOLTAGE_V)
 
-    print(f"Derived MPPT-D shading factor from telemetry: {MPPT_D_SHADE_FACTOR:.3f} "
+    print(f"MPPT-D shading factor in use: {MPPT_D_SHADE_FACTOR:.3f} "
           f"(D delivers ~{MPPT_D_SHADE_FACTOR*100:.1f}% of an unshaded channel)")
+    print(f"Stage speeds in use: Stage1={STAGE1_TARGET_SPEED_KMH:.0f} km/h, "
+          f"Loop={LOOP_TARGET_SPEED_KMH:.0f} km/h, Stage2={STAGE2_TARGET_SPEED_KMH:.0f} km/h")
     print()
 
     # ---- 2. Run for however many loops you want to test ----
     n_loops = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    result = run_day(n_loops=n_loops, start_pack_voltage_v=END_DAY2_VOLTAGE_V)
+    result = run_day(n_loops=n_loops, start_pack_voltage_v=END_DAY3_VOLTAGE_V)
     print_day_log(result)
 
     # ---- 3. Sweep loop counts to help pick N ----
@@ -659,6 +660,6 @@ if __name__ == "__main__":
     print("=" * 78)
     print(f"{'loops':>5s} {'arrival':>8s} {'final_SOC%':>11s} {'min_SOC%(post-06:00)':>21s} {'floor_ok':>9s}")
     for n in range(0, 8):
-        r = run_day(n_loops=n, start_pack_voltage_v=END_DAY2_VOLTAGE_V, verbose=False)
+        r = run_day(n_loops=n, start_pack_voltage_v=END_DAY3_VOLTAGE_V, verbose=False)
         print(f"{n:5d} {r['arrival_local']:%H:%M} {r['final_soc_pct']:11.2f} "
               f"{r['min_soc_seen']:21.2f} {str(r['floor_ok']):>9s}")
