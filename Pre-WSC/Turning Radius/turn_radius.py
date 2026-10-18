@@ -25,6 +25,7 @@ Usage:
   python turn_radius.py a.save b.save c.kml --outdir results
 """
 import argparse
+import glob
 import json
 import os
 import re
@@ -45,11 +46,11 @@ BRIDGE_GAP = 1            # merge dense runs separated by <= this many segments
 PAD_PTS = 2               # points added each side of a cluster
 SPLIT_MIN_DEG = 3.0       # turn-direction flips only count above this angle
 MIN_HEADING_CHANGE_DEG = 25.0
-MAX_RADIUS_M = 500.0      # beyond this a "turn" is effectively straight
+MAX_RADIUS_M = 100.0      # beyond this a "turn" is effectively straight
 MIN_ARC_M = 8.0
 # Radius tiers for the histogram (metres). Fine at the tight end where it
 # matters for speed limits, coarse for gentle curves.
-TIER_EDGES = [0, 10, 20, 30, 50, 75, 100, 150, 200, 300, 500]
+TIER_EDGES = [0, 10, 20, 30, 50, 75, 100]
 
 
 # ----------------------------------------------------------------- loading --
@@ -326,7 +327,58 @@ def report(path, top_n, rank, outdir):
     route_png = os.path.join(outdir, f"{stem}_route_top_turns.png")
     plot_route(res, top, route_png, f"{os.path.basename(path)} - top {len(top)} turns")
     print(f"\nSaved: {csv_path}\n       {hist_png}\n       {route_png}")
-    return top, counts
+    return top, counts, turns, stem
+
+
+def cumulative_report(per_day, outdir):
+    """per_day: list of (label, turns). Prints a per-day + total tier table and
+    saves a stacked histogram (bars = total turns per tier, colours = day) and
+    a CSV of every detected turn across all days."""
+    labels = tier_labels(TIER_EDGES)
+    mat = np.array([histogram_counts([t["radius_m"] for t in turns])
+                    if turns else np.zeros(len(labels), int)
+                    for _, turns in per_day])           # days x tiers
+    total = mat.sum(axis=0)
+
+    print("=" * 78)
+    print(f"CUMULATIVE ({len(per_day)} files, {int(total.sum())} turns)")
+    print("-" * 78)
+    hdr = f"{'tier':>10} " + " ".join(f"{d[:8]:>8}" for d, _ in per_day) + f" {'TOTAL':>7} {'cum %':>6}"
+    print(hdr)
+    cum = np.cumsum(total) / max(total.sum(), 1) * 100
+    for i, lab in enumerate(labels):
+        print(f"{lab:>10} " + " ".join(f"{mat[j, i]:>8}" for j in range(len(per_day)))
+              + f" {total[i]:>7} {cum[i]:>5.0f}%")
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    bottom = np.zeros(len(labels))
+    cmap = plt.get_cmap("tab10")
+    for j, (d, _) in enumerate(per_day):
+        ax.bar(labels, mat[j], bottom=bottom, label=d, color=cmap(j), edgecolor="white")
+        bottom += mat[j]
+    for i, c in enumerate(total):
+        if c:
+            ax.text(i, c, str(int(c)), ha="center", va="bottom", fontweight="bold")
+    ax.set_xlabel("Turn radius tier")
+    ax.set_ylabel("Number of turns")
+    ax.set_title(f"All days combined - turns per radius tier (n={int(total.sum())})")
+    ax.legend(title="Day")
+    ax.grid(axis="y", alpha=0.3)
+    plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
+    fig.tight_layout()
+    png = os.path.join(outdir, "ALL_DAYS_radius_histogram.png")
+    fig.savefig(png, dpi=150)
+    plt.close(fig)
+
+    csv = os.path.join(outdir, "ALL_DAYS_all_turns.csv")
+    with open(csv, "w") as f:
+        f.write("day,km,radius_m,fit_radius_m,heading_change_deg,direction,n_points,lat,lon\n")
+        for d, turns in per_day:
+            for t in sorted(turns, key=lambda t: t["radius_m"]):
+                f.write(f"{d},{t['km']:.3f},{t['radius_m']:.2f},{t['fit_radius_m'] or ''},"
+                        f"{t['heading_change_deg']:.1f},{t['direction']},{t['n_points']},"
+                        f"{t['lat']:.6f},{t['lon']:.6f}\n")
+    print(f"\nSaved: {png}\n       {csv}")
 
 
 if __name__ == "__main__":
@@ -337,5 +389,20 @@ if __name__ == "__main__":
                     help="sharpest = smallest radius first (default); largest = biggest radius first")
     ap.add_argument("--outdir", default="turn_results")
     args = ap.parse_args()
-    for fp in args.files:
-        report(fp, args.top, args.rank, args.outdir)
+    # Expand wildcards ourselves (PowerShell does not) and fail clearly.
+    paths = []
+    for pat in args.files:
+        hits = sorted(glob.glob(pat))
+        if not hits:
+            raise SystemExit(f"No file matches {pat!r}. Run from the folder that "
+                             f"contains it, and wrap names with spaces in quotes.")
+        paths.extend(hits)
+    paths = sorted(set(paths))
+    per_day = []
+    for fp in paths:
+        _, _, turns, stem = report(fp, args.top, args.rank, args.outdir)
+        m = re.search(r"Day\s*_?(\d+)", os.path.basename(fp), re.I)
+        per_day.append((f"Day {m.group(1)}" if m else stem, turns))
+    if len(per_day) > 1:
+        per_day.sort(key=lambda p: p[0])
+        cumulative_report(per_day, args.outdir)
