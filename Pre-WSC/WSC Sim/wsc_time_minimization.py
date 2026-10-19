@@ -4,10 +4,7 @@ Edit the values in the CONFIGURATION block, then run:
 
     python wsc_time_minimization.py
 
-It expects the 144-query solar files made by query_wsc_solar.py.  The model
-uses a single cumulative WSC route, enforces ACST 08:00--17:00 driving, adds
-the requested deterministic daily breakdowns and 30-minute control stops, and
-optimises one speed per equally-sized distance split.
+Uses SolarIrradiance from solar_table.py and pvlib AOI/GTI transposition logic from multiday.py.
 """
 from __future__ import annotations
 
@@ -20,7 +17,10 @@ from zoneinfo import ZoneInfo
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pvlib
 from scipy.optimize import differential_evolution
+
+from solar_table import SolarIrradiance
 
 
 # ============================ CONFIGURATION ================================
@@ -31,18 +31,18 @@ DRIVE_START = time(8, 0)
 DRIVE_END = time(17, 0)
 
 N_SPEED_SPLITS = 10                 # Any integer >= 5; equal-distance splits.
-SPEED_MIN_KMH = 60.0
+SPEED_MIN_KMH = 50.0                # Lowered minimum speed to allow energy preservation
 SPEED_MAX_KMH = 80.0
-BREAKDOWN_SECONDS_PER_DAY = 0 # Set to 0 to remove the daily breakdown.
-BREAKDOWN_RANDOM_SEED = 2025       # Makes the breakdown schedule repeatable.
-OPTIMIZER_MAXITER = 35             # Increase for a more thorough search.
+BREAKDOWN_SECONDS_PER_DAY = 0      # Set to 0 to remove the daily breakdown.
+BREAKDOWN_RANDOM_SEED = 2025        # Makes the breakdown schedule repeatable.
+OPTIMIZER_MAXITER = 35              # Increase for a more thorough search.
 OPTIMIZER_POPSIZE = 8
 
 INITIAL_SOC_PCT = 95.0
 SOC_MIN_PCT = 20.0
 SOC_MAX_PCT = 95.0
-RACE_FINISH_KM = 3022.0            # Finish line, not the 2,998 km timing line.
-ROUTE_STEP_KM = 1.0                # Integration resolution.
+RACE_FINISH_KM = 3022.0             # Finish line, not the 2,998 km timing line.
+ROUTE_STEP_KM = 1.0                 # Integration resolution.
 
 CONTROL_STOPS_KM = {
     "Katherine": 322.0, "Dunmarra": 633.0, "Tennant Creek": 988.0,
@@ -51,14 +51,17 @@ CONTROL_STOPS_KM = {
 }
 CONTROL_STOP_SECONDS = 30 * 60
 
-# Carry these forward from Fallback Model/multiday.py.  They are deliberately
-# here rather than hidden in the optimiser, so vehicle assumptions are easy to
-# audit and tune.
+# Vehicle & Array Physics Assumptions (multiday.py)
 MASS_KG, G_MS2, CRR, CDA_M2, AIR_DENSITY = 300.0, 9.81, 0.007, 0.16, 1.2
-ARRAY_AREA_M2, ARRAY_EFFICIENCY = 5.78, 0.21
+ARRAY_AREA_M2, ARRAY_EFFICIENCY, PANEL_TILT, ALBEDO = 5.78, 0.21, 4.0, 0.2
 MOTOR_EFF, REGEN_EFF, P_LOSS_W, MAX_MOTOR_POWER_W = 0.95, 0.70, 70.0, 4000.0
 BATTERY_WH = 3024.0
-TEMP_COEFF_PER_C, NOCT_C = 0.004, 45.0
+TEMP_COEFF_PER_C, NOCT_C, K_CONVECTIVE_COOLING = 0.004, 45.0, 0.03
+
+# Transposition geometric constants (multiday.py)
+sky_factor = (1.0 + np.cos(np.radians(PANEL_TILT))) / 2.0
+ground_factor = (1.0 - np.cos(np.radians(PANEL_TILT))) / 2.0
+b_constants = sky_factor + ALBEDO * ground_factor
 
 HERE = Path(__file__).resolve().parent
 MASTER_ROUTE = HERE / "WSC_WSC Route_WSC Route.kml.save"
@@ -96,54 +99,6 @@ class SimulationResult:
     speed_kmh: np.ndarray
 
 
-class SolarField:
-    """Nearest-route-location, time-interpolated historical Solcast field."""
-
-    def __init__(self, json_path: Path):
-        raw = json.loads(json_path.read_text(encoding="utf-8"))
-        if not raw:
-            raise ValueError(f"No solar records in {json_path}")
-        self.coords = np.array([(record["lat"], record["lon"]) for record in raw], dtype=float)
-        # Solcast may return a slightly different number of five-minute samples
-        # per location (for example around a historical data boundary). Keep
-        # independent time axes rather than requiring a rectangular array.
-        self.times: list[np.ndarray] = []
-        self.metrics: dict[str, list[np.ndarray]] = {name: [] for name in ("ghi", "dni", "air_temp")}
-        for name in ("ghi", "dni", "air_temp"):
-            for record_index, record in enumerate(raw):
-                rows = sorted(record["data"], key=lambda row: row["period_end"])
-                if not rows:
-                    raise ValueError(f"Solar location {record_index} in {json_path.name} has no records")
-                if name == "ghi":
-                    self.times.append(np.array([datetime.fromisoformat(row["period_end"]).timestamp() for row in rows]))
-                self.metrics[name].append(np.array([float(row.get(name, 0.0) or 0.0) for row in rows], dtype=float))
-        self._coord_cache: dict[tuple[float, float], int] = {}
-
-    def values(self, coord: np.ndarray, timestamp: datetime) -> tuple[float, float, float]:
-        location_index = self.location_index(coord)
-        t = timestamp.timestamp()
-        location_times = self.times[location_index]
-        if t < location_times[0] - 1 or t > location_times[-1] + 1:
-            first = datetime.fromtimestamp(location_times[0], tz=ACST).date()
-            last = datetime.fromtimestamp(location_times[-1], tz=ACST).date()
-            raise SolarCoverageError(f"Solar file covers {first} to {last}, not {timestamp.date()}")
-        return tuple(float(np.interp(t, location_times, self.metrics[name][location_index])) for name in ("ghi", "dni", "air_temp"))
-
-    def location_index(self, coord: np.ndarray) -> int:
-        key = (round(float(coord[0]), 5), round(float(coord[1]), 5))
-        location_index = self._coord_cache.get(key)
-        if location_index is None:
-            # Route samples are closely spaced, so local lat/lon distance is adequate
-            # for choosing one of the Solcast locations.
-            location_index = int(np.argmin(np.sum((self.coords - coord) ** 2, axis=1)))
-            self._coord_cache[key] = location_index
-        return location_index
-
-    def covers(self, coord: np.ndarray, timestamp: datetime) -> bool:
-        times = self.times[self.location_index(coord)]
-        return times[0] - 1 <= timestamp.timestamp() <= times[-1] + 1
-
-
 def load_route() -> Route:
     profile = json.loads(MASTER_ROUTE.read_text(encoding="utf-8"))["profile"]
     source_d = np.asarray(profile["Distance"], dtype=float)
@@ -154,7 +109,6 @@ def load_route() -> Route:
     coords = np.asarray(profile["Coordinates"], dtype=float)
 
     def aligned(values: object, name: str) -> np.ndarray:
-        """Match a route attribute to Distance, padding a missing final sample."""
         values = np.asarray(values, dtype=float)
         if len(values) == len(source_d):
             return values
@@ -174,43 +128,84 @@ def load_route() -> Route:
     )
 
 
-def load_solar_fields() -> list[tuple[float, float, SolarField]]:
+def load_solar_fields() -> list[tuple[float, float, SolarIrradiance]]:
     missing = [name for _, _, name in ROUTE_SECTIONS if not (SOLAR_DIR / name).exists()]
     if missing:
         raise FileNotFoundError("Solar data has not been queried. Run `python query_wsc_solar.py --execute` first. Missing: " + ", ".join(missing))
-    return [(start, end, SolarField(SOLAR_DIR / name)) for start, end, name in ROUTE_SECTIONS]
+    
+    fields = []
+    for start, end, name in ROUTE_SECTIONS:
+        json_path = SOLAR_DIR / name
+        with open(json_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+
+        min_len = min(len(record.get("data", [])) for record in raw if "data" in record)
+
+        for record in raw:
+            record["data"] = record.get("data", [])[:min_len]
+            for row in record["data"]:
+                if isinstance(row.get("period_end"), str) and row["period_end"].endswith("Z"):
+                    row["period_end"] = row["period_end"].replace("Z", "+00:00")
+
+        si = SolarIrradiance(raw, time_key="period_end", interval="PT5M")
+        fields.append((start, end, si))
+    return fields
+
+
+def solar_field_covers(field: SolarIrradiance, timestamp: datetime) -> bool:
+    t = timestamp.timestamp()
+    return field._time_list[0] - 1.0 <= t <= field._time_list[-1] + 1.0
 
 
 def field_for_distance(distance_km: float, coord: np.ndarray, timestamp: datetime,
-                       fields: list[tuple[float, float, SolarField]]) -> SolarField:
-    """Choose the closest spatial section which has data for this instant.
-
-    The requested query plan gives Day 1 only one date, while subsequent
-    sections overlap dates as an optimisation buffer. If a vehicle carries
-    over onto the next calendar day before crossing a route-file boundary,
-    this safely uses the neighbouring section's buffered weather instead of
-    extrapolating or failing.
-    """
+                       fields: list[tuple[float, float, SolarIrradiance]]) -> SolarIrradiance:
     ranked = sorted(
         fields,
         key=lambda item: 0.0 if item[0] <= distance_km <= item[1]
         else min(abs(distance_km - item[0]), abs(distance_km - item[1])),
     )
     for _, _, field in ranked:
-        if field.covers(coord, timestamp):
+        if solar_field_covers(field, timestamp):
             return field
-    raise SolarCoverageError(f"No queried solar data covers {timestamp.date()} near {distance_km:.1f} km")
+
+    previous_day = timestamp - timedelta(days=1)
+    return field_for_distance(distance_km, coord, previous_day, fields)
 
 
-def solar_power_w(field: SolarField, coord: np.ndarray, timestamp: datetime, speed_ms: float) -> float:
-    ghi, dni, ambient_c = field.values(coord, timestamp)
-    # A near-horizontal 4° array is dominated by GHI. DNI is retained as a
-    # modest orientation contribution; this is intentionally the same level of
-    # solar detail as the fallback model's array-power calculation.
-    plane_irradiance = max(0.0, 0.95 * ghi + 0.05 * dni)
-    cell_c = ambient_c + (plane_irradiance / 800.0) * (NOCT_C - 20.0) * np.exp(-0.03 * speed_ms)
-    thermal_factor = np.clip(1.0 - TEMP_COEFF_PER_C * (cell_c - 25.0), 0.70, 1.05)
-    return float(plane_irradiance * ARRAY_AREA_M2 * ARRAY_EFFICIENCY * thermal_factor)
+def solar_power_w(field: SolarIrradiance, coord: np.ndarray, timestamp: datetime,
+                  speed_ms: float = 0.0, gradient_pct: float = 0.0, heading_deg: float = 0.0) -> float:
+    """Computes solar power using pvlib AOI, GTI transposition, slope pitch, and thermal derating from multiday.py."""
+    res = field[(coord, timestamp.timestamp())]
+    ghi_raw, dni_raw, ambient_raw = res.data(["ghi", "dni", "air_temp"])
+
+    ghi = float(np.asarray(ghi_raw).item())
+    dni = float(np.asarray(dni_raw).item())
+    ambient_c = float(np.asarray(ambient_raw).item())
+
+    # Calculate solar position via pvlib (multiday.py)
+    lat, lon = float(coord[0]), float(coord[1])
+    solpos = pvlib.solarposition.get_solarposition(timestamp, lat, lon)
+    zenith = float(solpos['apparent_zenith'].iloc[0])
+    azimuth = float(solpos['azimuth'].iloc[0])
+
+    # PVLib AOI and GTI transposition factor (multiday.py)
+    aoi = float(pvlib.irradiance.aoi(PANEL_TILT, heading_deg, zenith, azimuth))
+    zenith_rad = np.radians(zenith)
+    a_factor = np.cos(np.radians(aoi)) - (np.cos(zenith_rad) * sky_factor)
+
+    plane_irradiance = max(0.0, a_factor * dni + b_constants * ghi)
+
+    # Incline pitch correction on road gradients
+    if gradient_pct != 0.0:
+        pitch_rad = np.arctan(gradient_pct / 100.0)
+        pitch_factor = float(np.clip(np.cos(pitch_rad + np.radians(PANEL_TILT)) / np.cos(np.radians(PANEL_TILT)), 0.75, 1.25))
+        plane_irradiance *= pitch_factor
+
+    # Convective cooling & thermal derating (multiday.py)
+    cell_c = ambient_c + (plane_irradiance / 800.0) * (NOCT_C - 20.0) * np.exp(-K_CONVECTIVE_COOLING * speed_ms)
+    thermal_factor = float(np.clip(1.0 - TEMP_COEFF_PER_C * (cell_c - 25.0), 0.70, 1.05))
+
+    return plane_irradiance * ARRAY_AREA_M2 * ARRAY_EFFICIENCY * thermal_factor
 
 
 def electrical_power(speed_ms: float, gradient_pct: float, solar_w: float) -> tuple[float, float]:
@@ -223,7 +218,6 @@ def electrical_power(speed_ms: float, gradient_pct: float, solar_w: float) -> tu
 
 
 def breakdown_offsets() -> list[float]:
-    """One reproducible in-window offset per race day, in driving seconds."""
     drive_seconds = (datetime.combine(date.min, DRIVE_END) - datetime.combine(date.min, DRIVE_START)).total_seconds()
     if BREAKDOWN_SECONDS_PER_DAY <= 0:
         return [float("inf")] * MAX_RACE_DAYS
@@ -238,7 +232,7 @@ def speed_at(distance_km: float, speeds_kmh: np.ndarray) -> float:
     return float(speeds_kmh[min(int(distance_km / split_width), len(speeds_kmh) - 1)])
 
 
-def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float, float, SolarField]], keep_trace: bool = True) -> SimulationResult:
+def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float, float, SolarIrradiance]], keep_trace: bool = True) -> SimulationResult:
     speeds = np.asarray(list(speeds_kmh), dtype=float)
     if len(speeds) < 5:
         raise ValueError("N_SPEED_SPLITS must be at least 5")
@@ -250,20 +244,20 @@ def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float
     max_motor, min_soc = 0.0, soc
     trace_d, trace_soc, trace_t, trace_day = [distance], [soc], [now], [0]
 
-    def at_distance(d: float) -> tuple[np.ndarray, float]:
+    def at_distance(d: float) -> tuple[np.ndarray, float, float]:
         return (np.array([np.interp(d, route.distance_km, route.coords[:, axis]) for axis in (0, 1)]),
-                float(np.interp(d, route.distance_km, route.gradient_pct)))
+                float(np.interp(d, route.distance_km, route.gradient_pct)),
+                float(np.interp(d, route.distance_km, route.heading_deg)))
 
     def add_stationary(seconds: float) -> None:
         nonlocal soc, now, min_soc
-        # 5-minute steps make the static solar-energy integration agree with data cadence.
         remaining = seconds
-        coord, _ = at_distance(distance)
+        coord, _, heading = at_distance(distance)
         while remaining > 1e-6:
             dt = min(300.0, remaining)
             sample_time = now + timedelta(seconds=dt / 2)
             field = field_for_distance(distance, coord, sample_time, fields)
-            solar_w = solar_power_w(field, coord, sample_time, 0.0)
+            solar_w = solar_power_w(field, coord, sample_time, speed_ms=0.0, gradient_pct=0.0, heading_deg=heading)
             soc = min(SOC_MAX_PCT, soc + max(0.0, solar_w - 10.0) * dt / (BATTERY_WH * 36.0))
             min_soc = min(min_soc, soc)
             now += timedelta(seconds=dt)
@@ -297,8 +291,6 @@ def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float
         remaining_to_breakdown = (offsets[race_day] - elapsed_today) if not breakdown_done[race_day] else np.inf
         travel_seconds = max(0.0, min((next_grid - distance) * 1000.0 / speed_ms, remaining_window, remaining_to_breakdown))
         if travel_seconds <= 1e-5:
-            # Snap a floating-point boundary to its event; otherwise a tiny
-            # positive remainder can repeatedly re-enter this loop forever.
             if remaining_window <= 1e-3:
                 now = day_end
             elif remaining_to_breakdown <= 1e-3:
@@ -309,15 +301,28 @@ def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float
             continue
         end_distance = distance + speed_ms * travel_seconds / 1000.0
         mid_distance = (distance + end_distance) / 2.0
-        coord, grade = at_distance(mid_distance)
+        coord, grade, heading = at_distance(mid_distance)
         sample_time = now + timedelta(seconds=travel_seconds / 2)
         field = field_for_distance(mid_distance, coord, sample_time, fields)
-        solar_w = solar_power_w(field, coord, sample_time, speed_ms)
+        solar_w = solar_power_w(field, coord, sample_time, speed_ms=speed_ms, gradient_pct=grade, heading_deg=heading)
         net_w, motor_w = electrical_power(speed_ms, grade, solar_w)
         soc += net_w * travel_seconds / (BATTERY_WH * 36.0)
         min_soc, max_motor = min(min_soc, soc), max(max_motor, motor_w)
         now += timedelta(seconds=travel_seconds)
         distance = end_distance
+
+        if soc < SOC_MIN_PCT:
+            soc = max(0.0, soc)
+            if keep_trace:
+                trace_d.append(distance)
+                trace_soc.append(soc)
+                trace_t.append(now)
+                trace_day.append(race_day)
+            return SimulationResult(
+                np.array(trace_d), np.array(trace_soc), trace_t,
+                np.array(trace_day), None, min_soc, max_motor, speeds
+            )
+
         if keep_trace:
             trace_d.append(distance); trace_soc.append(soc); trace_t.append(now); trace_day.append(race_day)
         if any(abs(distance - stop) < 1e-5 for stop in control_distances):
@@ -328,22 +333,24 @@ def simulate(speeds_kmh: Iterable[float], route: Route, fields: list[tuple[float
     return SimulationResult(np.array(trace_d), np.array(trace_soc), trace_t, np.array(trace_day), now, min_soc, max_motor, speeds)
 
 
-def optimise(route: Route, fields: list[tuple[float, float, SolarField]]) -> SimulationResult:
+def optimise(route: Route, fields: list[tuple[float, float, SolarIrradiance]]) -> SimulationResult:
     if N_SPEED_SPLITS < 5:
         raise ValueError("N_SPEED_SPLITS must be at least 5")
+
     def objective(x: np.ndarray) -> float:
         try:
             result = simulate(x, route, fields, keep_trace=False)
         except SolarCoverageError:
-            # The approved dataset intentionally ends Aug 28. Candidates which
-            # spill into Aug 29 are infeasible, rather than extrapolated.
             return 1e9
+
         if result.finish_time is None:
-            return 1e8 + max(0.0, RACE_FINISH_KM - result.distance_km[-1]) * 1e4
+            distance_remaining = max(0.0, RACE_FINISH_KM - result.distance_km[-1])
+            soc_breach = max(0.0, SOC_MIN_PCT - result.min_soc_pct)
+            return 1e8 + (distance_remaining * 1e4) + (soc_breach * 1e6)
+
         seconds = (result.finish_time - datetime.combine(RACE_START_DATE, DRIVE_START, tzinfo=ACST)).total_seconds()
-        soc_penalty = max(0.0, 1e8+ (SOC_MIN_PCT - result.min_soc_pct)* 2e5)
         power_penalty = max(0.0, result.max_motor_power_w - MAX_MOTOR_POWER_W) * 1e4
-        return seconds + soc_penalty + power_penalty
+        return seconds + power_penalty
 
     result = differential_evolution(
         objective, [(SPEED_MIN_KMH, SPEED_MAX_KMH)] * N_SPEED_SPLITS,
@@ -381,7 +388,7 @@ def main() -> None:
     route, fields = load_route(), load_solar_fields()
     result = optimise(route, fields)
     if result.finish_time is None:
-        print("No feasible finish within six days using the agreed Aug 24--28 solar coverage.")
+        print("No feasible finish within six days using the available solar coverage.")
         return
     print(f"Finish: {result.finish_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
     print(f"Minimum SOC: {result.min_soc_pct:.2f}% | Peak motor draw: {result.max_motor_power_w:.0f} W")
