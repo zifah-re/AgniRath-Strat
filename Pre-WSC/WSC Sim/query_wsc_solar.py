@@ -25,7 +25,7 @@ from solcast.unmetered_locations import UNMETERED_LOCATIONS
 
 
 HERE = Path(__file__).resolve().parent
-SOLAR_DIR = HERE / "Solar"
+SOLAR_DIR = HERE / "Solar25"
 CHECKPOINT_PATH = SOLAR_DIR / ".wsc_query_checkpoint.json"
 ACST = ZoneInfo("Australia/Darwin")  # ACST: UTC+09:30, no daylight saving
 # The first configured key is known invalid. The two remaining keys each have
@@ -35,11 +35,11 @@ LOCATIONS_PER_DATE = 16
 # The two dates are deliberately a sliding look-back window requested for the
 # simulation.  There are nine location/date batches: 1 + 2 * 4 = 9.
 QUERY_PLAN = {
-    "Day1_WSC_Day 1.kml.save": (date(2026, 8, 24),),
-    "Day2_WSC_Day 2.kml.save": (date(2026, 8, 24), date(2026, 8, 25)),
-    "Day3_WSC_Day 3.kml.save": (date(2026, 8, 25), date(2026, 8, 26)),
-    "Day4_WSC_Day 4.kml.save": (date(2026, 8, 26), date(2026, 8, 27)),
-    "Day5_WSC_Day 5.kml.save": (date(2026, 8, 27), date(2026, 8, 28)),
+    "Day1_WSC_Day 1.kml.save": (date(2025, 8, 24),),
+    "Day2_WSC_Day 2.kml.save": (date(2025, 8, 24), date(2025, 8, 25)),
+    "Day3_WSC_Day 3.kml.save": (date(2025, 8, 25), date(2025, 8, 26)),
+    "Day4_WSC_Day 4.kml.save": (date(2025, 8, 26), date(2025, 8, 27)),
+    "Day5_WSC_Day 5.kml.save": (date(2025, 8, 27), date(2025, 8, 28)),
 }
 
 
@@ -47,7 +47,17 @@ def load_api_keys() -> list[str]:
     """Extract string API-key assignments from the existing team script safely."""
     key_script = HERE.parent.parent / "Group" / "Solcast Data comparison" / "solcast_scraping.py"
     tree = ast.parse(key_script.read_text(encoding="utf-8"), filename=str(key_script))
-    keys = ["tqYlXYm5K8bVQ20coa5FJS-Wg5IHRAY8ac","mdJAwni-zDwxDQZm1pRbuMog15flMNxC","BIxzbRqwylC-hwNw1mHidlRYVBvOK9_g","8ITfBFfjrwMZQeoCC9fLBnXqrCSGWIXm"]
+    old_keys = ["tqYlXYm5K8bVQ20coa5FJS-Wg5IHRAY8ac",
+            "mdJAwni-zDwxDQZm1pRbuMog15flMNxC",
+            "BIxzbRqwylC-hwNw1mHidlRYVBvOK9_g",
+            "8ITfBFfjrwMZQeoCC9fLBnXqrCSGWIXm",]
+    
+    keys = ["F7s8YzfjgoNzcA1cX_2Gbqt5G8A3VsJp",
+            "o2AmalzhezuK1qqOnkHOvHo67kB_UoSy",
+            "x9F7mQ2pL8vR1tZ4aB6cY0wE3hJ5nU7dK",
+            "E_rxZoBY9JeNAqjFmvoKNaJoara19FPa",
+            "ztGpXqd6OoxwgiARn0pX7BKBu8_ZY3z8",
+            "7d3D3jIfEE4bUJhEmKKgwyNquwR1Hr7M"]
     '''for node in tree.body:
         if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Constant):
             continue
@@ -148,14 +158,14 @@ def main(execute: bool) -> None:
             continue
         print(f"[{call_number:03d}/{len(work)}] {route_name}, {sample_date}, {lat:.5f}, {lon:.5f}")
         # A brief retry handles transient limits without silently losing a point.
-        for attempt in range(4):
+        for attempt in range(len(keys)):
             try:
                 records = fetch_one(keys[(call_number - 1) % len(keys)], lat, lon, sample_date)
                 checkpoint[identifier] = records
                 CHECKPOINT_PATH.write_text(json.dumps(checkpoint), encoding="utf-8")
                 break
             except Exception as exc:
-                if attempt == 4:
+                if attempt == len(keys) - 1:
                     # Do not chain the Requests exception: it can include the
                     # complete request URL in diagnostics on older clients.
                     raise RuntimeError(f"Call {call_number} failed permanently: {type(exc).__name__}") from None
