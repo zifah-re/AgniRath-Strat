@@ -1,0 +1,6 @@
+segment,start_km,end_km,speed_kmh,solar_driving_kWh,solar_stationary_kWh,regeneration_kWh,propulsion_electrical_draw_kWh,rolling_resistance_work_kWh,aerodynamic_drag_work_kWh,gravity_work_signed_kWh,drivetrain_loss_kWh,regeneration_loss_kWh,fixed_70W_loss_kWh,auxiliary_5W_kWh,stationary_charge_stored_kWh,stationary_charge_curtailed_kWh,net_battery_energy_from_flows_kWh
+1,0.0,600.0,65.0,4.575576985788383,0.48914160580181415,0.0,6.888213167207362,2.50258898352494,3.5643004115226318,0.4769131137994221,0.34441065836036844,0.0,0.4415384615384614,0.031538461538461515,0.48330827246848085,9.701276818911235e-17,-2.3024048320274204
+2,600.0,1200.0,65.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+3,1200.0,1800.0,65.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+4,1800.0,2400.0,65.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+5,2400.0,3000.0,65.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

@@ -1,0 +1,82 @@
+====================================================================================
+2027 BRIDGESTONE WORLD SOLAR CHALLENGE — FIXED-SPEED ENERGY SHEET
+====================================================================================
+Speed bands (constant within each band):
+  Segment 1: 0-600 km  |  65.00 km/h
+  Segment 2: 600-1,200 km  |  65.00 km/h
+  Segment 3: 1,200-1,800 km  |  65.00 km/h
+  Segment 4: 1,800-2,400 km  |  65.00 km/h
+  Segment 5: 2,400-3,000 km  |  65.00 km/h
+
+Outcome: battery SOC fell below the 20% minimum
+Simulation stopped at: 2026-08-24 14:53:27 ACST
+Distance reached: 410.00 / 3,022.00 km
+Elapsed wall-clock time: 6:53:27.692314
+Time spent driving: 6:18:27.692308
+Minimum SOC observed: 19.65%
+Final SOC: 19.65%
+Peak model-reported motor power: 2,099.1 W
+
+BATTERY STATE
+------------------------------------------------------------------------------------
+Battery capacity in source model: 11.000 MJ (3,055.56 Wh)
+Initial stored energy at 95.00% SOC: 10.450 MJ  |  2.9028 kWh
+Final stored energy at 19.65% SOC:   2.161 MJ  |  0.6004 kWh
+Observed battery energy change from SOC: -8.289 MJ  |  -2.3024 kWh
+
+ENERGY GAINED / GENERATED
+------------------------------------------------------------------------------------
+  Gross solar electricity generated while driving:   16.472 MJ  |  4.5756 kWh
+  Gross solar electricity generated while stationary:1.761 MJ  |  0.4891 kWh
+  TOTAL gross solar-array electrical output:         18.233 MJ  |  5.0647 kWh
+  Regenerative-braking energy returned electrically:0.000 MJ  |  0.0000 kWh
+  Stationary charging energy actually stored:        1.740 MJ  |  0.4833 kWh
+
+ENERGY SPENT / CONVERSION LOSSES
+------------------------------------------------------------------------------------
+Wheel-level mechanical work breakdown (these are upstream of electrical draw;
+do not add these values again to the battery-side energy flows below):
+  Rolling resistance work:                           9.009 MJ  |  2.5026 kWh
+  Aerodynamic drag work:                             12.831 MJ  |  3.5643 kWh
+  Gravity work (signed; negative means net downhill):1.717 MJ  |  0.4769 kWh
+  Net signed mechanical work at wheels:              23.558 MJ  |  6.5438 kWh
+
+Battery-side terms:
+  Electrical propulsion draw:                        24.798 MJ  |  6.8882 kWh
+  Motor/drivetrain conversion loss (95% efficiency): 1.240 MJ  |  0.3444 kWh
+  Mechanical energy not recovered in regeneration:   0.000 MJ  |  0.0000 kWh
+  Fixed 70 W loss term while driving:                 1.590 MJ  |  0.4415 kWh
+  5 W auxiliary load while driving:                   0.114 MJ  |  0.0315 kWh
+
+STATIONARY SOLAR CHARGING DETAIL
+------------------------------------------------------------------------------------
+  Gross stationary solar-array output:               1.761 MJ  |  0.4891 kWh
+  10 W offset/threshold used by source formula:      0.021 MJ  |  0.0058 kWh
+  Energy offered to battery after offset:            1.740 MJ  |  0.4833 kWh
+  Energy actually stored:                             1.740 MJ  |  0.4833 kWh
+  Offered energy not stored at SOC ceiling:           0.000 MJ  |  0.0000 kWh
+  Signed SOC-ceiling adjustment, if any:              0.000 MJ  |  0.0000 kWh
+  By stationary period/stop:
+    Driver change near 160 km: 0:05:00; solar 0.230 MJ  |  0.0638 kWh; stored 0.227 MJ  |  0.0630 kWh
+    Control stop: Katherine: 0:30:00; solar 1.531 MJ  |  0.4253 kWh; stored 1.513 MJ  |  0.4203 kWh
+
+BATTERY ENERGY BALANCE CHECK
+------------------------------------------------------------------------------------
+  From driving and stationary model flows:           -8.289 MJ  |  -2.3024 kWh
+  Observed change from initial to final SOC:          -8.289 MJ  |  -2.3024 kWh
+  Difference (observed minus model-flow sum):         -0.000 MJ  |  -0.0000 kWh
+  A non-zero difference can occur if the source model applies its low-SOC floor/clamp.
+
+ENERGY BY 600 KM BAND
+------------------------------------------------------------------------------------
+Band    Distance               Speed    Solar drive        Regen     Propulsion     70W loss      5W aux   Station charge    Net battery
+1       0-600 km               65.0         4.576       0.000         6.888       0.442      0.032           0.483        -2.302
+2       600-1200 km            65.0         0.000       0.000         0.000       0.000      0.000           0.000         0.000
+3       1200-1800 km           65.0         0.000       0.000         0.000       0.000      0.000           0.000         0.000
+4       1800-2400 km           65.0         0.000       0.000         0.000       0.000      0.000           0.000         0.000
+5       2400-3000 km           65.0         0.000       0.000         0.000       0.000      0.000           0.000         0.000
+  Segment table energy columns are kWh; 'Net battery' is calculated from battery-side flows.
+
+Model note: this report preserves the equations and rules in optimizer.py.
+It does not search for, adjust, or optimize the five speeds.
+====================================================================================
