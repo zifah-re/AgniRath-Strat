@@ -1,0 +1,577 @@
+{
+  "day1": {
+    "date": "2026-09-10",
+    "race_window_sast": [
+      "09:00",
+      "17:00"
+    ],
+    "files": [
+      "day1beforerunning1.jsonl",
+      "day1beforerunning2.jsonl",
+      "day1loop.jsonl",
+      "day1stage1_1.jsonl",
+      "day1stage1_2beforebalastopping.jsonl",
+      "day1stage1_3_1.jsonl",
+      "day1stage1_3_2.jsonl",
+      "day1stage1_4.jsonl",
+      "day1stage1_5.jsonl",
+      "day1stage1_6.jsonl",
+      "day1stage2.jsonl"
+    ],
+    "first_record": "2026-09-10T08:06:35.141421+02:00",
+    "last_record": "2026-09-10T16:09:39.081405+02:00",
+    "records_written": 11163,
+    "main_packets": 9971,
+    "temp_packets": 1192,
+    "events_dropped": 3,
+    "bad_schema_dropped": 1,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [
+      {
+        "file": "day1stage1_3_2.jsonl",
+        "offset": "+05:30",
+        "switch_index": 453,
+        "sast_range": [
+          "2026-09-10T10:19:57.483764+02:00",
+          "2026-09-10T11:24:09.324822+02:00"
+        ]
+      }
+    ],
+    "clock_step_fixes": [
+      {
+        "file": "day1stage1_3_2.jsonl",
+        "at_index": 453,
+        "shifted_records": 453,
+        "shift_s": -24.866
+      },
+      {
+        "file": "day1stage1_3_2.jsonl",
+        "at_index": 424,
+        "shifted_records": 424,
+        "shift_s": -11.231
+      }
+    ],
+    "overlap_shifts": [
+      {
+        "earlier_file": "day1stage1_1.jsonl",
+        "later_file": "day1stage1_2beforebalastopping.jsonl",
+        "overlap_s": 115.7,
+        "shift_s": -117.8,
+        "mode": "whole",
+        "note": "whole file shifted",
+        "records_moved": 403,
+        "earlier_file_now_ends": "2026-09-10T09:16:03.766612+02:00",
+        "later_file_starts": "2026-09-10T09:16:05.951659+02:00"
+      }
+    ],
+    "window_coverage_pct": 70.8,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-10T08:37:58.450543+02:00",
+        "end": "2026-09-10T08:42:50.492266+02:00",
+        "duration_s": 292.0
+      },
+      {
+        "start": "2026-09-10T09:00:23.208784+02:00",
+        "end": "2026-09-10T09:00:55.289136+02:00",
+        "duration_s": 32.1
+      },
+      {
+        "start": "2026-09-10T09:01:11.229396+02:00",
+        "end": "2026-09-10T09:01:41.267898+02:00",
+        "duration_s": 30.0
+      },
+      {
+        "start": "2026-09-10T09:30:23.923619+02:00",
+        "end": "2026-09-10T09:35:58.343633+02:00",
+        "duration_s": 334.4
+      },
+      {
+        "start": "2026-09-10T10:10:52.863170+02:00",
+        "end": "2026-09-10T10:19:57.483764+02:00",
+        "duration_s": 544.6
+      },
+      {
+        "start": "2026-09-10T10:30:42.037947+02:00",
+        "end": "2026-09-10T10:32:17.187302+02:00",
+        "duration_s": 95.1
+      },
+      {
+        "start": "2026-09-10T11:24:09.324822+02:00",
+        "end": "2026-09-10T11:38:17.603279+02:00",
+        "duration_s": 848.3
+      },
+      {
+        "start": "2026-09-10T12:00:48.030036+02:00",
+        "end": "2026-09-10T12:08:23.494647+02:00",
+        "duration_s": 455.5
+      },
+      {
+        "start": "2026-09-10T12:08:25.393668+02:00",
+        "end": "2026-09-10T12:19:05.292572+02:00",
+        "duration_s": 639.9
+      },
+      {
+        "start": "2026-09-10T12:19:40.348581+02:00",
+        "end": "2026-09-10T12:42:34.721556+02:00",
+        "duration_s": 1374.4
+      },
+      {
+        "start": "2026-09-10T13:02:49.376125+02:00",
+        "end": "2026-09-10T13:04:15.655331+02:00",
+        "duration_s": 86.3
+      },
+      {
+        "start": "2026-09-10T13:09:21.455466+02:00",
+        "end": "2026-09-10T13:10:29.460737+02:00",
+        "duration_s": 68.0
+      },
+      {
+        "start": "2026-09-10T13:17:09.651747+02:00",
+        "end": "2026-09-10T13:18:05.500088+02:00",
+        "duration_s": 55.8
+      },
+      {
+        "start": "2026-09-10T13:21:05.504223+02:00",
+        "end": "2026-09-10T13:23:39.081936+02:00",
+        "duration_s": 153.6
+      },
+      {
+        "start": "2026-09-10T13:57:43.734834+02:00",
+        "end": "2026-09-10T14:09:03.857537+02:00",
+        "duration_s": 680.1
+      }
+    ]
+  },
+  "day2": {
+    "date": "2026-09-11",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day2stage1_1_beforetoll.jsonl",
+      "day2stage1_2.jsonl",
+      "day2stage2_1.jsonl",
+      "day2stage2_2.jsonl",
+      "day2stage2_3.jsonl",
+      "day2stage2_4.jsonl",
+      "day2stage2_5.jsonl"
+    ],
+    "first_record": "2026-09-11T07:57:05.215153+02:00",
+    "last_record": "2026-09-11T17:13:15.276493+02:00",
+    "records_written": 8802,
+    "main_packets": 7861,
+    "temp_packets": 941,
+    "events_dropped": 6,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [],
+    "window_coverage_pct": 56.6,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-11T08:17:55.202855+02:00",
+        "end": "2026-09-11T09:50:48.650886+02:00",
+        "duration_s": 5573.4
+      },
+      {
+        "start": "2026-09-11T10:49:35.104924+02:00",
+        "end": "2026-09-11T11:50:50.191949+02:00",
+        "duration_s": 3675.1
+      },
+      {
+        "start": "2026-09-11T12:00:16.760122+02:00",
+        "end": "2026-09-11T12:26:49.869209+02:00",
+        "duration_s": 1593.1
+      },
+      {
+        "start": "2026-09-11T13:05:04.185066+02:00",
+        "end": "2026-09-11T13:53:41.570685+02:00",
+        "duration_s": 2917.4
+      },
+      {
+        "start": "2026-09-11T14:52:02.240951+02:00",
+        "end": "2026-09-11T14:52:36.118737+02:00",
+        "duration_s": 33.9
+      },
+      {
+        "start": "2026-09-11T14:53:08.253371+02:00",
+        "end": "2026-09-11T14:56:19.326797+02:00",
+        "duration_s": 191.1
+      },
+      {
+        "start": "2026-09-11T15:35:36.213765+02:00",
+        "end": "2026-09-11T15:37:06.733753+02:00",
+        "duration_s": 90.5
+      }
+    ]
+  },
+  "day3": {
+    "date": "2026-09-12",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day3_morningcharging.jsonl",
+      "day3loop_1.jsonl",
+      "day3loop_2.jsonl",
+      "day3stage1_1.jsonl",
+      "day3stage1_2.jsonl",
+      "day3stage1_3.jsonl",
+      "day3stage2_1.jsonl",
+      "day3stage2_2(charging).jsonl",
+      "day3stage2_3.jsonl",
+      "day3stage2_4.jsonl"
+    ],
+    "first_record": "2026-09-12T06:43:03.914829+02:00",
+    "last_record": "2026-09-12T17:07:54.717543+02:00",
+    "records_written": 12332,
+    "main_packets": 11026,
+    "temp_packets": 1306,
+    "events_dropped": 9,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [
+      {
+        "earlier_file": "day3stage1_2.jsonl",
+        "later_file": "day3stage1_3.jsonl",
+        "overlap_s": 114.8,
+        "shift_s": -116.9,
+        "mode": "whole",
+        "note": "whole file shifted",
+        "records_moved": 553,
+        "earlier_file_now_ends": "2026-09-12T09:36:53.204360+02:00",
+        "later_file_starts": "2026-09-12T09:36:55.389732+02:00"
+      }
+    ],
+    "window_coverage_pct": 66.1,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-12T07:10:00.509842+02:00",
+        "end": "2026-09-12T07:25:35.404417+02:00",
+        "duration_s": 934.9
+      },
+      {
+        "start": "2026-09-12T08:03:46.801718+02:00",
+        "end": "2026-09-12T08:20:32.487428+02:00",
+        "duration_s": 1005.7
+      },
+      {
+        "start": "2026-09-12T09:06:51.846303+02:00",
+        "end": "2026-09-12T09:13:12.879129+02:00",
+        "duration_s": 381.0
+      },
+      {
+        "start": "2026-09-12T09:38:45.797132+02:00",
+        "end": "2026-09-12T09:39:43.970443+02:00",
+        "duration_s": 58.2
+      },
+      {
+        "start": "2026-09-12T10:38:12.990439+02:00",
+        "end": "2026-09-12T10:38:54.126108+02:00",
+        "duration_s": 41.1
+      },
+      {
+        "start": "2026-09-12T10:50:29.085011+02:00",
+        "end": "2026-09-12T11:02:35.231180+02:00",
+        "duration_s": 726.1
+      },
+      {
+        "start": "2026-09-12T11:02:53.206319+02:00",
+        "end": "2026-09-12T11:03:55.435681+02:00",
+        "duration_s": 62.2
+      },
+      {
+        "start": "2026-09-12T11:03:57.621738+02:00",
+        "end": "2026-09-12T11:08:55.256299+02:00",
+        "duration_s": 297.6
+      },
+      {
+        "start": "2026-09-12T11:09:05.439078+02:00",
+        "end": "2026-09-12T12:57:21.593679+02:00",
+        "duration_s": 6496.2
+      },
+      {
+        "start": "2026-09-12T13:01:10.344049+02:00",
+        "end": "2026-09-12T13:01:47.738234+02:00",
+        "duration_s": 37.4
+      },
+      {
+        "start": "2026-09-12T13:12:40.252226+02:00",
+        "end": "2026-09-12T13:17:43.085721+02:00",
+        "duration_s": 302.8
+      },
+      {
+        "start": "2026-09-12T13:17:45.091123+02:00",
+        "end": "2026-09-12T13:18:59.964737+02:00",
+        "duration_s": 74.9
+      },
+      {
+        "start": "2026-09-12T13:23:12.487120+02:00",
+        "end": "2026-09-12T13:26:58.289200+02:00",
+        "duration_s": 225.8
+      },
+      {
+        "start": "2026-09-12T13:30:11.883790+02:00",
+        "end": "2026-09-12T13:32:02.594629+02:00",
+        "duration_s": 110.7
+      },
+      {
+        "start": "2026-09-12T13:32:04.385121+02:00",
+        "end": "2026-09-12T13:34:04.937421+02:00",
+        "duration_s": 120.6
+      },
+      {
+        "start": "2026-09-12T14:22:02.745793+02:00",
+        "end": "2026-09-12T14:28:35.163198+02:00",
+        "duration_s": 392.4
+      },
+      {
+        "start": "2026-09-12T15:10:19.972587+02:00",
+        "end": "2026-09-12T15:11:44.734953+02:00",
+        "duration_s": 84.8
+      },
+      {
+        "start": "2026-09-12T15:54:24.264950+02:00",
+        "end": "2026-09-12T15:55:02.115555+02:00",
+        "duration_s": 37.9
+      },
+      {
+        "start": "2026-09-12T16:05:55.341800+02:00",
+        "end": "2026-09-12T16:06:49.860651+02:00",
+        "duration_s": 54.5
+      },
+      {
+        "start": "2026-09-12T16:07:03.519232+02:00",
+        "end": "2026-09-12T16:07:45.095196+02:00",
+        "duration_s": 41.6
+      },
+      {
+        "start": "2026-09-12T16:36:04.094450+02:00",
+        "end": "2026-09-12T16:40:35.747373+02:00",
+        "duration_s": 271.7
+      },
+      {
+        "start": "2026-09-12T16:44:32.008791+02:00",
+        "end": "2026-09-12T16:47:27.109549+02:00",
+        "duration_s": 175.1
+      }
+    ]
+  },
+  "day4": {
+    "date": "2026-09-13",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day4_morningcharging.jsonl"
+    ],
+    "first_record": "2026-09-13T07:54:36.586399+02:00",
+    "last_record": "2026-09-13T09:12:42.065377+02:00",
+    "records_written": 2124,
+    "main_packets": 1898,
+    "temp_packets": 226,
+    "events_dropped": 0,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [],
+    "window_coverage_pct": 13.0,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-13T08:31:23.566890+02:00",
+        "end": "2026-09-13T08:33:53.604522+02:00",
+        "duration_s": 150.0
+      }
+    ]
+  },
+  "day5": {
+    "date": "2026-09-14",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day5loop1_1.jsonl",
+      "day5loop1_2.jsonl",
+      "day5loop2_2.jsonl",
+      "day5stage2_1.jsonl",
+      "day5stage2_2.jsonl"
+    ],
+    "first_record": "2026-09-14T12:03:45.354838+02:00",
+    "last_record": "2026-09-14T17:15:11.998933+02:00",
+    "records_written": 7167,
+    "main_packets": 6405,
+    "temp_packets": 762,
+    "events_dropped": 0,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 2,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [],
+    "window_coverage_pct": 42.5,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-14T12:24:36.093519+02:00",
+        "end": "2026-09-14T12:39:32.414764+02:00",
+        "duration_s": 896.3
+      },
+      {
+        "start": "2026-09-14T13:15:57.089792+02:00",
+        "end": "2026-09-14T13:26:29.174353+02:00",
+        "duration_s": 632.1
+      },
+      {
+        "start": "2026-09-14T14:09:08.618821+02:00",
+        "end": "2026-09-14T14:38:54.757846+02:00",
+        "duration_s": 1786.1
+      },
+      {
+        "start": "2026-09-14T14:44:42.817659+02:00",
+        "end": "2026-09-14T14:45:28.962158+02:00",
+        "duration_s": 46.1
+      },
+      {
+        "start": "2026-09-14T14:50:14.785013+02:00",
+        "end": "2026-09-14T14:57:10.605046+02:00",
+        "duration_s": 415.8
+      },
+      {
+        "start": "2026-09-14T14:57:12.564231+02:00",
+        "end": "2026-09-14T15:00:52.323097+02:00",
+        "duration_s": 219.8
+      }
+    ]
+  },
+  "day6": {
+    "date": "2026-09-15",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day6stage1.jsonl"
+    ],
+    "first_record": "2026-09-15T09:32:25.037476+02:00",
+    "last_record": "2026-09-15T11:12:24.760565+02:00",
+    "records_written": 2751,
+    "main_packets": 2459,
+    "temp_packets": 292,
+    "events_dropped": 1,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [],
+    "window_coverage_pct": 18.2,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-15T09:50:48.609553+02:00",
+        "end": "2026-09-15T09:52:20.355214+02:00",
+        "duration_s": 91.7
+      }
+    ]
+  },
+  "day7": {
+    "date": "2026-09-16",
+    "race_window_sast": [
+      "08:00",
+      "17:00"
+    ],
+    "files": [
+      "day7loop1.jsonl",
+      "day7stage1_1.jsonl",
+      "day7stage1_2.jsonl",
+      "day7stage1_3.jsonl",
+      "day7stage1_4.jsonl",
+      "day7stage1_5.jsonl",
+      "day7stage2.jsonl"
+    ],
+    "first_record": "2026-09-16T08:03:35.844302+02:00",
+    "last_record": "2026-09-16T16:08:49.397551+02:00",
+    "records_written": 5344,
+    "main_packets": 4775,
+    "temp_packets": 569,
+    "events_dropped": 1,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [
+      {
+        "earlier_file": "day7stage1_2.jsonl",
+        "later_file": "day7stage1_3.jsonl",
+        "overlap_s": 190.2,
+        "shift_s": -192.4,
+        "mode": "after_stop",
+        "note": "standstill 08:42:49.154069-08:46:42.469836 compressed from 426 s to 233 s, everything after shifted",
+        "records_moved": 323,
+        "earlier_file_now_ends": "2026-09-16T08:51:02.871389+02:00",
+        "later_file_starts": "2026-09-16T08:51:05.048914+02:00"
+      }
+    ],
+    "window_coverage_pct": 35.2,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-16T09:26:17.770855+02:00",
+        "end": "2026-09-16T09:31:34.320573+02:00",
+        "duration_s": 316.5
+      },
+      {
+        "start": "2026-09-16T09:45:04.297258+02:00",
+        "end": "2026-09-16T13:48:57.712515+02:00",
+        "duration_s": 14633.4
+      },
+      {
+        "start": "2026-09-16T14:42:37.499527+02:00",
+        "end": "2026-09-16T15:28:43.627563+02:00",
+        "duration_s": 2766.1
+      }
+    ]
+  },
+  "day8": {
+    "date": "2026-09-17",
+    "race_window_sast": [
+      "08:00",
+      "15:00"
+    ],
+    "files": [
+      "day8stage1_nooncharging.jsonl",
+      "day8stage2.jsonl"
+    ],
+    "first_record": "2026-09-17T11:29:04.361694+02:00",
+    "last_record": "2026-09-17T14:11:20.919479+02:00",
+    "records_written": 4422,
+    "main_packets": 3953,
+    "temp_packets": 469,
+    "events_dropped": 4,
+    "bad_schema_dropped": 0,
+    "unparseable_lines": 0,
+    "keys_repaired": 0,
+    "timezone_fixes": [],
+    "clock_step_fixes": [],
+    "overlap_shifts": [],
+    "window_coverage_pct": 37.8,
+    "gaps_over_30s": [
+      {
+        "start": "2026-09-17T11:45:53.960472+02:00",
+        "end": "2026-09-17T11:49:16.172688+02:00",
+        "duration_s": 202.2
+      }
+    ]
+  }
+}
