@@ -74,10 +74,11 @@ class CarState:
                                          # (5.78); corrected per strategist
                                          # directive (CarState takes DASHBOARD
                                          # values only).
-    array_efficiency: float = 0.21     # source: DASHBOARD. Was 0.22 — did
-                                         # not match the DASHBOARD dict below
-                                         # (0.21); corrected (LEGACY_KR used
-                                         # 0.19 on 6 m2, for reference only).
+    array_efficiency: float = 0.245    # source: team's actual measured array
+                                         # efficiency (24.5 %), back-calculated
+                                         # from Sasol/track telemetry + Solcast
+                                         # irradiance. Was 0.21 (DASHBOARD dict
+                                         # below, kept as the legacy record).
     panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
     albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
     array_azimuth_deg: float = 0.0       # TODO-VERIFY: panel-plane azimuth

@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-.pytest_cache/
-data/raw/*.csv
-data/raw/*.json
-!data/raw/points.json
-data/processed/*.parquet
-data/processed/pmf.json
-.env
