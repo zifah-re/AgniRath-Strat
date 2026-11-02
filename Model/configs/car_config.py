@@ -88,12 +88,13 @@ class CarState:
                                          # arrays are near-flat, so this has a
                                          # small effect vs tilt, but is needed
                                          # for the pvlib incidence calc.
-    system_derate: float = 0.90          # TODO-VERIFY: soiling/temperature/
-                                         # mismatch/MPPT losses not otherwise
-                                         # modeled — the explicit conservatism
-                                         # knob paired with switching GHI ->
-                                         # POA irradiance (workplan fix "two
-                                         # birds"). Applied as p_solar *=
+    system_derate: float = 1.0           # Set to 1.0 (no extra derate): the 24.5 %
+                                         # array_efficiency above is the measured
+                                         # figure and already includes real-world
+                                         # losses. Was 0.90, a conservatism knob
+                                         # for soiling/temperature/mismatch/MPPT
+                                         # losses paired with the GHI -> POA
+                                         # switch. Applied as p_solar *=
                                          # system_derate when core.physics.
                                          # net_power is given poa_wm2.
 
