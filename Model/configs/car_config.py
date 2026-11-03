@@ -74,10 +74,11 @@ class CarState:
                                          # (5.78); corrected per strategist
                                          # directive (CarState takes DASHBOARD
                                          # values only).
-    array_efficiency: float = 0.21     # source: DASHBOARD. Was 0.22 — did
-                                         # not match the DASHBOARD dict below
-                                         # (0.21); corrected (LEGACY_KR used
-                                         # 0.19 on 6 m2, for reference only).
+    array_efficiency: float = 0.245    # source: team's actual measured array
+                                         # efficiency (24.5 %), back-calculated
+                                         # from Sasol/track telemetry + Solcast
+                                         # irradiance. Was 0.21 (DASHBOARD dict
+                                         # below, kept as the legacy record).
     panel_tilt_base_deg: float = 4.0     # source: DASHBOARD PANEL_TILT.
     albedo: float = 0.2                  # source: DASHBOARD ALBEDO.
     array_azimuth_deg: float = 0.0       # TODO-VERIFY: panel-plane azimuth
@@ -87,12 +88,13 @@ class CarState:
                                          # arrays are near-flat, so this has a
                                          # small effect vs tilt, but is needed
                                          # for the pvlib incidence calc.
-    system_derate: float = 0.90          # TODO-VERIFY: soiling/temperature/
-                                         # mismatch/MPPT losses not otherwise
-                                         # modeled — the explicit conservatism
-                                         # knob paired with switching GHI ->
-                                         # POA irradiance (workplan fix "two
-                                         # birds"). Applied as p_solar *=
+    system_derate: float = 1.0           # Set to 1.0 (no extra derate): the 24.5 %
+                                         # array_efficiency above is the measured
+                                         # figure and already includes real-world
+                                         # losses. Was 0.90, a conservatism knob
+                                         # for soiling/temperature/mismatch/MPPT
+                                         # losses paired with the GHI -> POA
+                                         # switch. Applied as p_solar *=
                                          # system_derate when core.physics.
                                          # net_power is given poa_wm2.
 
