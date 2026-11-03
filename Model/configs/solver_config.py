@@ -281,7 +281,7 @@ SKIP_BREAKDOWN_WHEN_UNUSED = True
 # process boundary (Route, CarState, the spline/KDTree weather providers, the
 # loop-geometry DataFrames) are picklable, so results are identical; only the
 # wall-clock changes. Left False in the baseline (thread path, unchanged); the
-# fastened build flips it True. See Model_fastened_hafiz/README_PERF.md.
+# fastened build flips it True. See docs/README_PERF_old.md.
 TIER2_USE_PROCESS_POOL = True
 
 # ---- Early-finish (evening) charging (strategist directive 23/08) ----------

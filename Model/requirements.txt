@@ -1,10 +1,9 @@
-# Pinned to the versions the skeleton was tested against (Jul 2026).
-numpy>=2.0
-pandas>=2.2
-scipy>=1.14          # SLSQP (L2/L3)
-pyarrow>=17.0        # route parquet
-pvlib>=0.11          # clear-sky fallback + solar position cross-checks
-tqdm>=4.66           # GA generation progress bar (optimizers/singleday.py)
-pytest>=8.0
-# optional (challenger backend; only if IPOPT wins the benchmark):
-# cyipopt
+# Pinned to the versions the test suite was last run against (Python 3.13, Nov 2026).
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1         # SLSQP (single-day solver)
+pvlib==0.16.1         # clear-sky fallback + solar position / POA
+tqdm==4.70.1          # GA generation progress bar
+pytest==9.2.0
+# Needed only to read/write route parquet files (not exercised by the tests):
+pyarrow>=17.0

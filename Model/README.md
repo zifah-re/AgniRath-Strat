@@ -1,37 +1,95 @@
 # Agnirath Strategy Model — Sasol Solar Challenge 2026
 
-Race strategy system for the 2026 Sasol Solar Challenge (9–17 Sep).
-Three layers on one shared physics core (Plan v3 §8):
+Offline race-strategy optimiser for the solar car. Given the route, weather and
+car parameters it produces, for each of the 8 race days, the number of loops, a
+speed profile and the start/end SOC, and writes them to a strategy JSON that the
+offline dashboard renders.
 
-| Layer | Module | Job |
+## How it works
+
+| Stage | File | Job |
 |---|---|---|
-| L1 | `optimizers/multiday_dp.py` | integer loops/day + start-of-day SOC floors |
-| L2 | `optimizers/singleday.py` | velocity per 5 km segment (GA→SLSQP→integer) |
-| L3 | `optimizers/mpc/` | live receding-horizon tracking + race logic |
+| Tier 1 | `optimizers/tier1.py` | coarse 500 m DP over all 8 days (baseline SOC trajectory) |
+| Tier 2 | `optimizers/tier2.py` | per-day, per-loop-count single-day solves at 3 start SOCs, giving surrogates (end SOC, finish time, wasted solar) |
+| Tier 3 | `optimizers/tier3.py` | backward multi-day DP over the surrogates (overnight charge, late-finish and high-SOC penalties) |
+| Outer loop | `optimizers/trust_region.py` | repeats Tier 2/3 inside a trust region, then extracts the final profiles |
+| Single-day solver | `optimizers/singleday.py` | speed per 10 km segment: GA, then SLSQP, then integer km/h |
+| Physics | `core/physics.py`, `core/battery.py`, `simulator/forward_sim.py` | force balance, motor/regen, SOC–voltage battery, forward simulation |
+| Route / solar / wind | `core/route.py`, `core/solar.py`, `core/wind.py` | route grid, POA irradiance (Solcast), relative wind |
+| Rules | `configs/race_config.py`, `compliance/` | regulation constants (clause-cited) and checker |
 
-Cross-cutting: `compliance/` (reg linter), `analysis/trailering.py`
-(red-flag map), reliability/degraded-mode (`analysis/degraded_playbook.py`,
-car-health gate in `optimizers/mpc/base.py`).
-
-## Status (workplan blocks)
-
-- **Block 0–1: DONE** — skeleton, frozen contracts (below), `race_config`
-  (reg-cited), `car_config` (mutable state; TODO-VERIFY items flagged),
-  weather collection cron, consolidated `core/physics.py` with both legacy
-  models reproduced under test (57 tests green).
-- Blocks 2–9: stubs in place with owners + frozen APIs in their docstrings.
+`optimizers/mpc/` holds the live receding-horizon code; it is not part of the
+offline pipeline.
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
-python -m pytest tests/            # must be green before any merge
-export SOLCAST_API_KEY=...         # then:
-python -m pipeline.collect_weather test-keys
-python -m pipeline.collect_weather pull --points data/raw/points.json
+python -m pytest tests -q          # 87 pass, 1 known failure (see below)
 ```
 
-Run everything from the `Model/` directory (imports are rooted here).
+Run everything from `Model/` (imports are rooted here).
+
+## Running
+
+```bash
+# Full 8-day cold start (Day 3 route variant: aryaman | prahlad | both)
+python -m optimizers.trust_region --variant aryaman
+
+# Re-solve Day N onward from a given start SOC (between days)
+python -m optimizers.trust_region resolve --resume-day 4 --start-soc 62 --variant aryaman
+
+# Re-plan the rest of one day (intra-day)
+python -m optimizers.trust_region resolve-intraday --day 4 --soc 62 --time 11:30 --variant aryaman
+
+# Live demo: print the saved plan, then re-solve one day (~10-20 s, single process)
+python run_demo.py --day 4 --soc 60 --time 09:30
+```
+
+Flags: `--breakdown` (one random breakdown per day), `--solar-eff 0.2x`
+(measured array efficiency for a re-solve), `--dist-done`, `--loops-left`, `--cs-taken`
+(intra-day state).
+
+Output goes to `output/` as `strategy_<variant>*.json`. View it with
+`python -m analysis.offline_dashboard --all output/` (offline Plotly HTML).
+
+## Parallelism
+
+Tier 2 samples the days in parallel. Set `TIER2_USE_PROCESS_POOL` in
+`configs/solver_config.py` for the default, or override per run without editing
+anything:
+
+```bash
+AGNIRATH_TIER2=serial     python -m optimizers.trust_region ...   # one process, safest
+AGNIRATH_TIER2=threads    python -m optimizers.trust_region ...   # no child processes
+AGNIRATH_TIER2=processes  python -m optimizers.trust_region ...   # fastest, many cores
+```
+
+(Windows PowerShell: `$env:AGNIRATH_TIER2="serial"`; cmd: `set AGNIRATH_TIER2=serial`.)
+If the process pool fails for any reason Tier 2 logs a warning and falls back to
+threads. `AGNIRATH_FORCE_SPAWN=1` forces the Windows/macOS 'spawn' start method on
+Linux for testing. Other speed knobs (`SKIP_BREAKDOWN_WHEN_UNUSED`,
+`ENERGY_GRID_M`, `GA_GENERATIONS`) are described in `docs/README_PERF_old.md`.
+
+## Car parameters (`configs/car_config.py`)
+
+Mass 336.5 kg, array area 5.78 m², array efficiency 24.5 % (measured), system
+derate 1.0, CdA 0.16 m², Crr 0.007, motor efficiency 0.95, regen 0.70, 6 packs
+x 588 Wh, v_max 85 km/h. Update values here only.
+
+## Deployed plan
+
+`output/strategy_aryaman_idk.json` is the plan that was actually run at Sasol
+(3201.9 km planned over 8 days, Day 3 = aryaman variant). Older plans are in
+`output/` and `output/archive_aug_plans/`.
+
+## Known issues
+
+- `tests/test_physics.py::test_new_model_matches_dashboard_when_wind_zero`
+  compares against the stale legacy Dashboard defaults and fails; it predates
+  the current car parameters.
+- `core/physics.py` keeps a fallback `SYSTEM_DERATE = 0.90`; the model uses
+  `CarState.system_derate` (1.0).
 
 ## FROZEN INTERFACE CONTRACTS (workplan 0.1 — change only via senior-approved PR)
 

@@ -417,6 +417,25 @@ def sample_all_days(routes: list, car: CarState, solar_providers: dict, wind_pro
     n_workers = min(n_days, _threads.worker_cap(n_workers) or os.cpu_count() or 4)
 
     _use_processes = bool(getattr(_sc_tier2, "TIER2_USE_PROCESS_POOL", False))
+    # Run-time override without editing config:  AGNIRATH_TIER2=serial|threads|processes
+    #   serial    -> one day at a time in this process (safest; use on a laptop
+    #                where multiprocessing misbehaves)
+    #   threads   -> thread pool (no pickling / no child processes)
+    #   processes -> process pool (fastest on a many-core machine)
+    _mode = os.environ.get("AGNIRATH_TIER2", "").strip().lower()
+    if _mode == "serial":
+        n_workers = 1
+    elif _mode == "threads":
+        _use_processes = False
+    elif _mode == "processes":
+        _use_processes = True
+    # A spawn-based process pool needs an importable __main__ (a script / -m).
+    # From a REPL or notebook it re-runs the caller and fails, so use threads.
+    if _use_processes:
+        import sys as _sys
+        if not getattr(_sys.modules.get("__main__"), "__file__", None):
+            logger.info("Tier2: no importable __main__ (REPL/notebook) - using threads")
+            _use_processes = False
 
     per_day = {}
 
