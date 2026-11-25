@@ -1233,6 +1233,25 @@ if __name__ == "__main__":
     save_dir  = os.path.abspath(os.path.join(current_dir, "..", "data", "processed"))
 
     # ------------------------------------------------------------------ #
+    # AS-GIVEN routes (post-race what-if): the model planned Day 2 on a 9.1 km
+    # surveyed "probable" loop and Day 3 on the "probable" Aryaman/Prahlad
+    # routes. The routes actually issued on the day are in data/as_given/
+    # (Day 2 = Zeerust loop; Day 3 = Stage 1 / Jan Kempdorp loop / Stage 2,
+    # with their own Solcast files). Run with `--variant as_given` (resolve
+    # only) to re-plan Day 2 onward on those routes. Default runs are untouched.
+    # ------------------------------------------------------------------ #
+    import sys as _sys_ag
+    _AS_GIVEN = ("as_given" in _sys_ag.argv)
+    as_given_dir = os.path.abspath(os.path.join(current_dir, "..", "data", "as_given"))
+    if _AS_GIVEN:
+        _zl = glob.glob(os.path.join(as_given_dir, "*Day 2*Loop*.save"))
+        if not _zl:
+            raise SystemExit("as_given: data/as_given has no Day 2 loop file")
+        with open(_zl[0], "r", encoding="utf-8") as _f_zl:
+            _zl_km = float(json.load(_f_zl)["profile"]["Distance"][-1])
+        rc.DAY_ROUTE_NOTES[1]["loops"] = [("day2_loop", round(_zl_km, 1))]
+
+    # ------------------------------------------------------------------ #
     # 1b. Output-report helpers (moved up from the bottom of this block so
     #     both resolve/resolve-intraday AND the cold-start save loop can
     #     share the exact same JSON schema via _save_strategy_json below).
@@ -1744,6 +1763,10 @@ if __name__ == "__main__":
 
         # --- Route ---
         route_files = glob.glob(os.path.join(save_dir, f"*Day {day_num}*.save"))
+        if _AS_GIVEN and d == 1:
+            # swap the surveyed 9.1 km loop for the loop actually issued
+            route_files = ([f for f in route_files if not _is_loop_file(f)]
+                           + glob.glob(os.path.join(as_given_dir, "*Day 2*Loop*.save")))
         if d == 2:
             # Day 3 loaded separately as multi-variant below
             continue
@@ -1816,7 +1839,7 @@ if __name__ == "__main__":
                     f"found {len(loop_files)}: {loop_files}"
                 )
             stage1_km = 0.0
-        elif variant == "prahlad":
+        elif variant in ("prahlad", "as_given"):
             if len(stage1_files) != 1:
                 raise ValueError(
                     "Day 3 Prahlad must contain exactly one Stage 1 file; "
@@ -1874,6 +1897,9 @@ if __name__ == "__main__":
         else:
             day3_variants.setdefault("unknown", []).append(fp)
 
+    if _AS_GIVEN:
+        day3_variants["as_given"] = sorted(glob.glob(os.path.join(as_given_dir, "*Day 3*.save")))
+
     if not day3_variants:
         logger.warning("Day 3: no route files found — flat fallback for single variant")
         day3_variants = {"flat_fallback": []}
@@ -1908,7 +1934,13 @@ if __name__ == "__main__":
     # and Tier 3 chains days around a Day-3-specific policy. Recompute per
     # variant so each result is self-consistent (cost: one ~10-min Tier 1
     # pass per variant).
+    if _AS_GIVEN:
+        day3_variant_weather["as_given"] = []
+        day3_variant_real_weather["as_given"] = sorted(
+            glob.glob(os.path.join(as_given_dir, "mean_Day 3*.jsonl")))
     kml_files_d3 = glob.glob(os.path.join(kml_dir, "*Day 3*.kml"))
+    if _AS_GIVEN:
+        kml_files_d3 = []      # the probables' trailer zones do not apply
 
     # ------------------------------------------------------------------ #
     # 5a. RE-SOLVE-FROM-ACTUALS CLI  (Feature C — locally testable)

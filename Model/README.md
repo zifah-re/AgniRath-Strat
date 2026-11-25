@@ -42,6 +42,10 @@ python -m optimizers.trust_region resolve --resume-day 4 --start-soc 62 --varian
 # Re-plan the rest of one day (intra-day)
 python -m optimizers.trust_region resolve-intraday --day 4 --soc 62 --time 11:30 --variant aryaman
 
+# Post-race what-if: re-plan Day 2 onward on the routes actually issued
+# (Day 2 Zeerust loop, Day 3 stage 1 / Jan Kempdorp loop / stage 2; files in data/as_given/)
+python -m optimizers.trust_region resolve --resume-day 2 --start-soc 90 --variant as_given
+
 # Live demo: print the saved plan, then re-solve one day (~10-20 s, single process)
 python run_demo.py --day 4 --soc 60 --time 09:30
 ```
