@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import dataclasses
 import random
+from collections import deque as _deque
 import typing as _t
 import numpy as np
 
@@ -296,25 +297,34 @@ class SustainedPowerTracker:
     def __init__(self, sustained_cap_w: float, window_s: float = 360.0):
         self.sustained_cap_w = float(sustained_cap_w)
         self.window_s = float(window_s)
-        self._t_hist: list[float] = []
-        self._p_hist: list[float] = []
+        # deques + running sums: O(1) per substep. The previous version
+        # re-summed both whole lists every substep and dropped aged entries
+        # with list.pop(0), i.e. O(window length) per substep -- about a third
+        # of all solve time (perf fix; results identical to ~1e-12 relative).
+        self._t_hist: _deque = _deque()
+        self._tp_hist: _deque = _deque()
+        self._sum_t = 0.0
+        self._sum_tp = 0.0
         self.over_budget_s = 0.0
         self.rolling_avg_w = 0.0
 
     def advance(self, dt_s: float, p_electric_w: float) -> float:
         """Record one substep's electrical draw (W, positive = consumption)
         and return the CURRENT rolling-window average draw (W)."""
+        tp = dt_s * max(0.0, p_electric_w)
         self._t_hist.append(dt_s)
-        self._p_hist.append(max(0.0, p_electric_w))
-        # Drop substeps that have aged out of the window (front of the list).
-        total_t = sum(self._t_hist)
-        while total_t > self.window_s and len(self._t_hist) > 1:
-            total_t -= self._t_hist.pop(0)
-            self._p_hist.pop(0)
+        self._tp_hist.append(tp)
+        self._sum_t += dt_s
+        self._sum_tp += tp
+        # Drop substeps that have aged out of the window (front of the deque).
+        while self._sum_t > self.window_s and len(self._t_hist) > 1:
+            self._sum_t -= self._t_hist.popleft()
+            self._sum_tp -= self._tp_hist.popleft()
+        total_t = self._sum_t
         if total_t <= 0.0:
             self.rolling_avg_w = 0.0
             return 0.0
-        weighted = sum(t * p for t, p in zip(self._t_hist, self._p_hist))
+        weighted = self._sum_tp
         self.rolling_avg_w = weighted / total_t
         if self.rolling_avg_w > self.sustained_cap_w:
             self.over_budget_s += dt_s

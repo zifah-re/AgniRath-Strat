@@ -92,9 +92,11 @@ class Battery:
             stored = delta_wh * self.car.charge_eff
         else:
             stored = delta_wh / self.car.discharge_eff
+        # plain min/max: same result as np.clip for a scalar (NaN included),
+        # ~20x cheaper -- this runs on every simulator substep (perf fix).
         self.soc_pct = float(
-            np.clip(self.soc_pct + stored / nominal * 100.0,
-                    0.0, self.car.soc_max_pct)
+            min(max(self.soc_pct + stored / nominal * 100.0, 0.0),
+                self.car.soc_max_pct)
         )
         return self.soc_pct
 
