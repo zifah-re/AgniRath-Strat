@@ -2,7 +2,7 @@
 held-out Days 5-8. Pre-WSC only. Hand check first: at steady cruise (flat, |a|<0.05) the measured power is only
 ~10-30 % above car_config, so the energy gap lives in the dynamic part (accel / grade / regen), not in cruise drag.
 Bounds are physical: aux <= 100 W, eff <= 0.95.  Objective = stage energy log-ratio^2 + 5-min window RMSE (normalised).
-Writes refit_bayes.csv (best per seed), refit_bayes_trials.csv (all trials), fig_refit_bayes.png
+Writes refit_bayes{TAG}.csv (best per seed), refit_bayes_trials{TAG}.csv (all trials), fig_refit_bayes{TAG}.png
 """
 import sys, warnings
 from pathlib import Path
@@ -14,12 +14,17 @@ sys.path.insert(0, str(HERE))
 import diagnose as dg
 FIT = {(1, "stage1"), (2, "stage1"), (2, "stage2"), (3, "stage1"), (3, "stage2")}
 WIN = 300.0
+SPLIT = "--split" in sys.argv
 BND = dict(cda=(0.15, 0.35), crr=(0.004, 0.02), eff=(0.85, 0.95), aux=(0.0, 100.0), regen=(0.0, 0.8))
+if SPLIT: BND["regen_brake"] = (0.0, 0.8)
+TAG = "_split" if SPLIT else ""
 
 def p_el(s, p):
     pa, pr, pg, pc = dg.terms(s, dict(cda=p["cda"], crr=p["crr"]))
     pm = pa + pr + pg + pc
-    return np.where(pm >= 0, pm / p["eff"], pm * p["regen"]) + p["aux"]
+    # regen on hill descents (near-steady speed) and on braking (|a| >= 0.1 m/s2) can differ
+    reg = np.where(np.abs(s["a"]) < 0.1, p["regen"], p.get("regen_brake", p["regen"]))
+    return np.where(pm >= 0, pm / p["eff"], pm * reg) + p["aux"]
 
 def prep(S):
     for s in S.values():
@@ -62,12 +67,12 @@ if __name__ == "__main__":
         rows.append(dict(run=f"TPE seed {seed}", **p, score_fit=st.best_value, rmse5_test=win_rmse(S, kt, p),
                          ratio_fit=ratio(S, kf, p), ratio_test=ratio(S, kt, p)))
         for t in st.trials: trials.append(dict(seed=seed, value=t.value, **t.params))
-    R = pd.DataFrame(rows); R.round(4).to_csv(HERE/"refit_bayes.csv", index=False)
-    Tr = pd.DataFrame(trials); Tr.round(5).to_csv(HERE/"refit_bayes_trials.csv", index=False)
+    R = pd.DataFrame(rows); R.round(4).to_csv(HERE/f"refit_bayes{TAG}.csv", index=False)
+    Tr = pd.DataFrame(trials); Tr.round(5).to_csv(HERE/f"refit_bayes_trials{TAG}.csv", index=False)
     print(R.round(4).to_string(index=False))
     top = Tr.nsmallest(int(len(Tr) * .05), "value")
     print("\ntop 5% trials (mean +- std):"); print(top[list(BND)].agg(["mean", "std"]).round(4).to_string())
     fig, ax = plt.subplots(1, len(BND), figsize=(13, 3))
     for a, k in zip(ax, BND):
         a.scatter(Tr[k], Tr.value, s=4, alpha=.4); a.set_xlabel(k); a.set_ylim(Tr.value.min(), np.percentile(Tr.value, 70))
-    ax[0].set_ylabel("objective"); plt.tight_layout(); plt.savefig(HERE/"fig_refit_bayes.png", dpi=170)
+    ax[0].set_ylabel("objective"); plt.tight_layout(); plt.savefig(HERE/f"fig_refit_bayes{TAG}.png", dpi=170)
