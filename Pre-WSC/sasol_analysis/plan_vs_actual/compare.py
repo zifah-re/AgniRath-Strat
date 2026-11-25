@@ -2,8 +2,14 @@
 Plan vs actual for Sasol 2026.
 
   plan        Model/output/strategy_aryaman_idk.json   (the plan that was deployed)
-  as-given    Model/output/strategy_as_given_resolve_day2_*.json (optional; latest is used)
-              = same model, same car, Day 2 onward re-solved on the routes actually issued
+  re-solves   Model/output/strategy_aryaman_resolve_day2_20261125T092844.json   (blind routes)
+              Model/output/strategy_as_given_resolve_day2_20261125T094159.json  (routes actually issued)
+              Both: current code, Day 2 onward from 90 % SOC, --solar-eff 0.189 = the 0.21 x 0.90 effective
+              array efficiency the deployed plan was solved with (car_config on 8 Sept). The route effect on
+              Day 2 / Day 3 is (as-given - blind) from this pair, so code changes and the later 24.5 % /
+              derate-1.0 config change cancel out. Reproduce with
+              python -m optimizers.trust_region resolve --resume-day 2 --start-soc 90 --variant aryaman  --solar-eff 0.189
+              python -m optimizers.trust_region resolve --resume-day 2 --start-soc 90 --variant as_given --solar-eff 0.189
   actual      debrief distances + telemetry (run actuals.py first)
 
 Writes fig_*.png and plan_vs_actual_by_day.csv next to this file.
@@ -48,11 +54,15 @@ CAUSE_COLOR = {"Controller / drivetrain": "#b5651d", "Battery / pack": "#8c2d2d"
 STATE_COL = {"driving": "#4f7d5a", "stopped": "#c2542d", "no data": "#e4e4e4"}
 
 
+BLIND_FILE = "strategy_aryaman_resolve_day2_20261125T092844.json"
+ASG_FILE = "strategy_as_given_resolve_day2_20261125T094159.json"
+
+
 def load_plans():
     plan = json.load(open(MODEL_OUT / "strategy_aryaman_idk.json"))
-    files = sorted(glob.glob(str(MODEL_OUT / "strategy_as_given_resolve_day2_*.json")))
-    asg = json.load(open(files[-1])) if files else None
-    return plan, asg
+    asg = json.load(open(MODEL_OUT / ASG_FILE))
+    blind = json.load(open(MODEL_OUT / BLIND_FILE))
+    return plan, asg, blind
 
 
 def stage_km(day):
@@ -62,7 +72,7 @@ def stage_km(day):
     return out
 
 
-def build_table(plan, asg):
+def build_table(plan, asg, blind):
     act_d = pd.read_csv(HERE / "actuals_by_day.csv", index_col="day")
     act_p = pd.read_csv(HERE / "actuals_by_phase.csv")
     rows = []
@@ -80,6 +90,9 @@ def build_table(plan, asg):
             r.update(asg_km=a["distance_km"], asg_stage1=ak["stage1"], asg_loop=ak["loop"], asg_stage2=ak["stage2"],
                      asg_loops=a["n_loops"], asg_eta=a["eta"], asg_speed=a["speed_avg_kmh"],
                      asg_soc_start=a["soc_start_pct"], asg_soc_end=a["soc_end_pct"])
+        if "eta" in blind["days"].get(str(d), {}):
+            b = blind["days"][str(d)]
+            r.update(blind_km=b["distance_km"], blind_eta=b["eta"], blind_loops=b["n_loops"])
         r["actual_km"] = ACTUAL_KM[d]
         ad = act_d.loc[d]
         r.update(tel_km=ad.km_telemetry, act_avg_moving=ad.avg_moving_kmh, act_p95=ad.p95_kmh,
@@ -113,7 +126,7 @@ def fig_waterfall(t):
     for d in range(1, 9):
         short = t.plan_km[d] - t.actual_km[d]
         if d in (2, 3) and "asg_km" in t and pd.notna(t.asg_km.get(d)):
-            route = t.plan_km[d] - t.asg_km[d]
+            route = t.blind_km[d] - t.asg_km[d]          # like-for-like: same code, same solar
             steps.append((f"D{d}\nroute", route, CAUSE_COLOR["Blind-route assumption"]))
             steps.append((f"D{d}\nfailures", short - route, CAUSE_COLOR[CAUSE[d][0]]))
         else:
@@ -292,8 +305,8 @@ def fig_energy(t):
 
 
 def main():
-    plan, asg = load_plans()
-    t = build_table(plan, asg)
+    plan, asg, blind = load_plans()
+    t = build_table(plan, asg, blind)
     pd.set_option("display.width", 250, "display.max_columns", 60)
     print(t.round(1).T.to_string())
     fig_waterfall(t)
