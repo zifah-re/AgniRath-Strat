@@ -64,7 +64,7 @@ def load_day(day):
                 t=r["__t"], file=fname, phase=ph,
                 v_ms=r["Vehicle_Velocity"], vbus=r["Bus_Voltage"], ibus=r["Bus_Current"],
                 p_sol_w=sum(r[f"Input_Voltage_{c}"] * r[f"Input_Current_{c}"] for c in "ABCD"),
-                lat=r.get("Latitude"), lon=r.get("Longitude"),
+                **{f"p_{c}": r[f"Input_Voltage_{c}"] * r[f"Input_Current_{c}"] for c in "ABCD"},
             ))
     df = pd.DataFrame(rows).sort_values("t").reset_index(drop=True)
     ts = (df.t - df.t.iloc[0]).dt.total_seconds().to_numpy()

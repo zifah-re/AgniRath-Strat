@@ -14,6 +14,7 @@ import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import actuals as ac
+from shading_check import SHARE   # string area shares from the tilted stops
 MODEL = HERE.parents[2]/"Model"/"data"
 AREA = 5.78
 GHI_MIN = 300.0
@@ -69,18 +70,24 @@ def main():
         df["poa_sun"] = df.dni.to_numpy() + dhi                                   # plane facing the sun
         df["cz"] = cz
         b = df.set_index(df.t.dt.tz_convert("UTC")).resample("5min").agg(
-            {"p_sol_w": "mean", "kmh": "mean", "poa_flat": "mean", "poa_sun": "mean", "ghi": "mean", "cz": "mean"}).dropna()
+            {"p_sol_w": "mean", "kmh": "mean", "poa_flat": "mean", "poa_sun": "mean", "ghi": "mean", "cz": "mean",
+             "p_A": "mean", "p_B": "mean", "p_C": "mean", "p_D": "mean"}).dropna()
         b["day"] = day
         bins.append(b)
     B = pd.concat(bins); B = B[B.ghi > GHI_MIN].copy()
     B["moving"] = B.kmh > 5; B["still"] = B.kmh < 1
     B["eta_flat"] = B.p_sol_w / (AREA * B.poa_flat)
     B["eta_sun"] = B.p_sol_w / (AREA * B.poa_sun)
+    for c in "ABCD":
+        B[f"eta_{c}"] = B[f"p_{c}"] / (SHARE[c] * AREA * B.poa_flat)
+    B["eta_best_string"] = B[[f"eta_{c}" for c in "ABCD"]].max(axis=1)
     B.round(4).to_csv(HERE/"solar_check_5min.csv")
     rows = []
     for day, g in B.groupby("day"):
         mv = g[g.moving]; st = g[g.still & (g.p_sol_w > 1100)]
         rows.append(dict(day=day, bins=len(g), eta_flat_moving_mean=mv.eta_flat.mean(), eta_flat_moving_std=mv.eta_flat.std(),
+                         eta_best_string_moving_mean=mv.eta_best_string.mean(), eta_best_string_moving_std=mv.eta_best_string.std(),
+                         **{f"eta_{c}_moving_mean": mv[f"eta_{c}"].mean() for c in "ABCD"},
                          eta_flat_moving_median=mv.eta_flat.median(), eta_tilted_mean=st.eta_sun.mean(), eta_tilted_std=st.eta_sun.std(),
                          n_tilted=len(st), peak_array_w=g.p_sol_w.max()))
     S = pd.DataFrame(rows).round(3); S.to_csv(HERE/"solar_check_by_day.csv", index=False)
@@ -90,12 +97,16 @@ def main():
     print("\ntilted-at-sun eta: mean %.3f std %.3f n=%d" % (T.eta_sun.mean(), T.eta_sun.std(), len(T)))
     M = B[B.moving]
     print("driving flat eta: mean %.3f std %.3f median %.3f n=%d" % (M.eta_flat.mean(), M.eta_flat.std(), M.eta_flat.median(), len(M)))
+    C = M[M.day.isin([1, 2, 3, 8])]
+    print("clear days 1,2,3,8 driving: whole array %.3f +- %.3f   best string %.3f +- %.3f  (n=%d)" % (
+        C.eta_flat.mean(), C.eta_flat.std(), C.eta_best_string.mean(), C.eta_best_string.std(), len(C)))
     # --- figures
     days = sorted(B.day.unique()); fig, axs = plt.subplots(2, 4, figsize=(14, 6), sharey=True)
     for ax, day in zip(axs.ravel(), days):
         g = B[B.day == day]; tl = g.index.tz_convert("Africa/Johannesburg"); h = tl.hour + tl.minute / 60
         mv = g.moving.to_numpy(); st = g.still.to_numpy()
-        ax.scatter(h[mv], g.eta_flat[mv], s=12, c="#3b6ea0", label="driving (flat)")
+        ax.scatter(h[mv], g.eta_best_string[mv], s=10, c="#9bb7d4", label="driving, best string")
+        ax.scatter(h[mv], g.eta_flat[mv], s=12, c="#3b6ea0", label="driving, whole array")
         ax.scatter(h[st], g.eta_sun[st], s=12, c="#c2542d", label="stopped (tilted at sun)")
         if mv.sum() > 1:
             m, s = g.eta_flat[mv].mean(), g.eta_flat[mv].std()
@@ -104,7 +115,7 @@ def main():
         ax.set_title(f"Day {day}", fontsize=9); ax.set_ylim(0, .4); ax.set_xlabel("local hour", fontsize=8)
     axs[0, 0].set_ylabel("array efficiency"); axs[1, 0].set_ylabel("array efficiency"); axs[0, 0].legend(fontsize=6)
     for ax in axs.ravel()[len(days):]: ax.axis("off")
-    fig.suptitle("Array efficiency = P_array / (5.78 m2 x POA); band = mean +- 1 std of driving 5-min bins; dashed = 24.5 % model", fontsize=9)
+    fig.suptitle("Array efficiency = P_array / (5.78 m2 x POA); band = mean +- 1 std of whole-array driving 5-min bins; light dots = best single string (unshaded); dashed = 24.5 % model", fontsize=9)
     plt.tight_layout(); plt.savefig(HERE/"fig_solar_eff_by_day.png", dpi=180)
     fig, ax = plt.subplots(figsize=(6.5, 4.2))
     ax.scatter(AREA*M.poa_flat, M.p_sol_w, s=9, c="#3b6ea0", label="driving"); ax.scatter(AREA*T.poa_sun, T.p_sol_w, s=14, c="#c2542d", label="tilted at sun")
