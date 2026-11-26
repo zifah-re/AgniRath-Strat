@@ -45,6 +45,8 @@ python -m optimizers.trust_region resolve-intraday --day 4 --soc 62 --time 11:30
 # Post-race what-if: re-plan Day 2 onward on the routes actually issued
 # (Day 2 Zeerust loop, Day 3 stage 1 / Jan Kempdorp loop / stage 2; files in data/as_given/)
 python -m optimizers.trust_region resolve --resume-day 2 --start-soc 90 --variant as_given
+# add --solar-eff 0.189 to match the deployed plan's solar (0.21 x 0.90, car_config of 8 Sept);
+# run the same with --variant aryaman for the like-for-like blind-route comparison
 
 # Live demo: print the saved plan, then re-solve one day (~10-20 s, single process)
 python run_demo.py --day 4 --soc 60 --time 09:30
