@@ -93,7 +93,8 @@ def build(aligned=True, report=None):
         th = np.arctan(np.interp(g.x_km.to_numpy(), dist_km, grad) / 100.0)
         mode_ = np.where(g.brk.to_numpy() > 0, "brake", np.where(g.thr.to_numpy() >= 0.99, "cruise",
                          np.where(g.thr.to_numpy() <= 0.01, "coast", "partial")))
-        rows.append(pd.DataFrame(dict(day=day, phase=phase, ts=ts, dt=g.dt_c.to_numpy(), v=vs, a=a, th=th,
+        rows.append(pd.DataFrame(dict(day=day, phase=phase, t=g.t.reset_index(drop=True), x_km=g.x_km.to_numpy(),
+                                      ts=ts, dt=g.dt_c.to_numpy(), v=vs, a=a, th=th,
                                       p=p_bus, mode=mode_, ok=cont & (v > 20 / 3.6))))
     return pd.concat(rows, ignore_index=True)
 
