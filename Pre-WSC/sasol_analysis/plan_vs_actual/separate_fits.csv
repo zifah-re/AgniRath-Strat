@@ -1,0 +1,16 @@
+fit,eta,crr,cda,n
+"baseline: 2 km, wind x0.60, real rho, Days 1,2,3,6,7",0.7622,0.0082,0.1766,162
+leave out Day 1,0.7722,0.0083,0.1786,149
+leave out Day 2,0.7382,0.0079,0.1672,99
+leave out Day 3,0.7813,0.01,0.1503,99
+leave out Day 6,0.7621,0.0081,0.1791,145
+leave out Day 7,0.7612,0.008,0.181,156
+1 km windows,0.7679,0.0093,0.1529,426
+3 km windows,0.7495,0.0084,0.1655,85
+wind x0.0,0.7514,0.0063,0.1781,162
+wind x1.0,0.7759,0.0104,0.1481,162
+cluster bootstrap 5th percentile,0.7354,0.0075,0.1309,162
+cluster bootstrap 95th percentile,0.7984,0.0107,0.1938,162
+"model as built (rho 1.2, 10 m wind): full fit = effective parameters for the planner",0.7732,0.0103,0.1256,162
+"model as built (rho 1.2, 10 m wind), track Crr/CdA: efficiency needed",0.6803,0.007,0.16,162
+"real air, track Crr/CdA: efficiency needed",0.675,0.007,0.16,162

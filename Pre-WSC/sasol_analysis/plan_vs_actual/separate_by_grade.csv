@@ -1,0 +1,5 @@
+grade_class,n,kmh,bus_w,eta_needed_track_roadload,eta_needed_fitted_roadload
+descent < -0.5 %,16,64.595,928.458,0.451,0.574
+flat |g| < 0.5 %,101,60.989,1099.604,0.681,0.772
+climb 0.5-1.5 %,33,57.327,1598.926,0.691,0.75
+climb > 1.5 %,12,58.185,2529.153,0.724,0.763
