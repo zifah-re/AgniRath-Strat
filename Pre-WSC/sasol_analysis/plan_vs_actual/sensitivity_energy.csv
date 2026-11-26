@@ -1,0 +1,6 @@
+parameter,energy_change_pct_plus10,energy_change_pct_minus10
+drivetrain efficiency,-9.03,11.03
+Crr,4.57,-4.57
+CdA,4.03,-4.03
+mass,5.9,-5.9
+array efficiency (solar offset),-6.97,6.97

@@ -1,0 +1,21 @@
+param_set,loops,feasible,km,eta,end_soc,avg_kmh_stage1,avg_kmh_stage2,solar_wh
+"original (track values, solar 0.189)",0,True,301.7,13:07,49.84,66.7,69.0,3567.0
+"original (track values, solar 0.189)",1,True,336.9,13:42,46.49,66.9,69.1,4059.0
+"original (track values, solar 0.189)",2,True,372.1,14:16,44.22,66.9,69.0,4517.0
+"original (track values, solar 0.189)",3,True,407.3,14:59,41.92,66.9,68.8,5070.0
+"original (track values, solar 0.189)",4,True,442.5,15:39,38.8,66.9,68.7,5534.0
+"original (track values, solar 0.189)",5,True,477.8,16:16,33.21,66.7,68.1,5906.0
+"original (track values, solar 0.189)",6,True,513.0,16:50,26.74,66.9,68.2,6188.0
+"original (track values, solar 0.189)",7,False,548.2,16:59,0.0,70.5,73.2,6218.0
+"refined (identified, solar 0.17)",0,True,301.7,13:35,21.01,61.7,61.2,3627.0
+"refined (identified, solar 0.17)",1,True,336.9,14:22,21.03,61.0,59.9,4221.0
+"refined (identified, solar 0.17)",2,True,372.1,15:15,21.02,60.0,57.9,4835.0
+"refined (identified, solar 0.17)",3,True,407.3,16:15,21.01,54.7,57.4,5415.0
+"refined (identified, solar 0.17)",4,False,442.5,16:52,7.74,57.8,56.5,5675.0
+"refined, solar 0.245 (no shading)",0,True,301.7,13:07,37.29,66.7,69.0,4624.0
+"refined, solar 0.245 (no shading)",1,True,336.9,13:42,34.17,66.9,69.1,5262.0
+"refined, solar 0.245 (no shading)",2,True,372.1,14:16,31.66,66.9,69.1,5853.0
+"refined, solar 0.245 (no shading)",3,True,407.3,14:59,29.25,66.9,68.8,6571.0
+"refined, solar 0.245 (no shading)",4,True,442.5,15:39,25.76,66.9,68.7,7174.0
+"refined, solar 0.245 (no shading)",5,True,477.8,16:18,21.09,66.9,67.6,7676.0
+"refined, solar 0.245 (no shading)",6,False,513.0,16:59,18.62,66.0,66.6,8127.0
