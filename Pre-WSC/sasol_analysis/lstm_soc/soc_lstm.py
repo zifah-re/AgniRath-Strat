@@ -38,7 +38,8 @@ DATA, RES = HERE / "data", HERE / "results"
 DT_H = 10.0 / 3600.0
 GAP_BREAK_S = 300
 WINDOW = 60                       # 60 x 10 s = 10 min of history
-FEATS = ["v_cell", "v_ir", "i_net", "i_bus", "t_cell"]   # v_ir = v_cell - R i_net (physics feature)
+FEATS = ["v_cell", "v_ir", "soc_lu", "i_net", "i_bus", "t_cell"]   # v_ir = v - R i; soc_lu = OCV^-1(v_ir)
+N_SEEDS = 3                       # ensemble: average of 3 independently initialised networks
 DAYS = [1, 2, 3, 5, 6, 7, 8]      # Day 4: trailered (no discharge), used for training only
 SEED = 0
 
@@ -211,6 +212,7 @@ def main():
     Q, R, rms_mv, nseg = fit_reference(days)
     for d in days.values():
         d["v_ir"] = d.v_cell - R * d.i_net
+        d["soc_lu"] = ocv_inv(d.v_ir.to_numpy())
     print(f"reference fit: Q = {Q:.1f} Ah, R = {1000 * R:.2f} mOhm (per series cell, pack current), "
           f"voltage RMS {rms_mv:.1f} mV over {nseg} segments")
     pd.DataFrame([dict(Q_ah=Q, R_ohm=R, v_rms_mv=rms_mv, segments=nseg)]).to_csv(RES / "reference_fit.csv", index=False)
@@ -219,16 +221,18 @@ def main():
     t0 = time.time()
     for test in DAYS:
         tr = [days[k] for k in days if k != test]
-        p, mu, sd = train(tr)
-        ph, muh, sdh = train(tr, hybrid=True)
+        global SEED
+        models = []
+        for SEED in range(N_SEEDS):
+            models.append(train(tr))
         d = days[test]
+        ens = lambda dd: np.mean([run_lstm(p, mu, sd, dd) for p, mu, sd in models], axis=0)
         y = d.soc_ref.to_numpy()
         dc = corrupt(d)
         dc["v_ir"] = dc.v_cell - R * dc.i_net
-        est = {"Hybrid: voltage lookup + LSTM correction": run_lstm(ph, muh, sdh, d, hybrid=True),
-               "Hybrid, corrupted current": run_lstm(ph, muh, sdh, dc, hybrid=True),
-               "LSTM": run_lstm(p, mu, sd, d),
-               "LSTM, corrupted current": run_lstm(p, mu, sd, dc),
+        dc["soc_lu"] = ocv_inv(dc.v_ir.to_numpy())
+        est = {"LSTM": ens(d),
+               "LSTM, corrupted current": ens(dc),
                "Coulomb counting (live start)": coulomb_live(d, Q),
                "Coulomb counting, corrupted current": coulomb_live(d, Q, offset=0.5, gain=1.02),
                "Voltage lookup (OCV + IR)": ocv_inv(d.v_cell.to_numpy() - R * d.i_net.to_numpy())}
@@ -262,7 +266,7 @@ def main():
     order = list(S.index)
     piv = M.pivot(index="test_day", columns="method", values="rmse")[order]
     x = np.arange(len(DAYS)); w = 0.8 / len(order)
-    cols = {"Hybrid: voltage lookup + LSTM correction": "#1f4e8c", "Hybrid, corrupted current": "#7a9cc6", "LSTM": "#6f8fb3", "LSTM, corrupted current": "#9bb7d4", "Coulomb counting (live start)": "#e3a07f",
+    cols = {"LSTM": "#3b6ea0", "LSTM, corrupted current": "#9bb7d4", "Coulomb counting (live start)": "#e3a07f",
             "Coulomb counting, corrupted current": "#c2542d", "Voltage lookup (OCV + IR)": "#999"}
     for i, mth in enumerate(order):
         ax.bar(x + (i - len(order) / 2 + .5) * w, piv[mth], w, label=mth, color=cols[mth])

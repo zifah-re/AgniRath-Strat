@@ -2,7 +2,7 @@
 
 Run (from this folder): `pip install jax pandas scipy matplotlib`, then
 `python dataset.py` (builds `data/day*.csv` from the Sasol logs, ~1 min) and
-`python soc_lstm.py` (reference fit, leave-one-day-out training of 7 folds, figures, ~6 min on CPU).
+`python soc_lstm.py` (reference fit, leave-one-day-out training of 7 folds x 3 networks, figures, ~10 min on CPU).
 JAX is used because it installs CPU-only everywhere (Windows included); the LSTM cell is written out
 explicitly (`lstm_forward`) and trained with Adam.
 
@@ -26,22 +26,38 @@ continuous log segment (logger gaps lose the current), Q and R fitted over all d
 Result: **Q = 29.3 Ah, R = 1.7 mOhm per series cell group, 41 mV RMS voltage fit** (results/reference_fit.csv).
 Q is consistent with the 588 Wh module rating (588 Wh / 6 cells / 3.6 V = 27 Ah).
 
+## Architecture
+- Input: the last 60 bins (10 min at 10 s) of 6 features: mean cell voltage, IR-corrected cell voltage
+  v - R i, the voltage-lookup SOC OCV^-1(v - R i), net pack current, motor current, cell temperature
+  (z-scored with training-day statistics).
+- One LSTM layer, 32 hidden units (forget-gate bias 1), linear output = SOC now. ~5k parameters.
+- Loss: mean squared error on SOC/100; Adam, lr 3e-3 halved at 60 % and 85 % of 40 epochs, batch 256.
+- Ensemble: 3 networks with different random initialisation, outputs averaged.
+- Validation: leave-one-day-out (train on 7 days incl. charging-only Day 4, test on the 8th), 7 folds.
+- Tried and dropped: raw voltages only (5.9 RMSE), without the lookup input (5.1), residual "hybrid" that
+  learns only a correction to the lookup (5.5).
+
 ## Results (leave-one-day-out, SOC percentage points, results/summary.csv)
 | estimator | RMSE | mean abs | needs start SOC | drifts with sensor offset |
 |---|---|---|---|---|
 | Voltage lookup, OCV^-1(v - R i) | 3.7 | 2.7 | no | no |
 | Coulomb counting, live start | 4.3 | 3.5 | yes | yes |
 | Coulomb counting, 0.5 A / 2 % sensor error | 4.3 | 3.6 | yes | yes |
-| **LSTM** (10 min window: v_cell, v - R i, i_net, i_bus, T) | 5.1 | 4.2 | **no** | **no** (5.14 -> 5.19 with corrupted current) |
-| Hybrid: lookup + LSTM correction | 5.5 | 4.2 | no | no |
+| **LSTM** (ensemble of 3) | 4.6 | 3.7 | **no** | **no** (4.60 -> 4.64 with corrupted current) |
+
+Per day the LSTM beats the lookup on Day 5 (2.8 vs 4.2), ties on Day 1 and loses on Days 2, 3, 7, the days that
+go below ~20 % SOC, where the training data is thin.
 
 Drift (results/coulomb_drift.csv, fig_soc_drift.png): coulomb counting starts 2.8 pts off when started from a
 loaded voltage and drifts 1.7 pts/h per 0.5 A offset, i.e. ~18 pts after a 9 h race day. The LSTM's error does
 not grow with time.
 
 ## Honest conclusion
-- On six training days the LSTM does **not yet beat** a physics voltage lookup; the reference itself is built from
-  coulomb counting and the same OCV curve, which favours those two methods structurally.
+- On this data the LSTM does **not yet beat** the physics voltage lookup on average. The main reason is the
+  reference: with no measured SOC, it is itself built from v = OCV(SOC) + R i and coulomb counting, so the voltage
+  lookup is close to the exact inverse of the reference by construction; its only error is the 41 mV model
+  residual. A learned model can only beat it by learning battery dynamics that are consistent across days, and
+  with 7 days (6 to train) that signal is small.
 - What the LSTM does show: no initial SOC needed, no drift, insensitive to current-sensor bias; worst where
   training data is thin (below ~20 % SOC; Day 7 went to 2.85 V/cell, outside the OCV table).
 - Recommended for WSC 2027: fix `Pack_Current`/`SOC_Ah` logging (true reference), log a full charge and a rest
