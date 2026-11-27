@@ -1,4 +1,6 @@
-# LSTM for live SOC / voltage-curve estimation: literature and proposed scope (future work, WSC 2027)
+# LSTM for live SOC / voltage-curve estimation: literature and proposed scope
+
+**Implemented and tested on the Sasol data: see `sasol_analysis/lstm_soc/README.md`.**
 
 Goal: estimate the battery state of charge (and the voltage-vs-SOC curve) live from what the car logs,
 so the strategist sees remaining energy during a stage instead of relying on the planned SOC trajectory.

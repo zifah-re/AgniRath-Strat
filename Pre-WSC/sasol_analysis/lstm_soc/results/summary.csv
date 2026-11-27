@@ -1,0 +1,8 @@
+method,rmse,mae,max_abs
+Voltage lookup (OCV + IR),3.7,2.74,14.72
+Coulomb counting (live start),4.29,3.51,6.81
+"Coulomb counting, corrupted current",4.29,3.59,7.75
+LSTM,5.14,4.17,15.5
+"LSTM, corrupted current",5.19,4.21,15.63
+Hybrid: voltage lookup + LSTM correction,5.46,4.22,18.33
+"Hybrid, corrupted current",5.51,4.25,18.46

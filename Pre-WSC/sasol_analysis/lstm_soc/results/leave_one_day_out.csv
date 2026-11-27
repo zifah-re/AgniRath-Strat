@@ -1,0 +1,50 @@
+test_day,method,hours,rmse,mae,max_abs
+1,Hybrid: voltage lookup + LSTM correction,6.411,3.433,2.518,14.522
+1,"Hybrid, corrupted current",6.411,3.403,2.492,14.304
+1,LSTM,6.411,2.97,2.326,11.054
+1,"LSTM, corrupted current",6.411,3.023,2.398,10.819
+1,Coulomb counting (live start),6.411,0.834,0.631,3.774
+1,"Coulomb counting, corrupted current",6.411,1.74,1.433,3.767
+1,Voltage lookup (OCV + IR),6.411,3.319,2.337,17.648
+2,Hybrid: voltage lookup + LSTM correction,5.331,6.833,5.504,21.581
+2,"Hybrid, corrupted current",5.331,6.827,5.52,21.633
+2,LSTM,5.331,7.897,6.067,23.175
+2,"LSTM, corrupted current",5.331,7.905,6.054,23.21
+2,Coulomb counting (live start),5.331,7.165,5.887,9.176
+2,"Coulomb counting, corrupted current",5.331,5.816,4.937,9.177
+2,Voltage lookup (OCV + IR),5.331,4.59,3.633,13.487
+3,Hybrid: voltage lookup + LSTM correction,7.042,5.639,4.741,15.996
+3,"Hybrid, corrupted current",7.042,5.615,4.665,16.099
+3,LSTM,7.042,6.159,5.07,18.314
+3,"LSTM, corrupted current",7.042,6.119,5.016,18.322
+3,Coulomb counting (live start),7.042,7.942,4.887,18.236
+3,"Coulomb counting, corrupted current",7.042,7.77,5.589,18.23
+3,Voltage lookup (OCV + IR),7.042,4.611,2.979,18.705
+5,Hybrid: voltage lookup + LSTM correction,4.083,2.983,2.543,10.618
+5,"Hybrid, corrupted current",4.083,2.982,2.534,10.728
+5,LSTM,4.083,3.653,3.182,10.385
+5,"LSTM, corrupted current",4.083,3.587,3.12,10.566
+5,Coulomb counting (live start),4.083,4.038,3.809,4.713
+5,"Coulomb counting, corrupted current",4.083,4.802,4.473,7.075
+5,Voltage lookup (OCV + IR),4.083,4.205,3.134,14.897
+6,Hybrid: voltage lookup + LSTM correction,1.639,1.846,1.506,5.271
+6,"Hybrid, corrupted current",1.639,1.97,1.645,5.302
+6,LSTM,1.639,1.932,1.476,4.616
+6,"LSTM, corrupted current",1.639,2.01,1.534,4.763
+6,Coulomb counting (live start),1.639,1.29,1.29,1.29
+6,"Coulomb counting, corrupted current",1.639,2.712,2.628,3.789
+6,Voltage lookup (OCV + IR),1.639,1.51,1.122,7.767
+7,Hybrid: voltage lookup + LSTM correction,3.156,12.873,9.202,48.61
+7,"Hybrid, corrupted current",3.156,12.846,9.154,48.522
+7,LSTM,3.156,8.824,7.461,28.355
+7,"LSTM, corrupted current",3.156,8.968,7.586,28.9
+7,Coulomb counting (live start),3.156,4.586,3.881,6.273
+7,"Coulomb counting, corrupted current",3.156,5.289,4.577,8.052
+7,Voltage lookup (OCV + IR),3.156,3.983,3.113,15.431
+8,Hybrid: voltage lookup + LSTM correction,2.653,4.624,3.505,11.736
+8,"Hybrid, corrupted current",2.653,4.948,3.725,12.663
+8,LSTM,2.653,4.56,3.578,12.572
+8,"LSTM, corrupted current",2.653,4.739,3.754,12.805
+8,Coulomb counting (live start),2.653,4.19,4.19,4.19
+8,"Coulomb counting, corrupted current",2.653,1.926,1.469,4.183
+8,Voltage lookup (OCV + IR),2.653,3.658,2.843,15.13
