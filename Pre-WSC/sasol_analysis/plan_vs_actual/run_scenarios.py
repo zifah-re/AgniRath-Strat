@@ -13,6 +13,8 @@ Scenarios (in order):
   3  old_day2_actual  original parameters, as_given routes, re-solve from Day 2 at the actual Day 2 start SOC,
                       solar 0.189: what the old model would have said on the morning of Day 2
   4  refined_day2_actual   same as 3 with the race-identified parameters and solar 0.17
+  5  refined_actual_s189   as 2 but solar 0.189: race drivetrain/road load only (0.17 also under-counts charging)
+  6  refined_day2_actual_s189   as 4 but solar 0.189
 
 Day 2 start SOC: 87 % by default. From the BMS cell voltages at 07:57 on 11 Sept (4.09 V per cell at rest):
 voltage lookup 88.6 %, fitted reference SOC 86.5 % (lstm_soc/soc_lstm.py). Override with --day2-soc.
@@ -59,6 +61,14 @@ def scenarios(day2_soc):
         ("refined_day2_actual", "refined",
          ["resolve", "--resume-day", "2", "--start-soc", str(day2_soc), "--variant", "as_given",
           "--solar-eff", "0.17"]),
+        # 5, 6: race drivetrain and road load, but the planned solar 0.189. The model uses one array
+        # efficiency for driving AND for charging at stops; 0.17 is the driving value (tilted at stops
+        # the array gave ~26 %), so 3 and 4 under-count charging. These isolate the drivetrain/road load.
+        ("refined_actual_s189", "refined",
+         ["resolve", "--resume-day", "1", "--start-soc", "100", "--variant", "as_given", "--solar-eff", "0.189"]),
+        ("refined_day2_actual_s189", "refined",
+         ["resolve", "--resume-day", "2", "--start-soc", str(day2_soc), "--variant", "as_given",
+          "--solar-eff", "0.189"]),
     ]
 
 
