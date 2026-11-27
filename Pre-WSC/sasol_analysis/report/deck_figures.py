@@ -104,8 +104,8 @@ def altitude():
     ax.plot(x, y, color=DEEP, lw=1.8)
     for xt, lab in ticks:
         ax.axvline(xt, color=LGREY, lw=1, zorder=0)
-        ax.text(xt + 12, 1950, lab, fontsize=14, color=GREY)
-    ax.set_ylim(0, 2100); ax.set_xlim(0, x[-1])
+        ax.text(xt + 12, 2120, lab, fontsize=14, color=GREY, va="center")
+    ax.set_ylim(0, 2250); ax.set_yticks([0, 500, 1000, 1500, 2000]); ax.set_xlim(0, x[-1])
     ax.set_xlabel("route distance, stages only (km)"); ax.set_ylabel("altitude (m)")
     save(fig, "altitude.png")
 
