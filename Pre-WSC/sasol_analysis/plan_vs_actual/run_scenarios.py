@@ -31,6 +31,7 @@ import csv
 import glob
 import json
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -112,7 +113,14 @@ def run_one(name, mode, args):
         if mode == "refined":
             json.dump(dict(identified=IDENTIFIED, args=args), open(OUT / f"{name}.params.json", "w"), indent=2)
     flag = ""
-    if mode != "demo":
+    text = open(log, encoding="utf-8", errors="replace").read()
+    if mode != "demo" and not new and re.search(r"feasible\s*:\s*False", text):
+        # The model saves no JSON when no legal plan exists; that is a result, not a crash.
+        row.update(converged="n/a", feasible=False)
+        m = re.findall(r"total=([\d.]+) km feasible=False", text)
+        row["total_km"] = f"infeasible (last try {m[-1]} km)" if m else "infeasible"
+        flag = "  <-- INFEASIBLE: no legal plan from this state, nothing saved"
+    elif mode != "demo":
         if rc != 0 or not new:
             flag = "  <-- FAILED, see log"
         elif row["converged"] is not True:
