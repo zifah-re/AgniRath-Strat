@@ -30,7 +30,7 @@ plt.rcParams.update({
 
 
 def save(fig, name):
-    fig.tight_layout()
+    fig.tight_layout(pad=1.6)
     fig.savefig(OUT / name, dpi=150)
     plt.close(fig)
 
