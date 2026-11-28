@@ -100,7 +100,7 @@ const s2 = [
   P("All four were met. The table gives the evidence."),
   table([2600, 5592, 1600], [
     ["Objective", "Result", "Met?"],
-    ["8-day plan under the rules", "3202 km, 43 loops, no trailering, every day inside the cut-off; about 9 min to solve. Deployed at Sasol 2026. The same solver re-plans the rest of a day from the current state.", "Yes"],
+    ["8-day plan under the rules", "3202 km, 43 loops, no trailering, every day inside the cut-off; about 9 min to solve. Deployed at Sasol 2026. The same solver re-plans the rest of a day from the current state in about 45 s on a laptop.", "Yes"],
     ["Plan vs actual", "3202 km planned, 1192.6 km driven, split by day and cause. The changed Day 2 and Day 3 routes were worth +56 km and -37 km.", "Yes"],
     ["Find the model error", "The model under-predicted motor energy by a third. Drivetrain efficiency was 0.76, not the assumed 0.95. The array gave 17 % while driving, not 24.5 %, because the canopy shades the front strings.", "Yes"],
     ["Refine, with before/after", "Battery energy used on the healthy days: 7.44 kWh measured. The original model predicted a small net gain (0.07 kWh); the refined model predicts 6.09 kWh used. Per-stage error fell from 626 Wh to 188 Wh.", "Yes"],
@@ -167,7 +167,7 @@ const s4 = [
     ["Refined, no canopy shading", "478 km, 5 loops", "about 67 km/h", "+176 km"],
   ]),
   gap(),
-  P("Run over all 8 days with the refined values, the planner found that some days could not be finished inside the rules even with no loops. In other words, the car as raced could not have driven the deployed plan, failures or not."),
+  P("Two optimiser fixes were made after the race: a day plan is now judged on its final simulated profile rather than on SLSQP\u2019s convergence flag, which had discarded up to half of the legal day plans, and the multi-day search re-centres instead of stopping after an infeasible first pass. With the same pre-race inputs the fixed optimiser converges and plans 3247 km, against the 3202 km deployed. Re-solved from Day 2 at the measured start SOC of 87 % on the routes actually issued, it plans 3130 km."),
   P("**Sensitivity.** Each parameter was moved by 10 % on the actual Day 1-3 driving. Drivetrain efficiency changed the energy used by 9-11 %, array output by 7 %, mass by 6 %, Crr by 4.6 % and CdA by 4.0 %. In the planner, 10 % lower drivetrain efficiency made Day 4 finish 29 minutes later. Regen efficiency hardly mattered."),
   P("**LSTM for SOC.** The mentor asked for an LSTM to estimate SOC in place of coulomb counting. The logger's SOC was stuck and pack current read zero, so a reference SOC was built from the BMS cell voltages and the measured currents (capacity 29.3 Ah, 41 mV fit). An LSTM (one layer, 32 units, three networks averaged) reads the last 10 minutes of voltage, current and temperature and outputs SOC. It needs no start SOC and does not drift:"),
   table([4600, 2000, 3192], [
