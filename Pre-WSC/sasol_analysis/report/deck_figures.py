@@ -227,6 +227,26 @@ def d2s2():
     save(fig, "d2s2.png")
 
 
+def day_error():
+    e = pd.read_csv(PVA / "energy_balance_by_stage.csv")
+    g = e.groupby("day")[["measured_bus_wh", "original_bus_wh", "refined_bus_wh"]].sum()
+    o = 100 * (g.original_bus_wh - g.measured_bus_wh) / g.measured_bus_wh
+    r = 100 * (g.refined_bus_wh - g.measured_bus_wh) / g.measured_bus_wh
+    x = np.arange(len(g))
+    fig, ax = plt.subplots(figsize=(10.0, 4.6))
+    ax.bar(x - .19, o, .36, color=LGREY, label="original model")
+    ax.bar(x + .19, r, .36, color=ORANGE, label="refined model")
+    for i, (a, b) in enumerate(zip(o, r)):
+        ax.text(i - .19, a - 2.5, f"{a:.0f}".replace("-", "\u2212"), ha="center", va="top", fontsize=12, color="#555")
+        ax.text(i + .19, b + (1.5 if b >= 0 else -2.5), f"{b:+.0f}".replace("-", "\u2212"), ha="center",
+                va="bottom" if b >= 0 else "top", fontsize=12, color=DEEP, weight="bold")
+    ax.axhline(0, color="#777", lw=1)
+    ax.set_xticks(x); ax.set_xticklabels([f"Day {d}" for d in g.index]); ax.tick_params(axis="x", length=0)
+    ax.set_ylabel("motor energy error (%)"); ax.set_ylim(-60, 30)
+    ax.legend(fontsize=13, loc="upper right", ncol=2)
+    save(fig, "day_error.png")
+
+
 def sensitivity():
     s = pd.read_csv(PVA / "sensitivity_energy.csv")
     s["mag"] = (s.energy_change_pct_plus10.abs() + s.energy_change_pct_minus10.abs()) / 2
@@ -265,7 +285,7 @@ def lstm_rmse():
 
 if __name__ == "__main__":
     which = sys.argv[1:] or ["route_map", "altitude", "plan_profile", "waterfall", "climb_eta", "shading",
-                             "energy_balance", "d2s2", "sensitivity", "lstm_rmse"]
+                             "energy_balance", "d2s2", "day_error", "sensitivity", "lstm_rmse"]
     for w in which:
         globals()[w]()
     print(sorted(p.name for p in OUT.glob("*.png")))

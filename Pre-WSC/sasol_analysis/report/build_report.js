@@ -34,6 +34,14 @@ const B = (t) => new Paragraph({ numbering: { reference: "bullets", level: 0 }, 
 const N = (t) => new Paragraph({ numbering: { reference: "numbers", level: 0 }, spacing: { after: 50 }, children: runs(t) });
 const EQ = (t) => new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 120 }, children: runs(t.replace(/ - /g, " \u2212 "), { italics: true }) });
 
+function eqImg(file, widthIn) {
+  const buf = fs.readFileSync(path.join(FIG, file));
+  const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
+  const wpx = Math.round(widthIn * 96);
+  return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 120 },
+    children: [new ImageRun({ type: "png", data: buf, transformation: { width: wpx, height: Math.round(wpx * h / w) },
+      altText: { title: "equation", description: "equation", name: file } })] });
+}
 function figure(file, caption, widthIn) {
   const buf = fs.readFileSync(path.join(FIG, file));
   const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
@@ -102,22 +110,23 @@ const s2 = [
     ["Objective", "Result", "Met?"],
     ["8-day plan under the rules", "3202 km, 43 loops, no trailering, every day inside the cut-off; about 9 min to solve. Deployed at Sasol 2026. The same solver re-plans the rest of a day from the current state in about 45 s on a laptop.", "Yes"],
     ["Plan vs actual", "3202 km planned, 1192.6 km driven, split by day and cause. The changed Day 2 and Day 3 routes were worth +56 km and -37 km.", "Yes"],
-    ["Find the model error", "The model under-predicted motor energy by a third. Drivetrain efficiency was 0.76, not the assumed 0.95. The array gave 17 % while driving, not 24.5 %, because the canopy shades the front strings.", "Yes"],
-    ["Refine, with before/after", "Battery energy used on the healthy days: 7.44 kWh measured. The original model predicted a small net gain (0.07 kWh); the refined model predicts 6.09 kWh used. Per-stage error fell from 626 Wh to 188 Wh.", "Yes"],
+    ["Find the model error", "The model under-predicted motor energy by a third. Drivetrain efficiency was 0.76, not the assumed 0.95. The array gave about 17 % while driving (26 % tilted at stops), not 24.5 %, because the canopy shades the front MPPTs.", "Yes"],
+    ["Refine, with before/after", "Motor energy error per day fell from 21-48 % (original) to 1-26 % (refined). Best case, Day 2: 25 % error down to 0.6 %; on Day 2 Stage 2 the refined model gives 2.65 kWh of battery energy against 2.70 kWh measured.", "Yes"],
     ["Sensitivity", "A 10 % change in drivetrain efficiency changes the energy used by 9-11 %, more than any other parameter.", "Yes"],
     ["LSTM for SOC (mentor's remark)", "Trained and tested on the race data. 4.6 % SOC error, no drift and no start SOC needed, but not yet better than a voltage lookup (3.7 %).", "Partly"],
   ]),
   gap(),
-  P("One point from the midterm needs correcting. The midterm put the whole shortfall down to failures on the car. The validation shows the plan itself was also optimistic. On Day 2, about half of the gap between plan and actual comes from the model and half from the failures."),
+  P("Most of the gap between the plan and the distance driven came from electrical and mechanical faults on the car. The post-race work used the race data to bring the model\u2019s car values in line with what the car actually did."),
 ];
 
 const s3 = [
   H1("3. Project Description"),
   H2("The Strategy Model"),
-  P("The model takes four inputs: the car config, the race rules config, the route data and the Solcast solar and wind forecast (Figure 1)."),
+  P("The model takes four inputs: the car config, the race rules config, the route data and the Solcast solar and wind forecast (Figure 1). Solcast irradiance and wind forecasts were extracted along the route, along with traffic data, for decisions on the day."),
   ...figure("architecture.png", "Figure 1. Model architecture.", 5.3),
   P("A force balance turns speed, gradient, wind and acceleration into battery power:"),
-  EQ("P_{net} = A η_{array} G - (F_{drag} + F_{roll} + F_{grade} + F_{acc}) v / η_{motor} - P_{idle}"),
+  eqImg("eq_power.png", 5.6),
+  P("Here I is the solar irradiance on the array, A the array area, v the road speed, v_air the speed of the car through the air (road speed plus headwind), θ the road grade angle and a the acceleration."),
   P("A simulator steps through each day on a 200 m grid and tracks time, SOC, stops and solar charging. The optimiser has three tiers (Figure 2):"),
   B("**Tier 1:** a coarse plan with one speed per stage gives a first guess of the start SOC for each day."),
   B("**Tier 2:** for every day and loop count, the single-day solver (genetic algorithm, then SLSQP) is run at a few start SOCs. This gives a per-day relation from start SOC to end SOC and finish time."),
@@ -125,12 +134,12 @@ const s3 = [
   ...figure("solver_flow.png", "Figure 2. Multi-day solver flow.", 5.5),
   P("During the race, the same single-day solver re-plans the rest of a day from the current SOC, clock time, distance done and loops left, and gives new speed targets, loops, finish time and end SOC."),
   H2("The Post-Race Validation"),
-  P("After the race a separate set of tools uses the car's telemetry to test the model. They match each log packet to the route, find the car's real parameters, check the solar array string by string and compare the battery energy the model predicts with what was measured. The logs had no GPS, altitude, accelerometer or working SOC, so all of this is built from speed, bus power, cell voltages, throttle, brake and MPPT readings."),
+  P("After the race a separate set of tools uses the car's telemetry to test the model. They match each log packet to the route, find the car's real parameters, check the solar array MPPT by MPPT and compare the battery energy the model predicts with what was measured. The logs had no GPS, altitude, accelerometer or working SOC, so all of this is built from speed, bus power, cell voltages, throttle, brake and MPPT readings."),
   H2("What Is Different"),
   B("**Three-tier decomposition.** Exact single-day solves sit inside an 8-day search, which would be far too slow to run directly. Splitting it into tiers makes a speed plan for every 10 km of an 8-day race solvable in about 9 minutes."),
   B("**Live re-planning.** The same single-day solver re-plans the rest of a day from the current state when the race does not go to plan."),
   B("**The model is tested against the race.** The car's real drivetrain efficiency, road load and array output were found from the race logs, with no GPS. Climbs were used to separate tyre losses from drivetrain losses."),
-  B("**Shading found from sun geometry.** The loss on each solar string was matched to the sun's direction relative to the car, which showed which front string sits on which side."),
+  B("**Shading found from sun geometry.** The loss on each MPPT was matched to the sun's direction relative to the car, which showed which front MPPT sits on which side."),
   B("**Reusable.** Car, rules and route are separate inputs, so the model carries over to WSC 2027."),
 ];
 
@@ -140,11 +149,12 @@ const s4 = [
   P("The physics model, the route, solar and wind pipeline and the single-day and multi-day optimisers were built and tuned. The race regulations were written as constraints. Car parameters came from track testing in India. The pre-race strategy (3202 km) was generated and used at Sasol 2026. This was covered in the midterm."),
   H2("Weeks 11-16: Testing the Model Against the Race"),
   P("**Plan vs actual.** The Sasol logs were cleaned and split by day and stage. Distance comes from integrating speed. Days 2 and 3 were planned on blind routes, so both days were re-solved on the planned and on the issued routes with the same code and the same solar settings as the deployed plan. Figure 3 splits the 2010 km shortfall into route changes and day-by-day losses."),
-  ...figure("waterfall.png", "Figure 3. From the deployed plan to the distance driven.", 6.4),
+  ...figure("r_waterfall.png", "Figure 3. From the deployed plan to the distance driven. Orange: distance not driven relative to that day\u2019s plan, due to electrical and mechanical faults.", 6.4),
   P("**Validation.** Running the model on the speeds the car actually drove, it predicted only 0.67 of the measured motor energy (13.3 kWh against 19.8 kWh over nine stages)."),
   P("**Diagnosis.** Without GPS, the position from integrated speed drifted away from the route, so the gradient read from the route was often wrong. Each kilometre of log was shifted along the route until the bus power best matched the grade pattern. This raised the correlation between power and grade from 0.03-0.36 to 0.40-0.84 on 13 of 14 stages."),
   P("Packet-by-packet fits still gave unstable values, so the parameters were found from energy over 2 km stretches of steady driving (162 stretches on Days 1, 2, 3, 6 and 7, the days the car had no mechanical fault). Over each stretch:"),
-  EQ("E_{bus} η = C_{rr} m g D + C_{d}A Σ ½ρ v_{air}² v Δt + m g Δh + ΔKE"),
+  eqImg("eq_energy.png", 5.4),
+  P("Here D is the stretch length, \u0394h the height gained, \u0394KE the change in kinetic energy, \u03c1 the air density on that stretch and v_air the speed of the car through the air."),
   P("Air density comes from altitude and temperature, wind from Solcast along the car's heading and the climb from the route altitude at the two ends. Climbs separate the causes: tyres cannot make a climb cost more, but a drivetrain loss does."),
   table([3000, 2200, 2400, 2192], [
     ["Parameter", "Track testing", "Sasol data", "Range (5-95 %)"],
@@ -154,11 +164,12 @@ const s4 = [
   ]),
   gap(),
   P("The road load from track testing holds up. The drivetrain efficiency does not: it was an assumed value, and the race data puts it at 0.76 whichever day is left out (Figure 4). On the 101 flat stretches (average 61 km/h) the bus drew 1100 W, against the 880 W estimate for 60 km/h. Thinner air on the highveld and the measured wind would have lowered that figure, not raised it. The logs also showed that regen only happens when cruise control holds speed downhill. Coasting and braking recover nothing."),
-  ...figure("climb_eta.png", "Figure 4. Drivetrain efficiency needed to match the measured energy, by road grade.", 6.4),
-  P("**Solar array.** Array power was compared with Solcast irradiance at the car's position. On clear days the whole array gave 15-17 % while driving. The best single string gave about 23 % and the array tilted at the sun at stops gave about 26 %. The loss is shading. When the sun is on the car's right, string D drops to 12-31 % of the best string; when it is on the left, string C drops to 29-57 % (Figure 5). So D is the front-left string and C the front-right, both shaded by the canopy."),
-  ...figure("shading.png", "Figure 5. Output of each solar string against the sun's direction relative to the car.", 6.4),
-  P("**Refinement.** The model core was left unchanged and was run with the refined values (drivetrain efficiency 0.77, Crr 0.0103 and CdA 0.126 as fitted under the model's own air assumptions, array 17 %, idle 9 W). On the healthy days the car used 7.44 kWh of battery energy. The original model predicted a small net gain of 0.07 kWh; the refined model predicts 6.09 kWh (Figure 6). On the days mechanical C broke (5 and 8) the car still used 12-14 % more than the refined model."),
-  ...figure("energy_balance.png", "Figure 6. Battery energy used per stage on the healthy days: measured, original and refined model.", 6.4),
+  ...figure("r_climb_eta.png", "Figure 4. Drivetrain efficiency needed to match the measured energy, by road grade.", 6.4),
+  P("**Solar array.** Array power was compared with Solcast irradiance at the car's position. On clear days the whole array gave 15-17 % while driving. The best single MPPT gave about 23 % and the array tilted at the sun at stops gave about 26 %, so the cells are fine and the loss is shading. When the sun is on the car's right, MPPT D drops to 12-31 % of the best MPPT; when it is on the left, MPPT C drops to 29-57 % (Figure 5). So D is the front-left MPPT and C the front-right, each shaded by the canopy when it is on the side away from the sun."),
+  ...figure("r_shading.png", "Figure 5. Output of each MPPT, relative to the best MPPT, against the sun's direction relative to the car.", 6.4),
+  P("**Refinement.** The model core was left unchanged and was run with the refined values (drivetrain efficiency 0.77, Crr 0.0103 and CdA 0.126 as fitted under the model's own air assumptions, array 17 %, idle 9 W). The original model under-predicted the motor energy on every day, by 21-48 %. With the refined values the error is 1-26 %, and on the best day, Day 2, it falls from 25 % to 0.6 % (Figure 6). On Day 2 Stage 2 (219.5 km) the car used 2.70 kWh of battery energy; the original model said 1.21 kWh and the refined model says 2.65 kWh (Figure 7)."),
+  ...figure("r_day_error.png", "Figure 6. Motor energy error per day against the measured value: original and refined model.", 6.2),
+  ...figure("r_d2s2.png", "Figure 7. Battery energy used on Day 2 Stage 2: measured, original and refined model.", 4.2),
   P("Re-planning Day 2 on the issued route from 90 % SOC:"),
   table([3800, 2400, 1800, 1792], [
     ["Parameters", "Plan", "Speed", "vs 302 km driven"],
@@ -178,7 +189,6 @@ const s4 = [
   ]),
   gap(),
   P("The LSTM does not yet beat the voltage lookup, because the reference itself is built from the same voltage curve and there are only six days to train on. A working pack current sensor and logged full charges would give a true reference."),
-  P("**Software.** The model ran slowly on the team laptop. The cause was a rolling power window in the simulator that re-summed its whole history at every step. Fixing it made solves 1.9 times faster with identical results."),
   H2("Changes from the Weekly Plan"),
   B("The model's parameters were not changed in code. The refined values are applied when the model is run, so the core stays the same."),
   B("The SOC comparison was done as a battery energy balance, because SOC was not logged."),
@@ -195,11 +205,11 @@ const s5 = [
   B("**Findings for WSC 2027:**"),
   table([4300, 5492], [
     ["Finding", "Action"],
-    ["Drivetrain efficiency is 0.76, not 0.95", "Measure motor and controller efficiency on a bench; plan with the measured value"],
-    ["Canopy shades the front strings (about 70 km on Day 2)", "Rework canopy or string layout; plan with 17 % while driving"],
-    ["Position, altitude and battery state had to be rebuilt from the logs", "Log GPS position and altitude, fix the pack-current sensor (it read zero) and the BMS SOC (it stayed stuck); add a gradient profiler, as the mentor suggested"],
-    ["One array efficiency hides string-by-string losses", "Build a per-MPPT solar model from each string's measured efficiency, in place of one array value and full car and sun-angle geometry"],
-    ["Wind and irradiance are modelled, not measured", "Build the weather station"],
+    ["Drivetrain efficiency is 0.76, not the assumed 0.95", "Bench-test the motor and controller across speed and torque, and plan with the measured map; until then, plan with 0.76"],
+    ["One array efficiency hides losses on individual MPPTs", "Build a per-MPPT solar model from each MPPT\u2019s measured efficiency against irradiance, in place of one array value with full car and sun-angle geometry"],
+    ["Traffic is used on the day but not in the plan", "Feed the traffic data we already collect, expected slow-downs through towns and roadworks, into the speed plan so it plans with traffic rather than only around it"],
+    ["Position, altitude and battery state had to be rebuilt from the logs", "Log GPS position and altitude, fix the pack-current sensor (it read zero) and the BMS SOC (it stayed stuck), and add a gradient profiler, as the mentor suggested"],
+    ["The LSTM reference SOC comes from the voltage curve itself", "Retrain the LSTM on a true SOC reference once pack current and full charges are logged"],
   ]),
   gap(),
   H2("Skills Gained"),
