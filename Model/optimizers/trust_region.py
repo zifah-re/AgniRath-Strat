@@ -452,6 +452,19 @@ def optimize(routes: list, car: CarState, solar_providers: dict, wind_providers:
                 return _package(result, plans, car, converged=True,
                                 iterations=it + 1, history=history, start_day=start_day)
             s_center = s_refined.copy()
+        elif last_feasible is None and it + 1 < max_iters:
+            # BUGFIX (post-Sasol scenario runs): with no feasible plan yet,
+            # the old code gave up after the first pass, so a poor Tier 1
+            # first guess (e.g. Day 2 centred at 27 % SOC) was reported as
+            # "the race cannot be finished". Re-centre on Tier 3's refined
+            # start SOCs (keeping the old centre where Tier 3 gave none) and
+            # try again, within the same max_iters budget.
+            fresh = np.where(np.isfinite(s_refined), s_refined, s_center)
+            logger.warning(
+                "trust-region it=%d produced an INFEASIBLE allocation "
+                "(total=%.1f km) with no feasible plan yet — re-centring and "
+                "trying again.", it, result["total_distance_km"])
+            s_center = fresh.copy()
         else:
             logger.warning(
                 "trust-region it=%d produced an INFEASIBLE allocation "

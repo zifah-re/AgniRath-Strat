@@ -1185,8 +1185,19 @@ def solve(route: Route, car: CarState, solar_provider, wind_provider,
         and peak_soc_pct <= _eff_ceiling + _tol
         and final_eval.final_soc_pct >= alpha_next_day_pct - _tol
         and final_eval.total_time_s <= allowed_time_s + _tol
-        and bool(slsqp_result.success)
     )
+    # BUGFIX (post-Sasol scenario runs): SLSQP's success flag is NOT a
+    # feasibility test. It is capped at SLSQP_MAX_ITER=20 and often stops early
+    # ("Iteration limit reached", "Positive directional derivative") on a
+    # profile that already meets every constraint. Requiring it threw away
+    # 13-48 % of legal day plans and made Tier 3 report whole races
+    # infeasible. Feasibility is judged on the final, integer-projected,
+    # re-simulated profile above; the flag is kept as a diagnostic.
+    if feasible and not bool(slsqp_result.success):
+        logger.info(
+            "Day %d solve(): SLSQP stopped early (%s) but the final profile meets "
+            "every constraint; accepted.", day_index + 1,
+            getattr(slsqp_result, "message", ""))
     if not feasible:
         logger.error(
             "Day %d solve() INFEASIBLE: trough=%.2f%% (floor=%.2f%%) "
