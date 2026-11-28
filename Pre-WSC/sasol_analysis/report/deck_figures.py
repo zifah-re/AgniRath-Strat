@@ -136,10 +136,11 @@ def plan_profile():
 
 # ---------- race vs plan ----------
 def waterfall():
+    from matplotlib.patches import Patch
     t = pd.read_csv(PVA / "plan_vs_actual_by_day.csv").set_index("day")
     route = {d: t.asg_km[d] - t.blind_km[d] for d in (2, 3)}
-    steps = [("Plan", 3202.0, "total")]
-    steps += [(f"D{d}\nroute", route[d], "route") for d in (2, 3)]
+    steps = [("Planned", 3202.0, "total")]
+    steps += [(f"Day {d}\nreroute", route[d], "route") for d in (2, 3)]
     for d in range(1, 9):
         steps.append((f"Day {d}", t.actual_km[d] - (t.plan_km[d] + route.get(d, 0.0)), "loss"))
     steps.append(("Driven", float(t.actual_km.sum()), "total"))
@@ -148,15 +149,19 @@ def waterfall():
     for i, (lab, v, kind) in enumerate(steps):
         if kind == "total":
             ax.bar(i, v, color=INK, width=.64)
-            ax.text(i, v + 55, f"{v:.0f}", ha="center", fontsize=17, weight="bold")
+            ax.text(i, v + 55, f"{v:.0f} km", ha="center", fontsize=15, weight="bold")
             run = v
         else:
             ax.bar(i, abs(v), bottom=run + min(v, 0), color=LGREY if kind == "route" else ORANGE, width=.64)
-            ax.text(i, run + max(v, 0) + 55, f"{v:+.0f}".replace("-", "−"), ha="center", fontsize=15, color="#444")
+            ax.text(i, run + max(v, 0) + 55, f"{v:+.0f}".replace("-", "\u2212"), ha="center", fontsize=14, color="#444")
             run += v
-    ax.set_xticks(range(len(steps))); ax.set_xticklabels([s[0] for s in steps], fontsize=14)
+    ax.set_xticks(range(len(steps))); ax.set_xticklabels([s[0] for s in steps], fontsize=13)
     ax.tick_params(axis="x", length=0)
-    ax.set_ylabel("km"); ax.set_ylim(0, 3600)
+    ax.set_ylabel("distance (km)"); ax.set_ylim(0, 3700)
+    ax.legend(handles=[Patch(color=INK, label="planned / driven total"),
+                       Patch(color=LGREY, label="route changed by the organisers"),
+                       Patch(color=ORANGE, label="km not driven: electrical and mechanical faults")],
+              fontsize=13, loc="upper right", ncol=1)
     save(fig, "waterfall.png")
 
 
@@ -180,14 +185,15 @@ def climb_eta():
 def shading():
     s = pd.read_csv(PVA / "shading_by_relaz.csv")
     fig, ax = plt.subplots(figsize=(10.0, 4.8))
-    sty = {"A": (GREY, "-", "o", "A rear left"), "B": (LGREY, "-", "o", "B rear right"),
-           "C": (DEEP, "--", "s", "C front right"), "D": (ORANGE, "-", "s", "D front left")}
+    sty = {"A": (GREY, "-", "o", "MPPT A, rear left"), "B": (LGREY, "-", "o", "MPPT B, rear right"),
+           "C": (DEEP, "--", "s", "MPPT C, front right"), "D": (ORANGE, "-", "s", "MPPT D, front left")}
     for c, (col, ls, mk, lab) in sty.items():
         ax.plot(s.bin, s[f"{c}_mean"], ls=ls, marker=mk, color=col, lw=2.4, ms=7, label=lab)
     ax.set_xticks([-180, -90, 0, 90, 180])
     ax.set_xticklabels(["behind", "sun on left", "ahead", "sun on right", "behind"])
-    ax.set_ylabel("output / best string"); ax.set_ylim(0, 1.3); ax.set_yticks([0, .25, .5, .75, 1.0])
-    ax.legend(fontsize=14, ncol=4, loc="upper center")
+    ax.set_ylabel("output / best MPPT"); ax.set_ylim(0, 1.3); ax.set_yticks([0, .25, .5, .75, 1.0])
+    ax.legend(fontsize=13, ncol=2, loc="upper center")
+    ax.set_ylim(0, 1.45)
     save(fig, "shading.png")
 
 
@@ -205,6 +211,20 @@ def energy_balance():
     ax.set_ylabel("kWh used")
     ax.legend(fontsize=14, ncol=3, loc="upper right")
     save(fig, "energy_balance.png")
+
+
+def d2s2():
+    e = pd.read_csv(PVA / "energy_balance_by_stage.csv")
+    r = e[(e.day == 2) & (e.phase == "stage2")].iloc[0]
+    vals = [-r.measured_net_wh / 1000, -r.original_net_wh / 1000, -r.refined_net_wh / 1000]
+    labs = ["measured\non the car", "original\nmodel", "refined\nmodel"]
+    fig, ax = plt.subplots(figsize=(8.0, 5.2))
+    ax.bar(range(3), vals, color=[INK, LGREY, ORANGE], width=.6)
+    for i, v in enumerate(vals):
+        ax.text(i, v + 0.06, f"{v:.2f} kWh", ha="center", fontsize=17, weight="bold")
+    ax.set_xticks(range(3)); ax.set_xticklabels(labs, fontsize=15); ax.tick_params(axis="x", length=0)
+    ax.set_ylabel("battery energy used (kWh)"); ax.set_ylim(0, 3.3)
+    save(fig, "d2s2.png")
 
 
 def sensitivity():
@@ -245,7 +265,7 @@ def lstm_rmse():
 
 if __name__ == "__main__":
     which = sys.argv[1:] or ["route_map", "altitude", "plan_profile", "waterfall", "climb_eta", "shading",
-                             "energy_balance", "sensitivity", "lstm_rmse"]
+                             "energy_balance", "d2s2", "sensitivity", "lstm_rmse"]
     for w in which:
         globals()[w]()
     print(sorted(p.name for p in OUT.glob("*.png")))

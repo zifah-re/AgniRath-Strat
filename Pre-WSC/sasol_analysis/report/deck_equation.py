@@ -42,7 +42,7 @@ if __name__ == "__main__":
     equation([
         (r"$P_{\mathrm{bat}}$", "", ORANGE),
         (r"$=$", "", WHITE),
-        (r"$\eta_{\mathrm{array}}\,A\,G$", "sun in", WHITE),
+        (r"$\eta_{\mathrm{array}}\,A\,I$", "sun in", WHITE),
         (r"$-\;(\frac{1}{2}\rho\, C_dA\, v_{\mathrm{air}}^2$", "drag", WHITE),
         (r"$+\;C_{rr}\, m g$", "tyres", WHITE),
         (r"$+\;m g \sin\theta$", "hills", WHITE),
